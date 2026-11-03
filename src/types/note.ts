@@ -20,3 +20,4 @@ export interface Folder {
 export type ViewMode = 'list' | 'gallery';
 
 export type FilterFolderId = string; // folder ID or special like 'all' | 'trash' | 'pinned'
+

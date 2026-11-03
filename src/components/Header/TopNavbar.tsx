@@ -201,3 +201,4 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({ onToggleChecklist, onForma
     </header>
   );
 };
+

@@ -55,3 +55,4 @@ To distribute as native desktop applications:
    npm install --save-dev electron electron-builder
    ```
 3. **Cloud Sync:** Optional backend sync using Supabase, Firebase, or WebDAV for multi-device sync.
+

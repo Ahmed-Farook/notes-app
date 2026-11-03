@@ -116,3 +116,4 @@ export const NotesList: React.FC = () => {
     </section>
   );
 };
+

@@ -165,3 +165,4 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
     </div>
   );
 };
+

@@ -226,3 +226,4 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible 
     </div>
   );
 };
+

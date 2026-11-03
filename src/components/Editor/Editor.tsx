@@ -177,3 +177,4 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     </div>
   );
 };
+

@@ -87,3 +87,4 @@ export const saveStoredFolders = (folders: Folder[]): void => {
     console.error('Failed to save folders to localStorage', err);
   }
 };
+
