@@ -17,6 +17,7 @@ export const UpdateBanner: React.FC<UpdateBannerProps> = ({
   const getActionText = () => {
     if (updateInfo.platform === 'android') return 'Download APK';
     if (updateInfo.platform === 'mac') return 'Download DMG';
+    if (updateInfo.platform === 'windows') return 'Download EXE';
     return 'Update';
   };
 
@@ -44,7 +45,8 @@ export const UpdateBanner: React.FC<UpdateBannerProps> = ({
           View Changes
         </button>
 
-        {updateInfo.platform === 'mac' && Boolean(window.electronAPI?.installUpdate) ? (
+        {(updateInfo.platform === 'mac' || updateInfo.platform === 'windows') &&
+        Boolean(window.electronAPI?.installUpdate) ? (
           <button
             onClick={() => {
               triggerHaptic();

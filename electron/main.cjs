@@ -8,17 +8,19 @@ let mainWindow = null;
 const isDev = !app.isPackaged && process.env.VITE_DEV_SERVER === 'true';
 
 function createWindow() {
+  const isMac = process.platform === 'darwin';
+
   mainWindow = new BrowserWindow({
     width: 1120,
     height: 760,
     minWidth: 720,
     minHeight: 480,
     title: 'Apple Notes',
-    titleBarStyle: 'hiddenInset', // Mac native traffic lights inside toolbar
-    trafficLightPosition: { x: 16, y: 14 },
-    vibrancy: 'under-window',
-    visualEffectState: 'active',
-    backgroundColor: '#00000000',
+    titleBarStyle: isMac ? 'hiddenInset' : 'default',
+    trafficLightPosition: isMac ? { x: 16, y: 14 } : undefined,
+    vibrancy: isMac ? 'under-window' : undefined,
+    visualEffectState: isMac ? 'active' : undefined,
+    backgroundColor: isMac ? '#00000000' : '#1e1e1e',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -144,9 +146,55 @@ function buildMenu() {
   Menu.setApplicationMenu(menu);
 }
 
-// In-app seamless auto-updater for macOS
+// In-app seamless auto-updater for macOS and Windows
 ipcMain.handle('updater:install-update', async (_event, downloadUrl) => {
   if (!downloadUrl) throw new Error('No download URL provided');
+
+  if (process.platform === 'win32') {
+    const tempExePath = path.join(os.tmpdir(), `Apple-Notes-Setup-${Date.now()}.exe`);
+    return new Promise((resolve, reject) => {
+      const curl = spawn('curl', ['-L', '--progress-bar', '-o', tempExePath, downloadUrl]);
+
+      curl.stderr.on('data', (chunk) => {
+        const text = chunk.toString();
+        const match = text.match(/(\d{1,3}(?:\.\d+)?)\s*%/);
+        if (match) {
+          const percent = Math.min(100, Math.max(0, parseFloat(match[1])));
+          mainWindow?.webContents.send('updater:progress', percent);
+        }
+      });
+
+      curl.on('error', (err) => {
+        reject(new Error(`Download failed: ${err.message}`));
+      });
+
+      curl.on('close', (code) => {
+        if (code !== 0) {
+          return reject(new Error(`Download failed with curl code ${code}`));
+        }
+        mainWindow?.webContents.send('updater:progress', 100);
+
+        try {
+          const installer = spawn(tempExePath, [], {
+            detached: true,
+            stdio: 'ignore',
+          });
+          installer.unref();
+
+          resolve({ success: true });
+          setTimeout(() => {
+            app.quit();
+          }, 400);
+        } catch (err) {
+          reject(err);
+        }
+      });
+    });
+  }
+
+  if (process.platform !== 'darwin') {
+    throw new Error('Auto-update is currently supported on macOS and Windows');
+  }
 
   const tempDmgPath = path.join(os.tmpdir(), `Apple-Notes-update-${Date.now()}.dmg`);
   const scriptPath = path.join(os.tmpdir(), `apply-apple-notes-update-${Date.now()}.sh`);

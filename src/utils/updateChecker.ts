@@ -3,7 +3,7 @@
 export const CURRENT_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.1.0';
 export const GITHUB_REPO = 'Ahmed-Farook/notes-app';
 
-export type PlatformType = 'mac' | 'android' | 'web';
+export type PlatformType = 'mac' | 'windows' | 'android' | 'web';
 
 export interface UpdateInfo {
   currentVersion: string;
@@ -30,6 +30,11 @@ export function getPlatform(): PlatformType {
   // Check macOS Electron
   if (win.electronAPI?.isMac || (/Electron/i.test(navigator.userAgent) && /Mac/i.test(navigator.userAgent))) {
     return 'mac';
+  }
+
+  // Check Windows Electron
+  if (win.electronAPI?.platform === 'win32' || (/Electron/i.test(navigator.userAgent) && /Win/i.test(navigator.userAgent))) {
+    return 'windows';
   }
 
   return 'web';
@@ -131,6 +136,12 @@ export async function checkForUpdates(overrideToken?: string): Promise<UpdateInf
       if (dmgAsset) {
         downloadUrl = dmgAsset.browser_download_url;
         assetName = dmgAsset.name;
+      }
+    } else if (platform === 'windows') {
+      const exeAsset = data.assets.find((a: any) => a.name.endsWith('.exe'));
+      if (exeAsset) {
+        downloadUrl = exeAsset.browser_download_url;
+        assetName = exeAsset.name;
       }
     }
   }

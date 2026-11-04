@@ -1,4 +1,4 @@
-name: Build & Release (Android & macOS)
+name: Build & Release (Android, macOS & Windows)
 
 on:
   push:
@@ -123,6 +123,61 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v${{ steps.meta.outputs.version }}"
-          gh release view "$TAG" || gh release create "$TAG" --title "Apple Notes $TAG" --notes "Release $TAG for Android and macOS"
+          gh release view "$TAG" || gh release create "$TAG" --title "Apple Notes $TAG" --notes "Release $TAG for Windows, macOS, and Android"
           gh release upload "$TAG" "Apple-Notes-${{ steps.meta.outputs.version }}-arm64.dmg" --clobber
+
+  build-win:
+    name: Build Windows Setup EXE
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Node Dependencies
+        run: npm ci
+
+      - name: Extract Version
+        id: meta
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build Web Application
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://fbkwajfibdbqbzfhaycx.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'sb_publishable_ID7MzXfTFabTtFPApRsYbg_SgpkigOH' }}
+        run: npm run build
+
+      - name: Package Windows Installer
+        run: npx electron-builder --win nsis --x64 --publish never
+
+      - name: Rename and Prepare EXE
+        shell: bash
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          find release -name "*.exe" -exec cp {} "Apple-Notes-Setup-${VERSION}.exe" \;
+          ls -lh Apple-Notes-Setup-${VERSION}.exe
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Apple-Notes-${{ steps.meta.outputs.version }}-win-exe
+          path: Apple-Notes-Setup-${{ steps.meta.outputs.version }}.exe
+
+      - name: Upload to GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.meta.outputs.version }}"
+          gh release view "$TAG" || gh release create "$TAG" --title "Apple Notes $TAG" --notes "Release $TAG for Windows, macOS, and Android"
+          gh release upload "$TAG" "Apple-Notes-Setup-${{ steps.meta.outputs.version }}.exe" --clobber
 

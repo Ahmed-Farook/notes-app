@@ -1,14 +1,15 @@
 # Cross-Platform Notes App (Apple Notes Inspired) 📝
 
-A lightweight, modern, cross-platform notes application inspired by Apple Notes. Built to run seamlessly on **macOS**, **Android**, and the **Web** with **free real-time cloud sync** and **local-first 0ms speed**.
+A lightweight, modern, cross-platform notes application inspired by Apple Notes. Built to run seamlessly on **macOS**, **Windows**, **Android**, and the **Web** with **free real-time cloud sync** and **local-first 0ms speed**.
 
 ---
 
 ## 📦 Downloads & Live App
 
 - **🌐 Live Web App (Vercel):** Deployable with 1-click on [Vercel](https://vercel.com)
-- **📱 Android APK:** Download [`Apple-Notes-*.apk`](https://github.com/Ahmed-Farook/notes-app/releases/latest) (~4.3 MB)
+- **🪟 Windows Setup (.exe):** Download [`Apple-Notes-Setup-*.exe`](https://github.com/Ahmed-Farook/notes-app/releases/latest) (~121 MB)
 - **💻 macOS DMG (Apple Silicon):** Download [`Apple-Notes-*-arm64.dmg`](https://github.com/Ahmed-Farook/notes-app/releases/latest) (~128 MB)
+- **📱 Android APK:** Download [`Apple-Notes-*.apk`](https://github.com/Ahmed-Farook/notes-app/releases/latest) (~4.3 MB)
 
 ---
 
@@ -71,7 +72,19 @@ npm run mac:start
 # 3. Package as a native macOS .dmg bundle
 npm run mac:build
 ```
-The compiled macOS app is placed in `release/Apple Notes-0.1.0-arm64.dmg`.
+The compiled macOS app is placed in `release/Apple Notes-0.2.0-arm64.dmg`.
+
+---
+
+## 🪟 Running & Building on Windows (.exe)
+
+Package as a standalone Windows Nullsoft (NSIS) installer:
+
+```bash
+# Package as a native Windows setup installer (.exe)
+npm run win:build
+```
+The compiled Windows setup installer is placed in `release/Apple Notes Setup 0.2.0.exe`.
 
 ---
 

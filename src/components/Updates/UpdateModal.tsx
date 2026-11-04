@@ -80,6 +80,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     if (!updateInfo) return 'Download Update';
     if (updateInfo.platform === 'android') return 'Download APK for Android';
     if (updateInfo.platform === 'mac') return 'Download DMG for macOS';
+    if (updateInfo.platform === 'windows') return 'Download EXE for Windows';
     return 'View GitHub Release';
   };
 
@@ -132,7 +133,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                 </p>
                 <p>
                   If this repository is <strong>Private</strong>, GitHub blocks unauthenticated
-                  checks. Making the repository <strong>Public</strong> on GitHub allows all your Mac &amp; Android users to check for updates seamlessly with 0 configuration.
+                  checks. Making the repository <strong>Public</strong> on GitHub allows all your Mac, Windows &amp; Android users to check for updates seamlessly with 0 configuration.
                 </p>
                 <button
                   type="button"
@@ -197,13 +198,16 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
 
               {/* Action Buttons */}
               <div className="pt-2 space-y-2">
-                {updateInfo.platform === 'mac' && Boolean(window.electronAPI?.installUpdate) ? (
+                {(updateInfo.platform === 'mac' || updateInfo.platform === 'windows') &&
+                Boolean(window.electronAPI?.installUpdate) ? (
                   isInstalling ? (
                     <div className="space-y-2.5 p-3.5 bg-amber-500/10 dark:bg-amber-500/15 rounded-xl border border-amber-500/25">
                       <div className="flex items-center justify-between text-xs font-semibold text-neutral-800 dark:text-neutral-100">
                         <span>
                           {installProgress >= 100
-                            ? 'Restarting Apple Notes...'
+                            ? updateInfo.platform === 'mac'
+                              ? 'Restarting Apple Notes...'
+                              : 'Launching installer...'
                             : 'Downloading & Updating...'}
                         </span>
                         <span className="font-mono text-apple-yellow">{Math.round(installProgress)}%</span>
@@ -215,8 +219,9 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                         />
                       </div>
                       <p className="text-[11px] text-neutral-500 dark:text-neutral-400 text-center">
-                        The app will automatically update in-place and restart with v
-                        {updateInfo.latestVersion}.
+                        {updateInfo.platform === 'mac'
+                          ? `The app will automatically update in-place and restart with v${updateInfo.latestVersion}.`
+                          : `The installer will launch automatically to update Apple Notes to v${updateInfo.latestVersion}.`}
                       </p>
                     </div>
                   ) : (
@@ -226,7 +231,11 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                         className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-apple-yellow hover:bg-apple-yellowHover active:scale-98 text-white font-semibold text-xs shadow-md transition-all"
                       >
                         <Zap size={16} />
-                        <span>Update &amp; Restart Now</span>
+                        <span>
+                          {updateInfo.platform === 'mac'
+                            ? 'Update & Restart Now'
+                            : 'Download & Install Update'}
+                        </span>
                       </button>
 
                       {installError && (
@@ -240,7 +249,9 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                           rel="noopener noreferrer"
                           className="text-[10px] text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 underline"
                         >
-                          Or manually download DMG
+                          {updateInfo.platform === 'mac'
+                            ? 'Or manually download DMG'
+                            : 'Or manually download EXE'}
                         </a>
                       </div>
                     </div>

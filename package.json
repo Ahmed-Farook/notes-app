@@ -12,6 +12,7 @@
     "mac:dev": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && VITE_DEV_SERVER=true electron electron/main.cjs\"",
     "mac:start": "electron electron/main.cjs",
     "mac:build": "npm run build && electron-builder --mac",
+    "win:build": "npm run build && electron-builder --win --publish never",
     "android:sync": "npm run build && npx cap sync android",
     "android:open": "npx cap open android",
     "android:build": "npm run build && npx cap sync android && cd android && ./gradlew assembleDebug"
@@ -32,6 +33,18 @@
       "target": [
         "dmg"
       ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Apple Notes"
     }
   },
   "dependencies": {
