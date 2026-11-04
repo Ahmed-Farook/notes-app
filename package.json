@@ -39,6 +39,7 @@
     "@capacitor/core": "^8.6.0",
     "@capacitor/haptics": "^8.0.2",
     "@capacitor/status-bar": "^8.0.4",
+    "@supabase/supabase-js": "^2.118.0",
     "@tiptap/extension-highlight": "^2.11.5",
     "@tiptap/extension-placeholder": "^2.11.5",
     "@tiptap/extension-task-item": "^2.11.5",

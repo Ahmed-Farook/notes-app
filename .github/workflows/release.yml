@@ -33,6 +33,9 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Build Web Application
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://fbkwajfibdbqbzfhaycx.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'sb_publishable_ID7MzXfTFabTtFPApRsYbg_SgpkigOH' }}
         run: npm run build
 
       - name: Sync Capacitor Android
@@ -95,6 +98,9 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Build Web Application
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://fbkwajfibdbqbzfhaycx.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'sb_publishable_ID7MzXfTFabTtFPApRsYbg_SgpkigOH' }}
         run: npm run build
 
       - name: Package macOS DMG

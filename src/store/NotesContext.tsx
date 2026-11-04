@@ -17,6 +17,22 @@ import {
   SYSTEM_FOLDERS,
 } from '../utils/storage';
 import { triggerHaptic } from '../utils/haptics';
+import { useAuth } from './AuthContext';
+import { supabase } from '../lib/supabase';
+import {
+  fetchUserNotes,
+  fetchUserFolders,
+  upsertNoteToCloud,
+  deleteNoteFromCloud,
+  upsertFolderToCloud,
+  deleteFolderFromCloud,
+  mergeNotes,
+  mergeFolders,
+  dbToNote,
+  dbToFolder,
+  DbNote,
+  DbFolder,
+} from '../utils/supabaseSync';
 
 interface NotesContextType {
   notes: Note[];
@@ -84,7 +100,112 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return 'light';
   });
 
+  const { user, setSyncStatus } = useAuth();
+  const notesRef = useRef(notes);
+  notesRef.current = notes;
+  const foldersRef = useRef(folders);
+  foldersRef.current = folders;
+  const cloudSaveTimers = useRef<Record<string, NodeJS.Timeout>>({});
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync with Supabase on user sign-in & listen to Realtime changes
+  useEffect(() => {
+    if (!user) return;
+
+    let isMounted = true;
+    setSyncStatus('syncing');
+
+    // 1. Initial hydration & bidirectional merge
+    const hydrateAndSync = async () => {
+      try {
+        const [remoteNotes, remoteFolders] = await Promise.all([
+          fetchUserNotes(),
+          fetchUserFolders(),
+        ]);
+
+        if (!isMounted) return;
+
+        const { merged: mergedNotes, toUpload: notesToUpload } = mergeNotes(
+          notesRef.current,
+          remoteNotes
+        );
+        const { merged: mergedFolders, toUpload: foldersToUpload } = mergeFolders(
+          foldersRef.current,
+          remoteFolders
+        );
+
+        setNotes(mergedNotes);
+        setFolders(mergedFolders);
+        setSyncStatus('synced');
+
+        // Upload any local items not yet in cloud
+        for (const n of notesToUpload) {
+          upsertNoteToCloud(n, user.id);
+        }
+        for (const f of foldersToUpload) {
+          upsertFolderToCloud(f, user.id);
+        }
+      } catch (err) {
+        console.warn('Sync error:', err);
+        setSyncStatus('offline');
+      }
+    };
+
+    hydrateAndSync();
+
+    // 2. Realtime WebSocket subscription
+    const channel = supabase
+      .channel('apple_notes_realtime_sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notes' }, (payload) => {
+        if (!isMounted) return;
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          const remoteNote = dbToNote(payload.new as DbNote);
+          setNotes(prev => {
+            const idx = prev.findIndex(n => n.id === remoteNote.id);
+            if (idx >= 0) {
+              if (remoteNote.updatedAt >= prev[idx].updatedAt) {
+                const copy = [...prev];
+                copy[idx] = remoteNote;
+                return copy;
+              }
+              return prev;
+            }
+            return [remoteNote, ...prev];
+          });
+        } else if (payload.eventType === 'DELETE') {
+          const deletedId = (payload.old as any)?.id;
+          if (deletedId) {
+            setNotes(prev => prev.filter(n => n.id !== deletedId));
+          }
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'folders' }, (payload) => {
+        if (!isMounted) return;
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          const remoteFolder = dbToFolder(payload.new as DbFolder);
+          setFolders(prev => {
+            const idx = prev.findIndex(f => f.id === remoteFolder.id);
+            if (idx >= 0) {
+              const copy = [...prev];
+              copy[idx] = remoteFolder;
+              return copy;
+            }
+            return [...prev, remoteFolder];
+          });
+        } else if (payload.eventType === 'DELETE') {
+          const deletedId = (payload.old as any)?.id;
+          if (deletedId) {
+            setFolders(prev => prev.filter(f => f.id !== deletedId));
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, [user, setSyncStatus]);
 
   // Apply dark mode class to html element
   useEffect(() => {
@@ -225,24 +346,40 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setNotes(prev => [newNote, ...prev]);
     setActiveNoteId(newNote.id);
     setMobileView('editor');
+
+    if (user) {
+      upsertNoteToCloud(newNote, user.id);
+    }
     return newNote;
-  }, [selectedFolderId]);
+  }, [selectedFolderId, user]);
 
   // Update note
   const updateNote = useCallback((id: string, updates: Partial<Note>) => {
     setNotes(prev =>
       prev.map(note => {
         if (note.id === id) {
-          return {
+          const updated: Note = {
             ...note,
             ...updates,
             updatedAt: Date.now(),
           };
+
+          if (user) {
+            if (cloudSaveTimers.current[id]) {
+              clearTimeout(cloudSaveTimers.current[id]);
+            }
+            cloudSaveTimers.current[id] = setTimeout(() => {
+              upsertNoteToCloud(updated, user.id);
+              delete cloudSaveTimers.current[id];
+            }, 500);
+          }
+
+          return updated;
         }
         return note;
       })
     );
-  }, []);
+  }, [user]);
 
   // Delete note
   const deleteNote = useCallback((id: string) => {
@@ -252,11 +389,16 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (!note) return prev;
 
       if (note.isTrash) {
+        if (user) {
+          deleteNoteFromCloud(id);
+        }
         return prev.filter(n => n.id !== id);
       } else {
-        return prev.map(n =>
-          n.id === id ? { ...n, isTrash: true, updatedAt: Date.now() } : n
-        );
+        const trashed: Note = { ...note, isTrash: true, updatedAt: Date.now() };
+        if (user) {
+          upsertNoteToCloud(trashed, user.id);
+        }
+        return prev.map(n => (n.id === id ? trashed : n));
       }
     });
 
@@ -267,11 +409,14 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         setMobileView('list');
       }
     }
-  }, [activeNoteId, filteredNotes]);
+  }, [activeNoteId, filteredNotes, user]);
 
   const permanentlyDeleteNote = useCallback((id: string) => {
     triggerHaptic();
     setNotes(prev => prev.filter(n => n.id !== id));
+    if (user) {
+      deleteNoteFromCloud(id);
+    }
     if (activeNoteId === id) {
       const remaining = filteredNotes.filter(n => n.id !== id);
       setActiveNoteId(remaining.length > 0 ? remaining[0].id : null);
@@ -279,27 +424,54 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         setMobileView('list');
       }
     }
-  }, [activeNoteId, filteredNotes]);
+  }, [activeNoteId, filteredNotes, user]);
 
   const restoreNote = useCallback((id: string) => {
     triggerHaptic();
     setNotes(prev =>
-      prev.map(n => (n.id === id ? { ...n, isTrash: false, updatedAt: Date.now() } : n))
+      prev.map(n => {
+        if (n.id === id) {
+          const restored: Note = { ...n, isTrash: false, updatedAt: Date.now() };
+          if (user) {
+            upsertNoteToCloud(restored, user.id);
+          }
+          return restored;
+        }
+        return n;
+      })
     );
-  }, []);
+  }, [user]);
 
   const togglePinNote = useCallback((id: string) => {
     triggerHaptic();
     setNotes(prev =>
-      prev.map(n => (n.id === id ? { ...n, isPinned: !n.isPinned } : n))
+      prev.map(n => {
+        if (n.id === id) {
+          const updated: Note = { ...n, isPinned: !n.isPinned, updatedAt: Date.now() };
+          if (user) {
+            upsertNoteToCloud(updated, user.id);
+          }
+          return updated;
+        }
+        return n;
+      })
     );
-  }, []);
+  }, [user]);
 
   const moveNoteToFolder = useCallback((noteId: string, folderId: string) => {
     setNotes(prev =>
-      prev.map(n => (n.id === noteId ? { ...n, folderId, updatedAt: Date.now() } : n))
+      prev.map(n => {
+        if (n.id === noteId) {
+          const updated: Note = { ...n, folderId, updatedAt: Date.now() };
+          if (user) {
+            upsertNoteToCloud(updated, user.id);
+          }
+          return updated;
+        }
+        return n;
+      })
     );
-  }, []);
+  }, [user]);
 
   const createFolder = useCallback((name: string) => {
     triggerHaptic();
@@ -311,7 +483,10 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
     setFolders(prev => [...prev, newFolder]);
     setSelectedFolderId(newFolder.id);
-  }, []);
+    if (user) {
+      upsertFolderToCloud(newFolder, user.id);
+    }
+  }, [user]);
 
   const deleteFolder = useCallback((id: string) => {
     triggerHaptic();
@@ -322,7 +497,10 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     if (selectedFolderId === id) {
       setSelectedFolderId('all');
     }
-  }, [selectedFolderId]);
+    if (user) {
+      deleteFolderFromCloud(id);
+    }
+  }, [selectedFolderId, user]);
 
   // Export current note
   const exportCurrentNote = useCallback((formatType: 'markdown' | 'txt' | 'html') => {

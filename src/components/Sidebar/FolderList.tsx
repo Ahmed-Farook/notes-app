@@ -9,8 +9,10 @@ import {
   X,
   Check,
   Sparkles,
+  Cloud,
 } from 'lucide-react';
 import { useNotes } from '../../store/NotesContext';
+import { useAuth } from '../../store/AuthContext';
 import { CURRENT_VERSION } from '../../utils/updateChecker';
 import { triggerHaptic } from '../../utils/haptics';
 
@@ -28,6 +30,7 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
     createFolder,
     deleteFolder,
   } = useNotes();
+  const { user, openAuthModal, syncStatus } = useAuth();
 
   const [isAddingFolder, setIsAddingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -54,6 +57,44 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
   return (
     <aside className="w-56 bg-[#f6f6f6] dark:bg-[#191919] border-r border-apple-border dark:border-apple-borderDark h-full flex flex-col justify-between select-none shrink-0 text-sm">
       <div className="overflow-y-auto px-2 py-3 space-y-4">
+        {/* Cloud Sync Status / Sign In Button */}
+        <div>
+          <button
+            onClick={() => {
+              triggerHaptic();
+              openAuthModal();
+            }}
+            className={`w-full px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs transition-colors border ${
+              user
+                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/20'
+                : 'bg-amber-500/10 border-amber-500/20 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20'
+            }`}
+          >
+            <div className="flex items-center space-x-2 truncate">
+              <Cloud
+                size={14}
+                className={user ? 'text-emerald-600 dark:text-emerald-400' : 'text-apple-yellow'}
+              />
+              <span className="truncate text-[11px] font-medium">
+                {user ? user.email : 'Sign in to Sync'}
+              </span>
+            </div>
+            {user ? (
+              <span
+                className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                  syncStatus === 'syncing'
+                    ? 'bg-amber-400 animate-ping'
+                    : syncStatus === 'error'
+                    ? 'bg-red-500'
+                    : 'bg-emerald-500'
+                }`}
+              />
+            ) : (
+              <span className="text-[10px] text-apple-yellow font-semibold uppercase">Cloud</span>
+            )}
+          </button>
+        </div>
+
         {/* System Folders Group */}
         <div>
           <div className="px-2 pb-1 text-[11px] font-semibold tracking-wider text-neutral-400 dark:text-neutral-500 uppercase">

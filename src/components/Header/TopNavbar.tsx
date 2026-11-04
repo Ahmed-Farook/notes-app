@@ -13,8 +13,10 @@ import {
   FolderOpen,
   ChevronLeft,
   Sparkles,
+  Cloud,
 } from 'lucide-react';
 import { useNotes } from '../../store/NotesContext';
+import { useAuth } from '../../store/AuthContext';
 import { triggerHaptic } from '../../utils/haptics';
 
 interface TopNavbarProps {
@@ -45,6 +47,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     mobileView,
     setMobileView,
   } = useNotes();
+  const { user, openAuthModal, syncStatus } = useAuth();
 
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [isMacApp, setIsMacApp] = useState(() => {
@@ -262,6 +265,37 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             <span className="hidden sm:inline">Update</span>
           </button>
         )}
+
+        {/* Cloud Sync Button */}
+        <button
+          onClick={() => {
+            triggerHaptic();
+            openAuthModal();
+          }}
+          title={
+            user
+              ? `Cloud Sync Active (${user.email}) • Status: ${syncStatus}`
+              : 'Sign in to Sync with Cloud'
+          }
+          className={`flex items-center space-x-1 p-1.5 rounded-md transition-colors active:scale-95 ${
+            user
+              ? 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
+              : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-800'
+          }`}
+        >
+          <Cloud size={17} />
+          {user && (
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                syncStatus === 'syncing'
+                  ? 'bg-amber-400 animate-ping'
+                  : syncStatus === 'error'
+                  ? 'bg-red-500'
+                  : 'bg-emerald-500'
+              }`}
+            />
+          )}
+        </button>
 
         {/* Dark/Light toggle */}
         <button
