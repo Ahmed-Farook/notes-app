@@ -100,7 +100,12 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return 'light';
   });
 
-  const { user, setSyncStatus } = useAuth();
+  const { user, setSyncStatus, encryptionKey } = useAuth();
+  const encryptionKeyRef = useRef<CryptoKey | null>(encryptionKey);
+  useEffect(() => {
+    encryptionKeyRef.current = encryptionKey;
+  }, [encryptionKey]);
+
   const notesRef = useRef(notes);
   notesRef.current = notes;
   const foldersRef = useRef(folders);
@@ -110,7 +115,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Sync with Supabase on user sign-in & listen to Realtime changes
   useEffect(() => {
-    if (!user) return;
+    if (!user || !encryptionKey) return;
 
     let isMounted = true;
     setSyncStatus('syncing');
@@ -119,8 +124,8 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const hydrateAndSync = async () => {
       try {
         const [remoteNotes, remoteFolders] = await Promise.all([
-          fetchUserNotes(),
-          fetchUserFolders(),
+          fetchUserNotes(encryptionKey),
+          fetchUserFolders(encryptionKey),
         ]);
 
         if (!isMounted) return;
@@ -138,12 +143,12 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         setFolders(mergedFolders);
         setSyncStatus('synced');
 
-        // Upload any local items not yet in cloud
+        // Upload any local items not yet in cloud (encrypted with E2EE key)
         for (const n of notesToUpload) {
-          upsertNoteToCloud(n, user.id);
+          upsertNoteToCloud(n, user.id, encryptionKey);
         }
         for (const f of foldersToUpload) {
-          upsertFolderToCloud(f, user.id);
+          upsertFolderToCloud(f, user.id, encryptionKey);
         }
       } catch (err) {
         console.warn('Sync error:', err);
@@ -156,10 +161,10 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     // 2. Realtime WebSocket subscription
     const channel = supabase
       .channel('apple_notes_realtime_sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notes' }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notes' }, async (payload) => {
         if (!isMounted) return;
         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          const remoteNote = dbToNote(payload.new as DbNote);
+          const remoteNote = await dbToNote(payload.new as DbNote, encryptionKeyRef.current);
           setNotes(prev => {
             const idx = prev.findIndex(n => n.id === remoteNote.id);
             if (idx >= 0) {
@@ -179,10 +184,10 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           }
         }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'folders' }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'folders' }, async (payload) => {
         if (!isMounted) return;
         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          const remoteFolder = dbToFolder(payload.new as DbFolder);
+          const remoteFolder = await dbToFolder(payload.new as DbFolder, encryptionKeyRef.current);
           setFolders(prev => {
             const idx = prev.findIndex(f => f.id === remoteFolder.id);
             if (idx >= 0) {
@@ -205,7 +210,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       isMounted = false;
       supabase.removeChannel(channel);
     };
-  }, [user, setSyncStatus]);
+  }, [user, encryptionKey, setSyncStatus]);
 
   // Apply dark mode class to html element
   useEffect(() => {
@@ -348,7 +353,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setMobileView('editor');
 
     if (user) {
-      upsertNoteToCloud(newNote, user.id);
+      upsertNoteToCloud(newNote, user.id, encryptionKeyRef.current);
     }
     return newNote;
   }, [selectedFolderId, user]);
@@ -369,7 +374,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
               clearTimeout(cloudSaveTimers.current[id]);
             }
             cloudSaveTimers.current[id] = setTimeout(() => {
-              upsertNoteToCloud(updated, user.id);
+              upsertNoteToCloud(updated, user.id, encryptionKeyRef.current);
               delete cloudSaveTimers.current[id];
             }, 500);
           }
@@ -396,7 +401,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       } else {
         const trashed: Note = { ...note, isTrash: true, updatedAt: Date.now() };
         if (user) {
-          upsertNoteToCloud(trashed, user.id);
+          upsertNoteToCloud(trashed, user.id, encryptionKeyRef.current);
         }
         return prev.map(n => (n.id === id ? trashed : n));
       }
@@ -433,7 +438,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         if (n.id === id) {
           const restored: Note = { ...n, isTrash: false, updatedAt: Date.now() };
           if (user) {
-            upsertNoteToCloud(restored, user.id);
+            upsertNoteToCloud(restored, user.id, encryptionKeyRef.current);
           }
           return restored;
         }
@@ -449,7 +454,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         if (n.id === id) {
           const updated: Note = { ...n, isPinned: !n.isPinned, updatedAt: Date.now() };
           if (user) {
-            upsertNoteToCloud(updated, user.id);
+            upsertNoteToCloud(updated, user.id, encryptionKeyRef.current);
           }
           return updated;
         }
@@ -464,7 +469,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         if (n.id === noteId) {
           const updated: Note = { ...n, folderId, updatedAt: Date.now() };
           if (user) {
-            upsertNoteToCloud(updated, user.id);
+            upsertNoteToCloud(updated, user.id, encryptionKeyRef.current);
           }
           return updated;
         }
@@ -484,7 +489,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setFolders(prev => [...prev, newFolder]);
     setSelectedFolderId(newFolder.id);
     if (user) {
-      upsertFolderToCloud(newFolder, user.id);
+      upsertFolderToCloud(newFolder, user.id, encryptionKeyRef.current);
     }
   }, [user]);
 

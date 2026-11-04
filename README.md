@@ -25,6 +25,10 @@ A lightweight, modern, cross-platform notes application inspired by Apple Notes.
   - Bold, Italic, Underline, Strikethrough, and Highlighter
   - Bulleted and numbered lists
   - Blockquotes, Code blocks, and Horizontal dividers
+- **🛡️ Zero-Knowledge End-to-End Encryption (E2EE):**
+  - Notes are encrypted directly on the client with AES-256-GCM before syncing to Supabase.
+  - Encryption keys are derived using PBKDF2 (100,000 iterations) from the user's password and never touch the server.
+  - The database administrator and third parties cannot read note titles, content, or previews.
 - **☁️ Free Real-Time Cloud Sync (Supabase):**
   - Instant WebSocket sync across macOS, Android, and Web.
   - Built-in authentication (Email & Password).

@@ -1,5 +1,6 @@
 import { Note, Folder } from '../types/note';
 import { supabase } from '../lib/supabase';
+import { encryptText, decryptText } from './crypto';
 
 export interface DbNote {
   id: string;
@@ -23,12 +24,21 @@ export interface DbFolder {
   user_id?: string;
 }
 
-export function noteToDb(note: Note, userId: string): DbNote {
+/**
+ * Encrypts and formats a Note for PostgreSQL storage.
+ */
+export async function noteToDb(note: Note, userId: string, key: CryptoKey | null): Promise<DbNote> {
+  const [encryptedTitle, encryptedContent, encryptedPreview] = await Promise.all([
+    encryptText(note.title || '', key),
+    encryptText(note.content || '', key),
+    encryptText(note.plainTextPreview || '', key),
+  ]);
+
   return {
     id: note.id,
-    title: note.title || '',
-    content: note.content || '',
-    plain_text_preview: note.plainTextPreview || '',
+    title: encryptedTitle,
+    content: encryptedContent,
+    plain_text_preview: encryptedPreview,
     folder_id: note.folderId || 'default',
     is_pinned: Boolean(note.isPinned),
     is_trash: Boolean(note.isTrash),
@@ -38,12 +48,21 @@ export function noteToDb(note: Note, userId: string): DbNote {
   };
 }
 
-export function dbToNote(db: DbNote): Note {
+/**
+ * Decrypts a DbNote retrieved from PostgreSQL.
+ */
+export async function dbToNote(db: DbNote, key: CryptoKey | null): Promise<Note> {
+  const [decryptedTitle, decryptedContent, decryptedPreview] = await Promise.all([
+    decryptText(db.title, key),
+    decryptText(db.content, key),
+    decryptText(db.plain_text_preview, key),
+  ]);
+
   return {
     id: db.id,
-    title: db.title,
-    content: db.content,
-    plainTextPreview: db.plain_text_preview,
+    title: decryptedTitle,
+    content: decryptedContent,
+    plainTextPreview: decryptedPreview,
     folderId: db.folder_id,
     isPinned: db.is_pinned,
     isTrash: db.is_trash,
@@ -52,10 +71,15 @@ export function dbToNote(db: DbNote): Note {
   };
 }
 
-export function folderToDb(folder: Folder, userId: string): DbFolder {
+/**
+ * Encrypts and formats a Folder for PostgreSQL storage.
+ */
+export async function folderToDb(folder: Folder, userId: string, key: CryptoKey | null): Promise<DbFolder> {
+  const encryptedName = folder.isSystem ? folder.name : await encryptText(folder.name, key);
+
   return {
     id: folder.id,
-    name: folder.name,
+    name: encryptedName,
     icon: folder.icon || null,
     is_system: Boolean(folder.isSystem),
     updated_at: Date.now(),
@@ -63,35 +87,40 @@ export function folderToDb(folder: Folder, userId: string): DbFolder {
   };
 }
 
-export function dbToFolder(db: DbFolder): Folder {
+/**
+ * Decrypts a DbFolder retrieved from PostgreSQL.
+ */
+export async function dbToFolder(db: DbFolder, key: CryptoKey | null): Promise<Folder> {
+  const decryptedName = db.is_system ? db.name : await decryptText(db.name, key);
+
   return {
     id: db.id,
-    name: db.name,
+    name: decryptedName,
     icon: db.icon || undefined,
     isSystem: db.is_system,
   };
 }
 
-export async function fetchUserNotes(): Promise<Note[]> {
+export async function fetchUserNotes(key: CryptoKey | null): Promise<Note[]> {
   const { data, error } = await supabase.from('notes').select('*');
   if (error) {
     console.warn('Error fetching notes from Supabase:', error);
     return [];
   }
-  return (data as DbNote[]).map(dbToNote);
+  return Promise.all((data as DbNote[]).map((d) => dbToNote(d, key)));
 }
 
-export async function fetchUserFolders(): Promise<Folder[]> {
+export async function fetchUserFolders(key: CryptoKey | null): Promise<Folder[]> {
   const { data, error } = await supabase.from('folders').select('*');
   if (error) {
     console.warn('Error fetching folders from Supabase:', error);
     return [];
   }
-  return (data as DbFolder[]).map(dbToFolder);
+  return Promise.all((data as DbFolder[]).map((d) => dbToFolder(d, key)));
 }
 
-export async function upsertNoteToCloud(note: Note, userId: string): Promise<void> {
-  const payload = noteToDb(note, userId);
+export async function upsertNoteToCloud(note: Note, userId: string, key: CryptoKey | null): Promise<void> {
+  const payload = await noteToDb(note, userId, key);
   const { error } = await supabase.from('notes').upsert(payload);
   if (error) {
     console.warn('Error upserting note to Supabase:', error);
@@ -105,8 +134,8 @@ export async function deleteNoteFromCloud(noteId: string): Promise<void> {
   }
 }
 
-export async function upsertFolderToCloud(folder: Folder, userId: string): Promise<void> {
-  const payload = folderToDb(folder, userId);
+export async function upsertFolderToCloud(folder: Folder, userId: string, key: CryptoKey | null): Promise<void> {
+  const payload = await folderToDb(folder, userId, key);
   const { error } = await supabase.from('folders').upsert(payload);
   if (error) {
     console.warn('Error upserting folder to Supabase:', error);
@@ -181,4 +210,3 @@ export function mergeFolders(
     toUpload,
   };
 }
-
