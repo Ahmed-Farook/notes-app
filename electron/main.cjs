@@ -1,5 +1,8 @@
 const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
 const path = require('path');
+const os = require('os');
+const fs = require('fs');
+const { spawn, execSync } = require('child_process');
 
 let mainWindow = null;
 const isDev = !app.isPackaged && process.env.VITE_DEV_SERVER === 'true';
@@ -140,6 +143,111 @@ function buildMenu() {
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
 }
+
+// In-app seamless auto-updater for macOS
+ipcMain.handle('updater:install-update', async (_event, downloadUrl) => {
+  if (!downloadUrl) throw new Error('No download URL provided');
+
+  const tempDmgPath = path.join(os.tmpdir(), `Apple-Notes-update-${Date.now()}.dmg`);
+  const scriptPath = path.join(os.tmpdir(), `apply-apple-notes-update-${Date.now()}.sh`);
+
+  return new Promise((resolve, reject) => {
+    // 1. Download DMG using curl with progress reporting
+    const curl = spawn('curl', ['-L', '--progress-bar', '-o', tempDmgPath, downloadUrl]);
+
+    curl.stderr.on('data', (chunk) => {
+      const text = chunk.toString();
+      const match = text.match(/(\d{1,3}(?:\.\d+)?)\s*%/);
+      if (match) {
+        const percent = Math.min(100, Math.max(0, parseFloat(match[1])));
+        mainWindow?.webContents.send('updater:progress', percent);
+      }
+    });
+
+    curl.on('error', (err) => {
+      reject(new Error(`Download failed: ${err.message}`));
+    });
+
+    curl.on('close', (code) => {
+      if (code !== 0) {
+        return reject(new Error(`Download failed with curl code ${code}`));
+      }
+
+      mainWindow?.webContents.send('updater:progress', 100);
+
+      try {
+        // 2. Mount DMG silently without opening a Finder window
+        const attachOutput = execSync(`hdiutil attach -nobrowse -readonly "${tempDmgPath}"`).toString();
+        const mountMatch = attachOutput.match(/\/Volumes\/[^\n\r]+/);
+        if (!mountMatch) {
+          throw new Error('Could not find DMG mount volume');
+        }
+        const mountPoint = mountMatch[0].trim();
+
+        // 3. Locate the new .app inside the mounted DMG
+        const files = fs.readdirSync(mountPoint);
+        const appName = files.find((f) => f.endsWith('.app'));
+        if (!appName) {
+          execSync(`hdiutil detach "${mountPoint}" -force`);
+          throw new Error('No .app found inside the DMG image');
+        }
+        const sourceApp = path.join(mountPoint, appName);
+
+        // 4. Determine current installed app path (or default to /Applications)
+        let targetApp = process.execPath.replace(/\/Contents\/MacOS\/.*$/, '');
+        if (!targetApp.endsWith('.app') || !fs.existsSync(targetApp)) {
+          targetApp = '/Applications/Apple Notes.app';
+        }
+
+        // 5. Generate bash script to swap the app and restart after current PID exits
+        const scriptContent = `#!/bin/bash
+OLD_PID=${process.pid}
+SOURCE_APP="${sourceApp}"
+TARGET_APP="${targetApp}"
+MOUNT_POINT="${mountPoint}"
+DMG_PATH="${tempDmgPath}"
+
+# Wait for old Electron app process to fully exit
+while kill -0 "$OLD_PID" 2>/dev/null; do
+  sleep 0.2
+done
+
+# Replace installed application bundle
+rm -rf "$TARGET_APP"
+cp -R "$SOURCE_APP" "$TARGET_APP"
+
+# Detach DMG and cleanup
+hdiutil detach "$MOUNT_POINT" -force >/dev/null 2>&1
+rm -f "$DMG_PATH"
+rm -f "$0"
+
+# Remove quarantine attribute so Gatekeeper allows immediate launch
+xattr -rd com.apple.quarantine "$TARGET_APP" >/dev/null 2>&1 || true
+
+# Relaunch updated application
+open -n -a "$TARGET_APP"
+`;
+
+        fs.writeFileSync(scriptPath, scriptContent, { mode: 0o755 });
+
+        // 6. Spawn update script detached and quit current app
+        const updateProcess = spawn('/bin/bash', [scriptPath], {
+          detached: true,
+          stdio: 'ignore',
+        });
+        updateProcess.unref();
+
+        resolve({ success: true });
+
+        setTimeout(() => {
+          app.quit();
+        }, 300);
+      } catch (err) {
+        reject(err);
+      }
+    });
+  });
+});
 
 app.whenReady().then(() => {
   createWindow();

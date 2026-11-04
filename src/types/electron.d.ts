@@ -4,6 +4,8 @@ export interface ElectronAPI {
   sendNewNote: (callback: () => void) => void;
   sendSearch: (callback: () => void) => void;
   sendCheckUpdates: (callback: () => void) => void;
+  installUpdate?: (downloadUrl: string) => Promise<{ success: boolean; error?: string }>;
+  onUpdateProgress?: (callback: (percent: number) => void) => () => void;
 }
 
 declare global {

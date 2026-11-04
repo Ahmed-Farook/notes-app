@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CheckCircle2,
   Download,
@@ -8,6 +8,7 @@ import {
   ExternalLink,
   Sparkles,
   Key,
+  Zap,
 } from 'lucide-react';
 import {
   UpdateInfo,
@@ -37,6 +38,33 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
 }) => {
   const [tokenInput, setTokenInput] = useState(() => getStoredGithubToken() || '');
   const [showTokenSettings, setShowTokenSettings] = useState(false);
+  const [isInstalling, setIsInstalling] = useState(false);
+  const [installProgress, setInstallProgress] = useState(0);
+  const [installError, setInstallError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (window.electronAPI?.onUpdateProgress) {
+      const unsubscribe = window.electronAPI.onUpdateProgress((percent) => {
+        setInstallProgress(percent);
+      });
+      return () => unsubscribe();
+    }
+  }, []);
+
+  const handleInstallNow = async () => {
+    if (!updateInfo?.downloadUrl || !window.electronAPI?.installUpdate) return;
+    setIsInstalling(true);
+    setInstallProgress(0);
+    setInstallError(null);
+    triggerHaptic();
+
+    try {
+      await window.electronAPI.installUpdate(updateInfo.downloadUrl);
+    } catch (err: any) {
+      setIsInstalling(false);
+      setInstallError(err?.message || 'Failed to install update automatically');
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -167,23 +195,75 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                 </div>
               )}
 
-              {/* Download Action */}
-              <div className="pt-2">
-                <a
-                  href={updateInfo.downloadUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => triggerHaptic()}
-                  className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-apple-yellow hover:bg-apple-yellowHover active:scale-98 text-white font-semibold text-xs shadow-md transition-all"
-                >
-                  <Download size={16} />
-                  <span>{getPlatformLabel()}</span>
-                  <ExternalLink size={13} className="opacity-70" />
-                </a>
-                {updateInfo.assetName && (
-                  <p className="text-center text-[10px] text-neutral-400 mt-1.5">
-                    File: <span className="font-mono">{updateInfo.assetName}</span>
-                  </p>
+              {/* Action Buttons */}
+              <div className="pt-2 space-y-2">
+                {updateInfo.platform === 'mac' && Boolean(window.electronAPI?.installUpdate) ? (
+                  isInstalling ? (
+                    <div className="space-y-2.5 p-3.5 bg-amber-500/10 dark:bg-amber-500/15 rounded-xl border border-amber-500/25">
+                      <div className="flex items-center justify-between text-xs font-semibold text-neutral-800 dark:text-neutral-100">
+                        <span>
+                          {installProgress >= 100
+                            ? 'Restarting Apple Notes...'
+                            : 'Downloading & Updating...'}
+                        </span>
+                        <span className="font-mono text-apple-yellow">{Math.round(installProgress)}%</span>
+                      </div>
+                      <div className="w-full h-2 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-apple-yellow transition-all duration-150 rounded-full"
+                          style={{ width: `${installProgress}%` }}
+                        />
+                      </div>
+                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400 text-center">
+                        The app will automatically update in-place and restart with v
+                        {updateInfo.latestVersion}.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <button
+                        onClick={handleInstallNow}
+                        className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-apple-yellow hover:bg-apple-yellowHover active:scale-98 text-white font-semibold text-xs shadow-md transition-all"
+                      >
+                        <Zap size={16} />
+                        <span>Update &amp; Restart Now</span>
+                      </button>
+
+                      {installError && (
+                        <p className="text-[11px] text-red-500 text-center">{installError}</p>
+                      )}
+
+                      <div className="text-center">
+                        <a
+                          href={updateInfo.downloadUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 underline"
+                        >
+                          Or manually download DMG
+                        </a>
+                      </div>
+                    </div>
+                  )
+                ) : (
+                  <div>
+                    <a
+                      href={updateInfo.downloadUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => triggerHaptic()}
+                      className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-apple-yellow hover:bg-apple-yellowHover active:scale-98 text-white font-semibold text-xs shadow-md transition-all"
+                    >
+                      <Download size={16} />
+                      <span>{getPlatformLabel()}</span>
+                      <ExternalLink size={13} className="opacity-70" />
+                    </a>
+                    {updateInfo.assetName && (
+                      <p className="text-center text-[10px] text-neutral-400 mt-1.5">
+                        File: <span className="font-mono">{updateInfo.assetName}</span>
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
