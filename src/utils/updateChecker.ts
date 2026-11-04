@@ -150,3 +150,4 @@ export async function checkForUpdates(overrideToken?: string): Promise<UpdateInf
     hasUpdate,
   };
 }
+

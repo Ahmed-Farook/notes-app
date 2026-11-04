@@ -77,3 +77,4 @@ export function useAppUpdater() {
     checkAgain: (token?: string) => runCheck(token, true),
   };
 }
+

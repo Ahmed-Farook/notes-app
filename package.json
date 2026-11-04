@@ -1,7 +1,9 @@
 {
   "name": "apple-notes-crossplatform",
-  "private": true,
   "version": "0.1.0",
+  "description": "Apple Notes cross-platform note taking application",
+  "author": "Ahmed Farook",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",

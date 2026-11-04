@@ -229,3 +229,4 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     </div>
   );
 };
+

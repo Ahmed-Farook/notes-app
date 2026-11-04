@@ -98,13 +98,19 @@ jobs:
         run: npm run build
 
       - name: Package macOS DMG
-        run: npx electron-builder --mac dmg --arm64
+        run: npx electron-builder --mac dmg --arm64 --publish never
 
       - name: Rename and Prepare DMG
         run: |
           VERSION="${{ steps.meta.outputs.version }}"
           find release -name "*.dmg" -exec cp {} "Apple-Notes-${VERSION}-arm64.dmg" \;
           ls -lh Apple-Notes-${VERSION}-arm64.dmg
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Apple-Notes-${{ steps.meta.outputs.version }}-arm64-dmg
+          path: Apple-Notes-${{ steps.meta.outputs.version }}-arm64.dmg
 
       - name: Upload to GitHub Release
         env:
@@ -113,3 +119,4 @@ jobs:
           TAG="v${{ steps.meta.outputs.version }}"
           gh release view "$TAG" || gh release create "$TAG" --title "Apple Notes $TAG" --notes "Release $TAG for Android and macOS"
           gh release upload "$TAG" "Apple-Notes-${{ steps.meta.outputs.version }}-arm64.dmg" --clobber
+

@@ -70,3 +70,4 @@ export const UpdateBanner: React.FC<UpdateBannerProps> = ({
     </aside>
   );
 };
+
