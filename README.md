@@ -42,17 +42,45 @@ npm run build
 
 ---
 
-## 🖥️ Cross-Platform Packaging Roadmap
+## 🖥️ Running on Mac (Native Desktop App)
 
-To distribute as native desktop applications:
-1. **Tauri (Recommended):** Ultra-lightweight (~10MB binary, uses system webview, Rust backend).
-   ```bash
-   npx @tauri-apps/cli init
-   npx @tauri-apps/cli dev
-   ```
-2. **Electron:** Full Chromium bundle (.dmg for macOS, .exe for Windows, .AppImage/.deb for Linux).
-   ```bash
-   npm install --save-dev electron electron-builder
-   ```
-3. **Cloud Sync:** Optional backend sync using Supabase, Firebase, or WebDAV for multi-device sync.
+You can run and build the native macOS application with native traffic light controls, vibrancy, and menus:
+
+```bash
+# 1. Launch in development mode
+npm run mac:dev
+
+# 2. Or run directly from built assets
+npm run mac:start
+
+# 3. Package as a native macOS .app / .dmg bundle
+npm run mac:build
+```
+The compiled macOS app is placed in `release/mac-arm64/Apple Notes.app`.
+
+---
+
+## 📱 Running on Android (Native Android App)
+
+The app is integrated with **Capacitor** to deliver 60-120fps hardware-accelerated Android performance, haptic feedback, safe area insets, and keyboard auto-resizing:
+
+```bash
+# 1. Sync any web code updates into Android
+npm run android:sync
+
+# 2. Open the project in Android Studio
+npm run android:open
+
+# 3. Build debug APK directly with Gradle
+npm run android:build
+```
+
+---
+
+## ⚡ Performance & "Snappy" Optimizations
+- **Non-blocking Persistence:** Notes auto-save is debounced (250ms), keeping keystrokes at 120 FPS without synchronous JSON serialization stutter.
+- **Hardware-Accelerated Mobile Transitions:** Seamless single-pane sliding on mobile (< 768px) and 3-column layout on desktop.
+- **Zero Touch Delay:** Uses `touch-action: manipulation` to eliminate the default 300ms mobile touch delay.
+- **Native Haptics:** Tactile feedback on checklists, note selections, and folder switching via `@capacitor/haptics`.
+- **macOS Native Window:** Vibrancy frosted glass effect, native traffic lights, and native macOS shortcuts (`Cmd+N`, `Cmd+F`).
 

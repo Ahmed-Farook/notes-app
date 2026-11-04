@@ -3,6 +3,7 @@ import { Pin, Trash2, RotateCcw } from 'lucide-react';
 import { Note, ViewMode } from '../../types/note';
 import { formatListDate } from '../../utils/dateUtils';
 import { useNotes } from '../../store/NotesContext';
+import { triggerHaptic } from '../../utils/haptics';
 
 interface NoteCardProps {
   note: Note;
@@ -12,6 +13,11 @@ interface NoteCardProps {
 
 export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }) => {
   const { setActiveNoteId, togglePinNote, deleteNote, restoreNote } = useNotes();
+
+  const handleSelect = () => {
+    triggerHaptic();
+    setActiveNoteId(note.id);
+  };
 
   const handlePin = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -31,8 +37,8 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
   if (viewMode === 'gallery') {
     return (
       <div
-        onClick={() => setActiveNoteId(note.id)}
-        className={`group relative flex flex-col justify-between p-3.5 rounded-xl border transition-all cursor-pointer select-none aspect-[4/3] ${
+        onClick={handleSelect}
+        className={`group relative flex flex-col justify-between p-3.5 rounded-xl border transition-all cursor-pointer select-none aspect-[4/3] active:scale-[0.98] ${
           isSelected
             ? 'border-apple-yellow bg-apple-yellowLight/40 dark:bg-apple-yellow/10 shadow-sm ring-1 ring-apple-yellow'
             : 'border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-850 hover:border-neutral-300 dark:hover:border-neutral-700 shadow-[0_1px_3px_rgba(0,0,0,0.05)]'
@@ -90,8 +96,8 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
   // Standard List View Card (Apple Notes style)
   return (
     <div
-      onClick={() => setActiveNoteId(note.id)}
-      className={`group relative px-3 py-2.5 rounded-lg transition-colors cursor-pointer select-none ${
+      onClick={handleSelect}
+      className={`group relative px-3 py-3 md:py-2.5 rounded-lg transition-all cursor-pointer select-none active:scale-[0.99] ${
         isSelected
           ? 'bg-apple-yellow text-white shadow-sm'
           : 'hover:bg-neutral-100 dark:hover:bg-neutral-800/70 text-neutral-900 dark:text-neutral-100'

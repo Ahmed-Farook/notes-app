@@ -14,10 +14,65 @@ export const NotesList: React.FC = () => {
     viewMode,
     currentFolder,
     createNote,
+    folders,
+    selectedFolderId,
+    setSelectedFolderId,
   } = useNotes();
 
+  const [showFolderPicker, setShowFolderPicker] = React.useState(false);
+
   return (
-    <section className="w-72 bg-white dark:bg-[#202020] border-r border-apple-border dark:border-apple-borderDark h-full flex flex-col select-none shrink-0">
+    <section className="w-full md:w-72 bg-white dark:bg-[#202020] md:border-r border-apple-border dark:border-apple-borderDark h-full flex flex-col select-none shrink-0">
+      {/* Mobile folder selector pill */}
+      <div className="md:hidden px-3 pt-2 pb-1 flex items-center justify-between border-b border-apple-border dark:border-apple-borderDark">
+        <button
+          onClick={() => setShowFolderPicker(!showFolderPicker)}
+          className="flex items-center space-x-1.5 text-xs font-semibold text-neutral-800 dark:text-neutral-200 bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 rounded-full"
+        >
+          <span>📁 {currentFolder?.name || 'All Notes'}</span>
+          <span className="text-[10px] text-neutral-400">▼</span>
+        </button>
+        <span className="text-xs text-neutral-400">{filteredNotes.length} notes</span>
+      </div>
+
+      {/* Mobile folder dropdown */}
+      {showFolderPicker && (
+        <div className="md:hidden bg-neutral-50 dark:bg-neutral-850 p-2 border-b border-apple-border dark:border-apple-borderDark grid grid-cols-2 gap-1 text-xs">
+          <button
+            onClick={() => { setSelectedFolderId('all'); setShowFolderPicker(false); }}
+            className={`p-2 rounded text-left ${selectedFolderId === 'all' ? 'bg-apple-yellow text-white font-bold' : 'bg-white dark:bg-neutral-800'}`}
+          >
+            All Notes
+          </button>
+          <button
+            onClick={() => { setSelectedFolderId('quick'); setShowFolderPicker(false); }}
+            className={`p-2 rounded text-left ${selectedFolderId === 'quick' ? 'bg-apple-yellow text-white font-bold' : 'bg-white dark:bg-neutral-800'}`}
+          >
+            Quick Notes
+          </button>
+          <button
+            onClick={() => { setSelectedFolderId('default'); setShowFolderPicker(false); }}
+            className={`p-2 rounded text-left ${selectedFolderId === 'default' ? 'bg-apple-yellow text-white font-bold' : 'bg-white dark:bg-neutral-800'}`}
+          >
+            Notes
+          </button>
+          {folders.map(f => (
+            <button
+              key={f.id}
+              onClick={() => { setSelectedFolderId(f.id); setShowFolderPicker(false); }}
+              className={`p-2 rounded text-left truncate ${selectedFolderId === f.id ? 'bg-apple-yellow text-white font-bold' : 'bg-white dark:bg-neutral-800'}`}
+            >
+              {f.name}
+            </button>
+          ))}
+          <button
+            onClick={() => { setSelectedFolderId('trash'); setShowFolderPicker(false); }}
+            className={`p-2 rounded text-left text-red-500 ${selectedFolderId === 'trash' ? 'bg-red-500 text-white font-bold' : 'bg-white dark:bg-neutral-800'}`}
+          >
+            Recently Deleted
+          </button>
+        </div>
+      )}
       {/* Search Bar */}
       <div className="p-2.5 border-b border-apple-border dark:border-apple-borderDark">
         <div className="relative flex items-center">

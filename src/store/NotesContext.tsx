@@ -1,4 +1,13 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback,
+  ReactNode,
+} from 'react';
 import { Note, Folder, ViewMode } from '../types/note';
 import {
   loadStoredNotes,
@@ -7,6 +16,7 @@ import {
   saveStoredFolders,
   SYSTEM_FOLDERS,
 } from '../utils/storage';
+import { triggerHaptic } from '../utils/haptics';
 
 interface NotesContextType {
   notes: Note[];
@@ -17,20 +27,22 @@ interface NotesContextType {
   searchQuery: string;
   viewMode: ViewMode;
   isSidebarOpen: boolean;
+  mobileView: 'list' | 'editor';
   theme: 'light' | 'dark';
   filteredNotes: Note[];
   pinnedNotes: Note[];
   unpinnedNotes: Note[];
   currentFolder: Folder | undefined;
-  
+
   // Actions
   setActiveNoteId: (id: string | null) => void;
   setSelectedFolderId: (id: string) => void;
   setSearchQuery: (query: string) => void;
   setViewMode: (mode: ViewMode) => void;
+  setMobileView: (view: 'list' | 'editor') => void;
   toggleSidebar: () => void;
   toggleTheme: () => void;
-  
+
   createNote: (folderId?: string) => Note;
   updateNote: (id: string, updates: Partial<Note>) => void;
   deleteNote: (id: string) => void;
@@ -38,7 +50,7 @@ interface NotesContextType {
   permanentlyDeleteNote: (id: string) => void;
   togglePinNote: (id: string) => void;
   moveNoteToFolder: (noteId: string, folderId: string) => void;
-  
+
   createFolder: (name: string) => void;
   deleteFolder: (id: string) => void;
   exportCurrentNote: (formatType: 'markdown' | 'txt' | 'html') => void;
@@ -56,7 +68,13 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   });
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768;
+    }
+    return true;
+  });
+  const [mobileView, setMobileView] = useState<'list' | 'editor'>('list');
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('apple_notes_theme');
@@ -65,6 +83,8 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
     return 'light';
   });
+
+  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Apply dark mode class to html element
   useEffect(() => {
@@ -76,9 +96,32 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     localStorage.setItem('apple_notes_theme', theme);
   }, [theme]);
 
-  // Persist notes
+  // Snappy debounced persistence: never blocks typing or UI updates
   useEffect(() => {
-    saveStoredNotes(notes);
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      saveStoredNotes(notes);
+    }, 250);
+
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [notes]);
+
+  // Flush pending save on window blur / hide
+  useEffect(() => {
+    const handleFlush = () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveStoredNotes(notes);
+      }
+    };
+    window.addEventListener('beforeunload', handleFlush);
+    window.addEventListener('pagehide', handleFlush);
+    return () => {
+      window.removeEventListener('beforeunload', handleFlush);
+      window.removeEventListener('pagehide', handleFlush);
+    };
   }, [notes]);
 
   // Persist folders
@@ -86,13 +129,25 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     saveStoredFolders(folders);
   }, [folders]);
 
-  const toggleTheme = () => {
-    setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
-  };
+  // Listen to native Electron bridge actions if available
+  useEffect(() => {
+    const electronAPI = (window as unknown as { electronAPI?: { sendNewNote: (cb: () => void) => void } })?.electronAPI;
+    if (electronAPI?.sendNewNote) {
+      electronAPI.sendNewNote(() => {
+        createNote();
+      });
+    }
+  }, []);
 
-  const toggleSidebar = () => {
+  const toggleTheme = useCallback(() => {
+    triggerHaptic();
+    setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
+  }, []);
+
+  const toggleSidebar = useCallback(() => {
+    triggerHaptic();
     setIsSidebarOpen(prev => !prev);
-  };
+  }, []);
 
   const allFolders = useMemo(() => {
     return [...SYSTEM_FOLDERS, ...folders];
@@ -104,6 +159,8 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Filter notes based on folder and search query
   const filteredNotes = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
     return notes.filter(note => {
       // 1. Folder filter
       if (selectedFolderId === 'trash') {
@@ -120,8 +177,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
 
       // 2. Search query filter
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
+      if (query) {
         const matchesTitle = note.title.toLowerCase().includes(query);
         const matchesContent = note.plainTextPreview.toLowerCase().includes(query);
         if (!matchesTitle && !matchesContent) return false;
@@ -146,9 +202,14 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }, [notes, activeNoteId]);
 
   // Create new note
-  const createNote = (folderId?: string): Note => {
-    const targetFolder = folderId || (selectedFolderId === 'trash' || selectedFolderId === 'all' ? 'default' : selectedFolderId);
-    
+  const createNote = useCallback((folderId?: string): Note => {
+    triggerHaptic();
+    const targetFolder =
+      folderId ||
+      (selectedFolderId === 'trash' || selectedFolderId === 'all'
+        ? 'default'
+        : selectedFolderId);
+
     const newNote: Note = {
       id: `note-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       title: 'New Note',
@@ -163,11 +224,12 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     setNotes(prev => [newNote, ...prev]);
     setActiveNoteId(newNote.id);
+    setMobileView('editor');
     return newNote;
-  };
+  }, [selectedFolderId]);
 
   // Update note
-  const updateNote = (id: string, updates: Partial<Note>) => {
+  const updateNote = useCallback((id: string, updates: Partial<Note>) => {
     setNotes(prev =>
       prev.map(note => {
         if (note.id === id) {
@@ -180,57 +242,67 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         return note;
       })
     );
-  };
+  }, []);
 
-  // Delete note (move to trash or permanently if already in trash)
-  const deleteNote = (id: string) => {
+  // Delete note
+  const deleteNote = useCallback((id: string) => {
+    triggerHaptic();
     setNotes(prev => {
       const note = prev.find(n => n.id === id);
       if (!note) return prev;
 
       if (note.isTrash) {
-        // Permanently delete
         return prev.filter(n => n.id !== id);
       } else {
-        // Move to trash
-        return prev.map(n => (n.id === id ? { ...n, isTrash: true, updatedAt: Date.now() } : n));
+        return prev.map(n =>
+          n.id === id ? { ...n, isTrash: true, updatedAt: Date.now() } : n
+        );
       }
     });
 
-    // Auto switch active note if the deleted one was active
     if (activeNoteId === id) {
       const remaining = filteredNotes.filter(n => n.id !== id);
       setActiveNoteId(remaining.length > 0 ? remaining[0].id : null);
+      if (remaining.length === 0) {
+        setMobileView('list');
+      }
     }
-  };
+  }, [activeNoteId, filteredNotes]);
 
-  const permanentlyDeleteNote = (id: string) => {
+  const permanentlyDeleteNote = useCallback((id: string) => {
+    triggerHaptic();
     setNotes(prev => prev.filter(n => n.id !== id));
     if (activeNoteId === id) {
       const remaining = filteredNotes.filter(n => n.id !== id);
       setActiveNoteId(remaining.length > 0 ? remaining[0].id : null);
+      if (remaining.length === 0) {
+        setMobileView('list');
+      }
     }
-  };
+  }, [activeNoteId, filteredNotes]);
 
-  const restoreNote = (id: string) => {
+  const restoreNote = useCallback((id: string) => {
+    triggerHaptic();
     setNotes(prev =>
       prev.map(n => (n.id === id ? { ...n, isTrash: false, updatedAt: Date.now() } : n))
     );
-  };
+  }, []);
 
-  const togglePinNote = (id: string) => {
+  const togglePinNote = useCallback((id: string) => {
+    triggerHaptic();
     setNotes(prev =>
       prev.map(n => (n.id === id ? { ...n, isPinned: !n.isPinned } : n))
     );
-  };
+  }, []);
 
-  const moveNoteToFolder = (noteId: string, folderId: string) => {
+  const moveNoteToFolder = useCallback((noteId: string, folderId: string) => {
     setNotes(prev =>
       prev.map(n => (n.id === noteId ? { ...n, folderId, updatedAt: Date.now() } : n))
     );
-  };
+  }, []);
 
-  const createFolder = (name: string) => {
+  const createFolder = useCallback((name: string) => {
+    triggerHaptic();
     const trimmed = name.trim();
     if (!trimmed) return;
     const newFolder: Folder = {
@@ -239,25 +311,27 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
     setFolders(prev => [...prev, newFolder]);
     setSelectedFolderId(newFolder.id);
-  };
+  }, []);
 
-  const deleteFolder = (id: string) => {
+  const deleteFolder = useCallback((id: string) => {
+    triggerHaptic();
     setFolders(prev => prev.filter(f => f.id !== id));
-    // Move notes in this folder to default folder
     setNotes(prev =>
       prev.map(n => (n.folderId === id ? { ...n, folderId: 'default' } : n))
     );
     if (selectedFolderId === id) {
       setSelectedFolderId('all');
     }
-  };
+  }, [selectedFolderId]);
 
   // Export current note
-  const exportCurrentNote = (formatType: 'markdown' | 'txt' | 'html') => {
+  const exportCurrentNote = useCallback((formatType: 'markdown' | 'txt' | 'html') => {
     if (!activeNote) return;
 
     let contentToExport = activeNote.content;
-    let filename = `${activeNote.title || 'Untitled'}.${formatType === 'markdown' ? 'md' : formatType}`;
+    const filename = `${activeNote.title || 'Untitled'}.${
+      formatType === 'markdown' ? 'md' : formatType
+    }`;
     let mimeType = 'text/plain';
 
     if (formatType === 'txt') {
@@ -265,7 +339,6 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       tempDiv.innerHTML = activeNote.content;
       contentToExport = tempDiv.textContent || tempDiv.innerText || '';
     } else if (formatType === 'markdown') {
-      // Simple html-to-markdown basic converter
       contentToExport = activeNote.content
         .replace(/<h1>(.*?)<\/h1>/gi, '# $1\n\n')
         .replace(/<h2>(.*?)<\/h2>/gi, '## $1\n\n')
@@ -292,7 +365,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  };
+  }, [activeNote]);
 
   return (
     <NotesContext.Provider
@@ -305,15 +378,20 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         searchQuery,
         viewMode,
         isSidebarOpen,
+        mobileView,
         theme,
         filteredNotes,
         pinnedNotes,
         unpinnedNotes,
         currentFolder,
-        setActiveNoteId,
+        setActiveNoteId: (id) => {
+          setActiveNoteId(id);
+          if (id) setMobileView('editor');
+        },
         setSelectedFolderId,
         setSearchQuery,
         setViewMode,
+        setMobileView,
         toggleSidebar,
         toggleTheme,
         createNote,
@@ -340,4 +418,3 @@ export const useNotes = () => {
   }
   return context;
 };
-
