@@ -6,3 +6,4 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sendNewNote: (callback) => ipcRenderer.on('action:new-note', callback),
   sendSearch: (callback) => ipcRenderer.on('action:search', callback),
 });
+

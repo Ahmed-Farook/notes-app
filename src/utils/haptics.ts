@@ -7,3 +7,4 @@ export const triggerHaptic = async (style: ImpactStyle = ImpactStyle.Light) => {
     // Graceful fallback for non-mobile platforms (Mac/Web)
   }
 };
+

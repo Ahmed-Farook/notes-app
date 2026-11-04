@@ -2,50 +2,48 @@ const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
 const path = require('path');
 
 let mainWindow = null;
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+const isDev = !app.isPackaged && process.env.VITE_DEV_SERVER === 'true';
 
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1120,
     height: 760,
-    minWidth: 700,
+    minWidth: 720,
     minHeight: 480,
     title: 'Apple Notes',
-    titleBarStyle: 'hiddenInset', // Mac native embedded traffic lights
+    titleBarStyle: 'hiddenInset', // Mac native traffic lights inside toolbar
     trafficLightPosition: { x: 16, y: 14 },
-    vibrancy: 'under-window', // macOS frosted vibrancy
+    vibrancy: 'under-window',
     visualEffectState: 'active',
-    backgroundColor: '#00000000', // transparent for vibrancy
+    backgroundColor: '#00000000',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
       spellcheck: true,
     },
-    show: false, // show once ready-to-show for instant smooth appearance
+    show: false,
   });
 
-  // Snappy display: avoid white flicker
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
   });
 
-  // Open external links in user's default browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
   });
 
-  const devUrl = 'http://127.0.0.1:5173';
-  const prodPath = path.join(__dirname, '..', 'dist', 'index.html');
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+    console.error('Window failed to load:', errorCode, errorDescription);
+  });
 
-  if (isDev && process.env.VITE_DEV_SERVER !== 'false') {
-    mainWindow.loadURL(devUrl).catch(() => {
-      // Fallback if dev server is not ready yet
-      setTimeout(() => mainWindow.loadURL(devUrl), 1000);
+  if (isDev) {
+    mainWindow.loadURL('http://127.0.0.1:5173').catch(() => {
+      mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
     });
   } else {
-    mainWindow.loadFile(prodPath);
+    mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   }
 
   buildMenu();
