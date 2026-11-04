@@ -59,6 +59,12 @@ function buildMenu() {
             label: app.name,
             submenu: [
               { role: 'about' },
+              {
+                label: 'Check for Updates...',
+                click: () => {
+                  mainWindow?.webContents.send('action:check-updates');
+                },
+              },
               { type: 'separator' },
               { role: 'services' },
               { type: 'separator' },

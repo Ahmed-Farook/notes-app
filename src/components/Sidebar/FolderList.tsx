@@ -8,10 +8,18 @@ import {
   Trash,
   X,
   Check,
+  Sparkles,
 } from 'lucide-react';
 import { useNotes } from '../../store/NotesContext';
+import { CURRENT_VERSION } from '../../utils/updateChecker';
+import { triggerHaptic } from '../../utils/haptics';
 
-export const FolderList: React.FC = () => {
+interface FolderListProps {
+  onCheckUpdates?: () => void;
+  hasUpdate?: boolean;
+}
+
+export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdate }) => {
   const {
     folders,
     notes,
@@ -214,14 +222,33 @@ export const FolderList: React.FC = () => {
         </div>
       </div>
 
-      {/* Bottom Action: New Folder Button */}
-      <div className="p-2 border-t border-apple-border dark:border-apple-borderDark">
+      {/* Bottom Action: New Folder & Updates */}
+      <div className="p-2 border-t border-apple-border dark:border-apple-borderDark space-y-1">
         <button
           onClick={() => setIsAddingFolder(true)}
           className="w-full flex items-center space-x-2 px-2 py-1.5 rounded-md text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white hover:bg-neutral-200/50 dark:hover:bg-neutral-800/50 transition-colors"
         >
           <FolderPlus size={15} className="text-apple-yellow" />
           <span>New Folder</span>
+        </button>
+
+        <button
+          onClick={() => {
+            triggerHaptic();
+            onCheckUpdates?.();
+          }}
+          title="Check for software updates"
+          className="w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] text-neutral-400 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 hover:bg-neutral-200/40 dark:hover:bg-neutral-800/40 transition-colors"
+        >
+          <span className="font-mono">v{CURRENT_VERSION}</span>
+          {hasUpdate ? (
+            <span className="flex items-center space-x-1 text-apple-yellow font-semibold">
+              <Sparkles size={11} className="animate-pulse" />
+              <span>Update Ready</span>
+            </span>
+          ) : (
+            <span className="hover:underline">Check Updates</span>
+          )}
         </button>
       </div>
     </aside>

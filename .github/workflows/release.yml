@@ -1,0 +1,115 @@
+name: Build & Release (Android & macOS)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Node Dependencies
+        run: npm ci
+
+      - name: Extract Version
+        id: meta
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build Web Application
+        run: npm run build
+
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Make Gradlew Executable
+        run: chmod +x android/gradlew
+
+      - name: Build Debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug
+
+      - name: Prepare APK for Release
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk Apple-Notes-${{ steps.meta.outputs.version }}.apk
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Apple-Notes-${{ steps.meta.outputs.version }}-apk
+          path: Apple-Notes-${{ steps.meta.outputs.version }}.apk
+
+      - name: Upload to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.meta.outputs.version }}"
+          gh release view "$TAG" || gh release create "$TAG" --title "Apple Notes $TAG" --notes "Release $TAG for Android and macOS"
+          gh release upload "$TAG" Apple-Notes-${{ steps.meta.outputs.version }}.apk --clobber
+
+  build-mac:
+    name: Build macOS DMG
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Node Dependencies
+        run: npm ci
+
+      - name: Extract Version
+        id: meta
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build Web Application
+        run: npm run build
+
+      - name: Package macOS DMG
+        run: npx electron-builder --mac dmg --arm64
+
+      - name: Rename and Prepare DMG
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          find release -name "*.dmg" -exec cp {} "Apple-Notes-${VERSION}-arm64.dmg" \;
+          ls -lh Apple-Notes-${VERSION}-arm64.dmg
+
+      - name: Upload to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.meta.outputs.version }}"
+          gh release view "$TAG" || gh release create "$TAG" --title "Apple Notes $TAG" --notes "Release $TAG for Android and macOS"
+          gh release upload "$TAG" "Apple-Notes-${{ steps.meta.outputs.version }}-arm64.dmg" --clobber

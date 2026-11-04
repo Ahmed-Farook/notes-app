@@ -6,11 +6,15 @@ import { Editor } from './Editor/Editor';
 import { useNotes } from '../store/NotesContext';
 import { Plus } from 'lucide-react';
 import { triggerHaptic } from '../utils/haptics';
+import { useAppUpdater } from '../hooks/useAppUpdater';
+import { UpdateBanner } from './Updates/UpdateBanner';
+import { UpdateModal } from './Updates/UpdateModal';
 
 export const Layout: React.FC = () => {
   const { isSidebarOpen, createNote, mobileView } = useNotes();
   const [showFormatToolbar, setShowFormatToolbar] = useState(true);
   const checklistActionRef = useRef<(() => void) | null>(null);
+  const updater = useAppUpdater();
 
   // Global Keyboard Shortcuts (Cmd/Ctrl + N for new note)
   useEffect(() => {
@@ -39,14 +43,30 @@ export const Layout: React.FC = () => {
       <TopNavbar
         onToggleChecklist={handleToggleChecklist}
         onFormatClick={() => setShowFormatToolbar(prev => !prev)}
+        onCheckUpdates={updater.openModal}
+        hasUpdate={Boolean(updater.updateInfo?.hasUpdate)}
       />
+
+      {/* Software Update Notification Banner */}
+      {updater.isBannerVisible && updater.updateInfo && (
+        <UpdateBanner
+          updateInfo={updater.updateInfo}
+          onOpenDetails={updater.openModal}
+          onDismiss={updater.dismissBanner}
+        />
+      )}
 
       {/* Main Container */}
       <div className="flex flex-1 overflow-hidden relative">
         {/* Desktop 3-Pane Layout */}
         <div className="hidden md:flex flex-1 overflow-hidden">
           {/* Pane 1: Folders / Tags Sidebar */}
-          {isSidebarOpen && <FolderList />}
+          {isSidebarOpen && (
+            <FolderList
+              onCheckUpdates={updater.openModal}
+              hasUpdate={Boolean(updater.updateInfo?.hasUpdate)}
+            />
+          )}
 
           {/* Pane 2: Notes List & Search */}
           <NotesList />
@@ -89,6 +109,16 @@ export const Layout: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Software Update Modal */}
+      <UpdateModal
+        isOpen={updater.isModalOpen}
+        onClose={updater.closeModal}
+        updateInfo={updater.updateInfo}
+        isChecking={updater.isChecking}
+        error={updater.error}
+        onCheckAgain={updater.checkAgain}
+      />
     </div>
   );
 };

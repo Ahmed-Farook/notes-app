@@ -12,6 +12,7 @@ import {
   Type,
   FolderOpen,
   ChevronLeft,
+  Sparkles,
 } from 'lucide-react';
 import { useNotes } from '../../store/NotesContext';
 import { triggerHaptic } from '../../utils/haptics';
@@ -19,9 +20,16 @@ import { triggerHaptic } from '../../utils/haptics';
 interface TopNavbarProps {
   onToggleChecklist?: () => void;
   onFormatClick?: () => void;
+  onCheckUpdates?: () => void;
+  hasUpdate?: boolean;
 }
 
-export const TopNavbar: React.FC<TopNavbarProps> = ({ onToggleChecklist, onFormatClick }) => {
+export const TopNavbar: React.FC<TopNavbarProps> = ({
+  onToggleChecklist,
+  onFormatClick,
+  onCheckUpdates,
+  hasUpdate,
+}) => {
   const {
     toggleSidebar,
     isSidebarOpen,
@@ -224,9 +232,36 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({ onToggleChecklist, onForma
               >
                 HTML (.html)
               </button>
+              <div className="border-t border-neutral-100 dark:border-neutral-700 my-1" />
+              <button
+                onClick={() => {
+                  triggerHaptic();
+                  setShowExportMenu(false);
+                  onCheckUpdates?.();
+                }}
+                className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300 flex items-center justify-between"
+              >
+                <span>Check for Updates...</span>
+                {hasUpdate && <span className="w-1.5 h-1.5 rounded-full bg-apple-yellow animate-ping" />}
+              </button>
             </div>
           )}
         </div>
+
+        {/* Update notification button (if available) */}
+        {hasUpdate && (
+          <button
+            onClick={() => {
+              triggerHaptic();
+              onCheckUpdates?.();
+            }}
+            title="Software Update Available"
+            className="flex items-center space-x-1 px-2 py-1 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-medium hover:bg-amber-500/25 transition-all active:scale-95"
+          >
+            <Sparkles size={13} className="text-apple-yellow animate-pulse" />
+            <span className="hidden sm:inline">Update</span>
+          </button>
+        )}
 
         {/* Dark/Light toggle */}
         <button

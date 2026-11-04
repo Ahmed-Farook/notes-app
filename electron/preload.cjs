@@ -5,5 +5,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   isMac: process.platform === 'darwin',
   sendNewNote: (callback) => ipcRenderer.on('action:new-note', callback),
   sendSearch: (callback) => ipcRenderer.on('action:search', callback),
+  sendCheckUpdates: (callback) => ipcRenderer.on('action:check-updates', callback),
 });
 
