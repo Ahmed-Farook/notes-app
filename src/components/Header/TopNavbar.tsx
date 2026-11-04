@@ -39,7 +39,20 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({ onToggleChecklist, onForma
   } = useNotes();
 
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [isMacApp, setIsMacApp] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return (
+      Boolean(window.electronAPI?.isMac) ||
+      (navigator.userAgent.includes('Electron') && /Mac/i.test(navigator.userAgent))
+    );
+  });
   const exportRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (window.electronAPI?.isMac) {
+      setIsMacApp(true);
+    }
+  }, []);
 
   // Close export dropdown when clicking outside
   useEffect(() => {
@@ -53,9 +66,16 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({ onToggleChecklist, onForma
   }, []);
 
   return (
-    <header className="h-12 border-b border-apple-border dark:border-apple-borderDark bg-[#f6f6f6]/95 dark:bg-[#1e1e1e]/95 backdrop-blur-md flex items-center justify-between px-3 shrink-0 select-none transition-colors pt-[env(safe-area-inset-top)] [app-region:drag] md:[app-region:drag]">
+    <header className="h-12 border-b border-apple-border dark:border-apple-borderDark bg-[#f6f6f6]/95 dark:bg-[#1e1e1e]/95 backdrop-blur-md flex items-center justify-between pr-3 shrink-0 select-none transition-colors pt-[env(safe-area-inset-top)] [app-region:drag]">
       {/* Left controls: Traffic light clearance on Mac + navigation */}
       <div className="flex items-center space-x-1.5 [app-region:no-drag]">
+        {/* Dedicated clearance spacer for macOS window traffic lights */}
+        {isMacApp ? (
+          <div className="w-[78px] h-12 shrink-0 [app-region:drag]" aria-hidden="true" />
+        ) : (
+          <div className="w-2" />
+        )}
+
         {/* Mobile Back Button (when inside editor on phone) */}
         {mobileView === 'editor' && (
           <button
