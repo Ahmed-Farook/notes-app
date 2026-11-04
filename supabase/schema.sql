@@ -50,3 +50,4 @@ create policy "Users can manage their own notes"
 -- 5. Enable Realtime WebSockets for Notes & Folders
 alter publication supabase_realtime add table public.folders;
 alter publication supabase_realtime add table public.notes;
+

@@ -1,6 +1,14 @@
 # Cross-Platform Notes App (Apple Notes Inspired) 📝
 
-A lightweight, modern, cross-platform notes application inspired by Apple Notes. Built to run seamlessly on macOS, Windows, Linux, and the Web.
+A lightweight, modern, cross-platform notes application inspired by Apple Notes. Built to run seamlessly on **macOS**, **Android**, and the **Web** with **free real-time cloud sync** and **local-first 0ms speed**.
+
+---
+
+## 📦 Downloads & Live App
+
+- **🌐 Live Web App (Vercel):** Deployable with 1-click on [Vercel](https://vercel.com)
+- **📱 Android APK:** Download [`Apple-Notes-*.apk`](https://github.com/Ahmed-Farook/notes-app/releases/latest) (~4.3 MB)
+- **💻 macOS DMG (Apple Silicon):** Download [`Apple-Notes-*-arm64.dmg`](https://github.com/Ahmed-Farook/notes-app/releases/latest) (~128 MB)
 
 ---
 
@@ -16,8 +24,15 @@ A lightweight, modern, cross-platform notes application inspired by Apple Notes.
   - Bold, Italic, Underline, Strikethrough, and Highlighter
   - Bulleted and numbered lists
   - Blockquotes, Code blocks, and Horizontal dividers
-- **Smart Title & Snippet Detection:**
-  - Automatically derives the note title from the first line of content and snippet preview from the following lines.
+- **☁️ Free Real-Time Cloud Sync (Supabase):**
+  - Instant WebSocket sync across macOS, Android, and Web.
+  - Built-in authentication (Email & Password).
+  - Row Level Security (RLS) ensures users only access their own data.
+  - Merges local notes automatically upon sign-in so you never lose anything created offline.
+- **🔔 Cross-Platform Software Updates:**
+  - In-app automatic update notification banner and dialog.
+  - Check for updates via Mac menu, sidebar version pill, or top navbar.
+  - Direct 1-click download tailored for Android (`.apk`) and macOS (`.dmg`).
 - **Offline & Local-First:**
   - Instant auto-save to local storage with zero latency and full offline support.
 - **Exporting:**
@@ -35,7 +50,7 @@ npm run dev
 ```
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-### 2. Build for Production (Web / PWA)
+### 2. Build for Production
 ```bash
 npm run build
 ```
@@ -53,10 +68,10 @@ npm run mac:dev
 # 2. Or run directly from built assets
 npm run mac:start
 
-# 3. Package as a native macOS .app / .dmg bundle
+# 3. Package as a native macOS .dmg bundle
 npm run mac:build
 ```
-The compiled macOS app is placed in `release/mac-arm64/Apple Notes.app`.
+The compiled macOS app is placed in `release/Apple Notes-0.1.0-arm64.dmg`.
 
 ---
 
@@ -65,7 +80,7 @@ The compiled macOS app is placed in `release/mac-arm64/Apple Notes.app`.
 The app is integrated with **Capacitor** to deliver 60-120fps hardware-accelerated Android performance, haptic feedback, safe area insets, and keyboard auto-resizing:
 
 ```bash
-# 1. Sync any web code updates into Android
+# 1. Sync web code updates into Android
 npm run android:sync
 
 # 2. Open the project in Android Studio
@@ -83,4 +98,3 @@ npm run android:build
 - **Zero Touch Delay:** Uses `touch-action: manipulation` to eliminate the default 300ms mobile touch delay.
 - **Native Haptics:** Tactile feedback on checklists, note selections, and folder switching via `@capacitor/haptics`.
 - **macOS Native Window:** Vibrancy frosted glass effect, native traffic lights, and native macOS shortcuts (`Cmd+N`, `Cmd+F`).
-
