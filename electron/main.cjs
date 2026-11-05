@@ -277,25 +277,23 @@ xattr -rd com.apple.quarantine "$TARGET_APP" >/dev/null 2>&1 || true
 open -n -a "$TARGET_APP"
 `;
 
-        fs.writeFileSync(scriptPath, scriptContent, { mode: 0o755 });
+    fs.writeFileSync(scriptPath, scriptContent, { mode: 0o755 });
 
-        // 6. Spawn update script detached and quit current app
-        const updateProcess = spawn('/bin/bash', [scriptPath], {
-          detached: true,
-          stdio: 'ignore',
-        });
-        updateProcess.unref();
-
-        resolve({ success: true });
-
-        setTimeout(() => {
-          app.quit();
-        }, 300);
-      } catch (err) {
-        reject(err);
-      }
+    // 6. Spawn update script detached and quit current app
+    const updateProcess = spawn('/bin/bash', [scriptPath], {
+      detached: true,
+      stdio: 'ignore',
     });
-  });
+    updateProcess.unref();
+
+    setTimeout(() => {
+      app.quit();
+    }, 300);
+
+    return { success: true };
+  } catch (err) {
+    throw new Error(`macOS update failed: ${err.message}`);
+  }
 });
 
 app.whenReady().then(() => {
