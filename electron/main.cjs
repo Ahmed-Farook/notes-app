@@ -2,6 +2,7 @@ const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
+const https = require('https');
 const { spawn, execSync } = require('child_process');
 
 let mainWindow = null;
@@ -146,50 +147,68 @@ function buildMenu() {
   Menu.setApplicationMenu(menu);
 }
 
+// Helper to download files with redirect support and progress reporting
+function downloadFileWithProgress(url, destPath, onProgress) {
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(destPath);
+    const req = https.get(url, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        file.close();
+        try { fs.unlinkSync(destPath); } catch (_) {}
+        return downloadFileWithProgress(res.headers.location, destPath, onProgress).then(resolve).catch(reject);
+      }
+      if (res.statusCode !== 200) {
+        file.close();
+        try { fs.unlinkSync(destPath); } catch (_) {}
+        return reject(new Error(`Download failed with HTTP ${res.statusCode}`));
+      }
+      const total = parseInt(res.headers['content-length'] || '0', 10);
+      let received = 0;
+      res.on('data', (chunk) => {
+        received += chunk.length;
+        if (total > 0 && onProgress) {
+          const percent = Math.min(100, Math.round((received / total) * 100));
+          onProgress(percent);
+        }
+      });
+      res.pipe(file);
+      file.on('finish', () => {
+        file.close(() => resolve());
+      });
+    });
+    req.on('error', (err) => {
+      file.close();
+      try { fs.unlinkSync(destPath); } catch (_) {}
+      reject(err);
+    });
+  });
+}
+
 // In-app seamless auto-updater for macOS and Windows
 ipcMain.handle('updater:install-update', async (_event, downloadUrl) => {
   if (!downloadUrl) throw new Error('No download URL provided');
 
   if (process.platform === 'win32') {
     const tempExePath = path.join(os.tmpdir(), `Apple-Notes-Setup-${Date.now()}.exe`);
-    return new Promise((resolve, reject) => {
-      const curl = spawn('curl', ['-L', '--progress-bar', '-o', tempExePath, downloadUrl]);
-
-      curl.stderr.on('data', (chunk) => {
-        const text = chunk.toString();
-        const match = text.match(/(\d{1,3}(?:\.\d+)?)\s*%/);
-        if (match) {
-          const percent = Math.min(100, Math.max(0, parseFloat(match[1])));
-          mainWindow?.webContents.send('updater:progress', percent);
-        }
+    try {
+      await downloadFileWithProgress(downloadUrl, tempExePath, (percent) => {
+        mainWindow?.webContents.send('updater:progress', percent);
       });
+      mainWindow?.webContents.send('updater:progress', 100);
 
-      curl.on('error', (err) => {
-        reject(new Error(`Download failed: ${err.message}`));
+      const installer = spawn(tempExePath, [], {
+        detached: true,
+        stdio: 'ignore',
       });
+      installer.unref();
 
-      curl.on('close', (code) => {
-        if (code !== 0) {
-          return reject(new Error(`Download failed with curl code ${code}`));
-        }
-        mainWindow?.webContents.send('updater:progress', 100);
-
-        try {
-          const installer = spawn(tempExePath, [], {
-            detached: true,
-            stdio: 'ignore',
-          });
-          installer.unref();
-
-          resolve({ success: true });
-          setTimeout(() => {
-            app.quit();
-          }, 400);
-        } catch (err) {
-          reject(err);
-        }
-      });
-    });
+      setTimeout(() => {
+        app.quit();
+      }, 400);
+      return { success: true };
+    } catch (err) {
+      throw new Error(`Windows update failed: ${err.message}`);
+    }
   }
 
   if (process.platform !== 'darwin') {
@@ -199,56 +218,38 @@ ipcMain.handle('updater:install-update', async (_event, downloadUrl) => {
   const tempDmgPath = path.join(os.tmpdir(), `Apple-Notes-update-${Date.now()}.dmg`);
   const scriptPath = path.join(os.tmpdir(), `apply-apple-notes-update-${Date.now()}.sh`);
 
-  return new Promise((resolve, reject) => {
-    // 1. Download DMG using curl with progress reporting
-    const curl = spawn('curl', ['-L', '--progress-bar', '-o', tempDmgPath, downloadUrl]);
-
-    curl.stderr.on('data', (chunk) => {
-      const text = chunk.toString();
-      const match = text.match(/(\d{1,3}(?:\.\d+)?)\s*%/);
-      if (match) {
-        const percent = Math.min(100, Math.max(0, parseFloat(match[1])));
-        mainWindow?.webContents.send('updater:progress', percent);
-      }
+  try {
+    // 1. Download DMG using reliable native https stream with progress reporting
+    await downloadFileWithProgress(downloadUrl, tempDmgPath, (percent) => {
+      mainWindow?.webContents.send('updater:progress', percent);
     });
+    mainWindow?.webContents.send('updater:progress', 100);
 
-    curl.on('error', (err) => {
-      reject(new Error(`Download failed: ${err.message}`));
-    });
+    // 2. Mount DMG silently without opening a Finder window
+    const attachOutput = execSync(`hdiutil attach -nobrowse -readonly "${tempDmgPath}"`).toString();
+    const mountMatch = attachOutput.match(/\/Volumes\/[^\n\r]+/);
+    if (!mountMatch) {
+      throw new Error('Could not find DMG mount volume');
+    }
+    const mountPoint = mountMatch[0].trim();
 
-    curl.on('close', (code) => {
-      if (code !== 0) {
-        return reject(new Error(`Download failed with curl code ${code}`));
-      }
+    // 3. Locate the new .app inside the mounted DMG
+    const files = fs.readdirSync(mountPoint);
+    const appName = files.find((f) => f.endsWith('.app'));
+    if (!appName) {
+      execSync(`hdiutil detach "${mountPoint}" -force`);
+      throw new Error('No .app found inside the DMG image');
+    }
+    const sourceApp = path.join(mountPoint, appName);
 
-      mainWindow?.webContents.send('updater:progress', 100);
+    // 4. Determine current installed app path (or default to /Applications)
+    let targetApp = process.execPath.replace(/\/Contents\/MacOS\/.*$/, '');
+    if (!targetApp.endsWith('.app') || !fs.existsSync(targetApp)) {
+      targetApp = '/Applications/Apple Notes.app';
+    }
 
-      try {
-        // 2. Mount DMG silently without opening a Finder window
-        const attachOutput = execSync(`hdiutil attach -nobrowse -readonly "${tempDmgPath}"`).toString();
-        const mountMatch = attachOutput.match(/\/Volumes\/[^\n\r]+/);
-        if (!mountMatch) {
-          throw new Error('Could not find DMG mount volume');
-        }
-        const mountPoint = mountMatch[0].trim();
-
-        // 3. Locate the new .app inside the mounted DMG
-        const files = fs.readdirSync(mountPoint);
-        const appName = files.find((f) => f.endsWith('.app'));
-        if (!appName) {
-          execSync(`hdiutil detach "${mountPoint}" -force`);
-          throw new Error('No .app found inside the DMG image');
-        }
-        const sourceApp = path.join(mountPoint, appName);
-
-        // 4. Determine current installed app path (or default to /Applications)
-        let targetApp = process.execPath.replace(/\/Contents\/MacOS\/.*$/, '');
-        if (!targetApp.endsWith('.app') || !fs.existsSync(targetApp)) {
-          targetApp = '/Applications/Apple Notes.app';
-        }
-
-        // 5. Generate bash script to swap the app and restart after current PID exits
-        const scriptContent = `#!/bin/bash
+    // 5. Generate bash script to swap the app and restart after current PID exits
+    const scriptContent = `#!/bin/bash
 OLD_PID=${process.pid}
 SOURCE_APP="${sourceApp}"
 TARGET_APP="${targetApp}"
