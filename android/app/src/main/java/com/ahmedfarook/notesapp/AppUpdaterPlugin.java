@@ -73,9 +73,18 @@ public class AppUpdaterPlugin extends Plugin {
                                     apkFile
                                 );
 
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                    if (!context.getPackageManager().canRequestPackageInstalls()) {
+                                        Intent settingsIntent = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+                                        settingsIntent.setData(Uri.parse("package:" + context.getPackageName()));
+                                        settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                        context.startActivity(settingsIntent);
+                                    }
+                                }
+
                                 Intent installIntent = new Intent(Intent.ACTION_VIEW);
                                 installIntent.setDataAndType(apkUri, "application/vnd.android.package-archive");
-                                installIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                                installIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
                                 context.startActivity(installIntent);
 
                                 JSObject ret = new JSObject();

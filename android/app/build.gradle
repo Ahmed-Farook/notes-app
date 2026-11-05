@@ -1,14 +1,51 @@
 apply plugin: 'com.android.application'
+import groovy.json.JsonSlurper
+
+def getAppVersionCode() {
+    try {
+        def packageJsonFile = file('../../package.json')
+        if (packageJsonFile.exists()) {
+            def json = new JsonSlurper().parseText(packageJsonFile.text)
+            def parts = json.version.tokenize('.')
+            def major = parts[0].toInteger()
+            def minor = parts[1].toInteger()
+            def patch = parts[2].toInteger()
+            return major * 10000 + minor * 100 + patch
+        }
+    } catch (Exception ignored) {}
+    return 1
+}
+
+def getAppVersionName() {
+    try {
+        def packageJsonFile = file('../../package.json')
+        if (packageJsonFile.exists()) {
+            def json = new JsonSlurper().parseText(packageJsonFile.text)
+            return json.version
+        }
+    } catch (Exception ignored) {}
+    return "1.0.0"
+}
 
 android {
     namespace = "com.ahmedfarook.notesapp"
     compileSdk = rootProject.ext.compileSdkVersion
+
+    signingConfigs {
+        release {
+            storeFile file('notes.keystore')
+            storePassword 'notesappkeystore'
+            keyAlias 'notes'
+            keyPassword 'notesappkeystore'
+        }
+    }
+
     defaultConfig {
         applicationId "com.ahmedfarook.notesapp"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode getAppVersionCode()
+        versionName getAppVersionName()
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -17,7 +54,11 @@ android {
         }
     }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.release
+        }
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
