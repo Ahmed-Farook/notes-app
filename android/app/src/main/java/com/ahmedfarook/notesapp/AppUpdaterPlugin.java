@@ -111,3 +111,4 @@ public class AppUpdaterPlugin extends Plugin {
         }
     }
 }
+
