@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sendNewNote: (callback) => ipcRenderer.on('action:new-note', callback),
   sendSearch: (callback) => ipcRenderer.on('action:search', callback),
   sendCheckUpdates: (callback) => ipcRenderer.on('action:check-updates', callback),
+  checkForUpdates: (token) => ipcRenderer.invoke('updater:check', token),
   installUpdate: (downloadUrl) => ipcRenderer.invoke('updater:install-update', downloadUrl),
   onUpdateProgress: (callback) => {
     const listener = (_event, percent) => callback(percent);

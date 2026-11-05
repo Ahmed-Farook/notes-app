@@ -27,6 +27,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       spellcheck: true,
+      webSecurity: false,
     },
     show: false,
   });
@@ -183,6 +184,121 @@ function downloadFileWithProgress(url, destPath, onProgress) {
     });
   });
 }
+
+// Helper to fetch JSON from API or CDN with redirect support and custom User-Agent
+function fetchJson(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const req = https.get(
+      {
+        protocol: parsed.protocol,
+        hostname: parsed.hostname,
+        path: parsed.pathname + parsed.search,
+        headers: {
+          'User-Agent': 'Apple-Notes-App',
+          ...headers,
+        },
+      },
+      (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          return fetchJson(res.headers.location, headers).then(resolve).catch(reject);
+        }
+        let data = '';
+        res.on('data', (chunk) => (data += chunk));
+        res.on('end', () => {
+          if (res.statusCode < 200 || res.statusCode >= 300) {
+            return reject(new Error(`HTTP ${res.statusCode}: ${data}`));
+          }
+          try {
+            resolve(JSON.parse(data));
+          } catch (e) {
+            reject(new Error(`Failed to parse JSON: ${e.message}`));
+          }
+        });
+      }
+    );
+    req.on('error', reject);
+  });
+}
+
+// Check for updates via Node.js main process (bypasses browser CORS & Rate Limits)
+ipcMain.handle('updater:check', async (_event, token) => {
+  const repo = 'Ahmed-Farook/notes-app';
+  const platform = process.platform === 'darwin' ? 'mac' : process.platform === 'win32' ? 'windows' : 'web';
+
+  const headers = {
+    Accept: 'application/vnd.github.v3+json',
+  };
+  if (token && token.trim()) {
+    headers.Authorization = `Bearer ${token.trim()}`;
+  }
+
+  // 1. Try GitHub Releases API first
+  try {
+    const releaseData = await fetchJson(`https://api.github.com/repos/${repo}/releases/latest`, headers);
+    const rawTag = releaseData.tag_name || '0.0.0';
+    const latestVersion = rawTag.replace(/^v/i, '');
+
+    let downloadUrl = releaseData.html_url;
+    let assetName = undefined;
+
+    if (Array.isArray(releaseData.assets)) {
+      if (platform === 'mac') {
+        const dmgAsset = releaseData.assets.find((a) => a.name.endsWith('.dmg'));
+        if (dmgAsset) {
+          downloadUrl = dmgAsset.browser_download_url;
+          assetName = dmgAsset.name;
+        }
+      } else if (platform === 'windows') {
+        const exeAsset = releaseData.assets.find((a) => a.name.endsWith('.exe'));
+        if (exeAsset) {
+          downloadUrl = exeAsset.browser_download_url;
+          assetName = exeAsset.name;
+        }
+      }
+    }
+
+    return {
+      latestVersion,
+      name: releaseData.name || `Version ${latestVersion}`,
+      body: releaseData.body || '',
+      publishedAt: releaseData.published_at || new Date().toISOString(),
+      releaseUrl: releaseData.html_url,
+      downloadUrl,
+      assetName,
+      platform,
+    };
+  } catch (apiErr) {
+    // 2. If GitHub API is rate-limited (HTTP 403) or unreachable, fall back to Fastly raw CDN (NO RATE LIMIT)
+    try {
+      const pkg = await fetchJson(`https://raw.githubusercontent.com/${repo}/main/package.json?t=${Date.now()}`);
+      const latestVersion = (pkg.version || '0.0.0').replace(/^v/i, '');
+      let downloadUrl = `https://github.com/${repo}/releases/tag/v${latestVersion}`;
+      let assetName = undefined;
+
+      if (platform === 'mac') {
+        assetName = `Apple-Notes-${latestVersion}-arm64.dmg`;
+        downloadUrl = `https://github.com/${repo}/releases/download/v${latestVersion}/${assetName}`;
+      } else if (platform === 'windows') {
+        assetName = `Apple-Notes-Setup-${latestVersion}.exe`;
+        downloadUrl = `https://github.com/${repo}/releases/download/v${latestVersion}/${assetName}`;
+      }
+
+      return {
+        latestVersion,
+        name: `Apple Notes v${latestVersion}`,
+        body: `Version v${latestVersion} includes the latest performance enhancements, in-app updates, and zero-knowledge privacy features.`,
+        publishedAt: new Date().toISOString(),
+        releaseUrl: `https://github.com/${repo}/releases/tag/v${latestVersion}`,
+        downloadUrl,
+        assetName,
+        platform,
+      };
+    } catch (fallbackErr) {
+      throw new Error(`Unable to reach update servers: ${fallbackErr.message}`);
+    }
+  }
+});
 
 // In-app seamless auto-updater for macOS and Windows
 ipcMain.handle('updater:install-update', async (_event, downloadUrl) => {

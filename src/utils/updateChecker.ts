@@ -133,6 +133,29 @@ export async function checkForUpdates(overrideToken?: string): Promise<UpdateInf
   const platform = getPlatform();
   const token = overrideToken ?? getStoredGithubToken();
 
+  // If running inside Electron, use Node's native HTTP updater via IPC (avoids all browser CORS & rate limit issues)
+  const win = typeof window !== 'undefined' ? (window as any) : undefined;
+  if (win?.electronAPI?.checkForUpdates) {
+    try {
+      const electronResult = await win.electronAPI.checkForUpdates(token || undefined);
+      const hasUpdate = compareVersions(electronResult.latestVersion, CURRENT_VERSION) > 0;
+      return {
+        currentVersion: CURRENT_VERSION,
+        latestVersion: electronResult.latestVersion,
+        name: electronResult.name,
+        body: electronResult.body,
+        publishedAt: electronResult.publishedAt,
+        releaseUrl: electronResult.releaseUrl,
+        downloadUrl: electronResult.downloadUrl,
+        assetName: electronResult.assetName,
+        platform,
+        hasUpdate,
+      };
+    } catch (ipcErr: any) {
+      console.warn('Electron IPC update check failed, falling back to web fetch:', ipcErr);
+    }
+  }
+
   try {
     const headers: Record<string, string> = {
       Accept: 'application/vnd.github.v3+json',
