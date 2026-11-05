@@ -166,19 +166,6 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
 
       {/* Right controls */}
       <div className="flex items-center space-x-1 sm:space-x-1.5 [app-region:no-drag]">
-        {/* Checklist shortcut */}
-        <button
-          onClick={() => {
-            triggerHaptic();
-            onToggleChecklist?.();
-          }}
-          title="Insert Checklist"
-          disabled={!activeNote || activeNote.isTrash}
-          className="p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 disabled:opacity-30 disabled:pointer-events-none transition-colors active:scale-95"
-        >
-          <CheckSquare size={17} />
-        </button>
-
         {/* Format toolbar toggle */}
         <button
           onClick={() => {

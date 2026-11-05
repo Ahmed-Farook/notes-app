@@ -1,10 +1,22 @@
-import React from 'react';
-import { Search, X, FileText, Plus } from 'lucide-react';
+import React, { useState } from 'react';
+import {
+  Search,
+  X,
+  FileText,
+  Plus,
+  Folder,
+  Zap,
+  Trash2,
+  Check,
+  ChevronDown,
+} from 'lucide-react';
 import { useNotes } from '../../store/NotesContext';
 import { NoteCard } from './NoteCard';
+import { triggerHaptic } from '../../utils/haptics';
 
 export const NotesList: React.FC = () => {
   const {
+    notes,
     filteredNotes,
     pinnedNotes,
     unpinnedNotes,
@@ -19,58 +31,230 @@ export const NotesList: React.FC = () => {
     setSelectedFolderId,
   } = useNotes();
 
-  const [showFolderPicker, setShowFolderPicker] = React.useState(false);
+  const [showFolderPicker, setShowFolderPicker] = useState(false);
+
+  // Folder note counts
+  const allNotesCount = notes.filter(n => !n.isTrash).length;
+  const quickNotesCount = notes.filter(n => !n.isTrash && n.folderId === 'quick').length;
+  const defaultNotesCount = notes.filter(n => !n.isTrash && n.folderId === 'default').length;
+  const trashCount = notes.filter(n => n.isTrash).length;
+  const getFolderCount = (folderId: string) =>
+    notes.filter(n => !n.isTrash && n.folderId === folderId).length;
 
   return (
     <section className="w-full md:w-72 bg-white dark:bg-[#202020] md:border-r border-apple-border dark:border-apple-borderDark h-full flex flex-col select-none shrink-0">
       {/* Mobile folder selector pill */}
-      <div className="md:hidden px-3 pt-2 pb-1 flex items-center justify-between border-b border-apple-border dark:border-apple-borderDark">
+      <div className="md:hidden px-3.5 py-2 flex items-center justify-between border-b border-apple-border dark:border-apple-borderDark bg-[#fafafa]/90 dark:bg-[#1c1c1e]/90 backdrop-blur-md">
         <button
-          onClick={() => setShowFolderPicker(!showFolderPicker)}
-          className="flex items-center space-x-1.5 text-xs font-semibold text-neutral-800 dark:text-neutral-200 bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 rounded-full"
+          onClick={() => {
+            triggerHaptic();
+            setShowFolderPicker(true);
+          }}
+          className="flex items-center space-x-2 text-xs font-semibold text-neutral-800 dark:text-neutral-200 bg-neutral-200/60 dark:bg-neutral-800/80 hover:bg-neutral-200 dark:hover:bg-neutral-700/80 px-3 py-1.5 rounded-full transition-all active:scale-95 border border-neutral-300/40 dark:border-neutral-700/50 shadow-xs"
         >
-          <span>📁 {currentFolder?.name || 'All Notes'}</span>
-          <span className="text-[10px] text-neutral-400">▼</span>
+          <Folder size={13} className="text-apple-yellow" />
+          <span className="truncate max-w-[150px]">{currentFolder?.name || 'All Notes'}</span>
+          <ChevronDown size={12} className="text-neutral-400" />
         </button>
-        <span className="text-xs text-neutral-400">{filteredNotes.length} notes</span>
+        <span className="text-[11px] font-medium text-neutral-400">
+          {filteredNotes.length} {filteredNotes.length === 1 ? 'note' : 'notes'}
+        </span>
       </div>
 
-      {/* Mobile folder dropdown */}
+      {/* Apple-style Mobile Folder Bottom Sheet */}
       {showFolderPicker && (
-        <div className="md:hidden bg-neutral-50 dark:bg-neutral-850 p-2 border-b border-apple-border dark:border-apple-borderDark grid grid-cols-2 gap-1 text-xs">
-          <button
-            onClick={() => { setSelectedFolderId('all'); setShowFolderPicker(false); }}
-            className={`p-2 rounded text-left ${selectedFolderId === 'all' ? 'bg-apple-yellow text-white font-bold' : 'bg-white dark:bg-neutral-800'}`}
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          {/* Backdrop click dismiss */}
+          <div
+            className="absolute inset-0"
+            onClick={() => setShowFolderPicker(false)}
+          />
+
+          <div
+            className="relative w-full max-w-sm bg-[#f2f2f7] dark:bg-[#1c1c1e] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-neutral-200/80 dark:border-neutral-800/80 overflow-hidden flex flex-col max-h-[82vh] animate-in slide-in-from-bottom duration-250 z-10"
+            role="dialog"
+            aria-modal="true"
           >
-            All Notes
-          </button>
-          <button
-            onClick={() => { setSelectedFolderId('quick'); setShowFolderPicker(false); }}
-            className={`p-2 rounded text-left ${selectedFolderId === 'quick' ? 'bg-apple-yellow text-white font-bold' : 'bg-white dark:bg-neutral-800'}`}
-          >
-            Quick Notes
-          </button>
-          <button
-            onClick={() => { setSelectedFolderId('default'); setShowFolderPicker(false); }}
-            className={`p-2 rounded text-left ${selectedFolderId === 'default' ? 'bg-apple-yellow text-white font-bold' : 'bg-white dark:bg-neutral-800'}`}
-          >
-            Notes
-          </button>
-          {folders.map(f => (
-            <button
-              key={f.id}
-              onClick={() => { setSelectedFolderId(f.id); setShowFolderPicker(false); }}
-              className={`p-2 rounded text-left truncate ${selectedFolderId === f.id ? 'bg-apple-yellow text-white font-bold' : 'bg-white dark:bg-neutral-800'}`}
-            >
-              {f.name}
-            </button>
-          ))}
-          <button
-            onClick={() => { setSelectedFolderId('trash'); setShowFolderPicker(false); }}
-            className={`p-2 rounded text-left text-red-500 ${selectedFolderId === 'trash' ? 'bg-red-500 text-white font-bold' : 'bg-white dark:bg-neutral-800'}`}
-          >
-            Recently Deleted
-          </button>
+            {/* Grabber indicator */}
+            <div className="pt-2.5 pb-1 flex justify-center sm:hidden">
+              <div className="w-9 h-1 bg-neutral-300 dark:bg-neutral-600 rounded-full" />
+            </div>
+
+            {/* Sheet Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-neutral-200/70 dark:border-neutral-800/80">
+              <div className="flex items-center space-x-2">
+                <Folder size={17} className="text-apple-yellow" />
+                <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                  Folders
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowFolderPicker(false)}
+                className="text-xs font-semibold text-apple-yellow hover:text-apple-yellowHover py-1 px-2 rounded-lg transition-colors"
+              >
+                Done
+              </button>
+            </div>
+
+            {/* Folder List Group */}
+            <div className="p-3 space-y-3 overflow-y-auto">
+              {/* System Folders Group */}
+              <div className="bg-white dark:bg-[#2c2c2e] rounded-xl overflow-hidden shadow-xs divide-y divide-neutral-100 dark:divide-neutral-800/60">
+                {/* All Notes */}
+                <button
+                  onClick={() => {
+                    triggerHaptic();
+                    setSelectedFolderId('all');
+                    setShowFolderPicker(false);
+                  }}
+                  className={`w-full px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors text-left ${
+                    selectedFolderId === 'all'
+                      ? 'bg-apple-yellow/10 dark:bg-apple-yellow/15 text-apple-yellow font-semibold'
+                      : 'text-neutral-800 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800/50'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <div className="w-6 h-6 rounded-md bg-amber-500/15 text-apple-yellow flex items-center justify-center shrink-0">
+                      <Folder size={14} />
+                    </div>
+                    <span>All Notes</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[11px] text-neutral-400 font-mono">{allNotesCount}</span>
+                    {selectedFolderId === 'all' && (
+                      <Check size={15} className="text-apple-yellow stroke-[2.5]" />
+                    )}
+                  </div>
+                </button>
+
+                {/* Quick Notes */}
+                <button
+                  onClick={() => {
+                    triggerHaptic();
+                    setSelectedFolderId('quick');
+                    setShowFolderPicker(false);
+                  }}
+                  className={`w-full px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors text-left ${
+                    selectedFolderId === 'quick'
+                      ? 'bg-apple-yellow/10 dark:bg-apple-yellow/15 text-apple-yellow font-semibold'
+                      : 'text-neutral-800 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800/50'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <div className="w-6 h-6 rounded-md bg-amber-500/15 text-apple-yellow flex items-center justify-center shrink-0">
+                      <Zap size={14} />
+                    </div>
+                    <span>Quick Notes</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[11px] text-neutral-400 font-mono">{quickNotesCount}</span>
+                    {selectedFolderId === 'quick' && (
+                      <Check size={15} className="text-apple-yellow stroke-[2.5]" />
+                    )}
+                  </div>
+                </button>
+
+                {/* Notes (Default) */}
+                <button
+                  onClick={() => {
+                    triggerHaptic();
+                    setSelectedFolderId('default');
+                    setShowFolderPicker(false);
+                  }}
+                  className={`w-full px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors text-left ${
+                    selectedFolderId === 'default'
+                      ? 'bg-apple-yellow/10 dark:bg-apple-yellow/15 text-apple-yellow font-semibold'
+                      : 'text-neutral-800 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800/50'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <div className="w-6 h-6 rounded-md bg-amber-500/15 text-apple-yellow flex items-center justify-center shrink-0">
+                      <FileText size={14} />
+                    </div>
+                    <span>Notes</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[11px] text-neutral-400 font-mono">{defaultNotesCount}</span>
+                    {selectedFolderId === 'default' && (
+                      <Check size={15} className="text-apple-yellow stroke-[2.5]" />
+                    )}
+                  </div>
+                </button>
+              </div>
+
+              {/* Custom Folders Group */}
+              {folders.length > 0 && (
+                <div className="space-y-1">
+                  <span className="px-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                    Custom Folders
+                  </span>
+                  <div className="bg-white dark:bg-[#2c2c2e] rounded-xl overflow-hidden shadow-xs divide-y divide-neutral-100 dark:divide-neutral-800/60">
+                    {folders.map(f => {
+                      const count = getFolderCount(f.id);
+                      const isSelected = selectedFolderId === f.id;
+                      return (
+                        <button
+                          key={f.id}
+                          onClick={() => {
+                            triggerHaptic();
+                            setSelectedFolderId(f.id);
+                            setShowFolderPicker(false);
+                          }}
+                          className={`w-full px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors text-left ${
+                            isSelected
+                              ? 'bg-apple-yellow/10 dark:bg-apple-yellow/15 text-apple-yellow font-semibold'
+                              : 'text-neutral-800 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800/50'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2.5 truncate pr-2">
+                            <div className="w-6 h-6 rounded-md bg-blue-500/15 text-blue-500 flex items-center justify-center shrink-0">
+                              <Folder size={14} />
+                            </div>
+                            <span className="truncate">{f.name}</span>
+                          </div>
+                          <div className="flex items-center space-x-2 shrink-0">
+                            <span className="text-[11px] text-neutral-400 font-mono">{count}</span>
+                            {isSelected && (
+                              <Check size={15} className="text-apple-yellow stroke-[2.5]" />
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Trash Folder Group */}
+              <div className="bg-white dark:bg-[#2c2c2e] rounded-xl overflow-hidden shadow-xs">
+                <button
+                  onClick={() => {
+                    triggerHaptic();
+                    setSelectedFolderId('trash');
+                    setShowFolderPicker(false);
+                  }}
+                  className={`w-full px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors text-left ${
+                    selectedFolderId === 'trash'
+                      ? 'bg-red-500/10 text-red-600 dark:text-red-400 font-semibold'
+                      : 'text-neutral-800 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800/50'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <div className="w-6 h-6 rounded-md bg-red-500/15 text-red-500 flex items-center justify-center shrink-0">
+                      <Trash2 size={14} />
+                    </div>
+                    <span>Recently Deleted</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[11px] text-neutral-400 font-mono">{trashCount}</span>
+                    {selectedFolderId === 'trash' && (
+                      <Check size={15} className="text-red-500 stroke-[2.5]" />
+                    )}
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
       {/* Search Bar */}

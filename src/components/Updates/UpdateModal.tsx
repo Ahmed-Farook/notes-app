@@ -52,14 +52,45 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
   }, []);
 
   const handleInstallNow = async () => {
-    if (!updateInfo?.downloadUrl || !window.electronAPI?.installUpdate) return;
+    if (!updateInfo) return;
     setIsInstalling(true);
     setInstallProgress(0);
     setInstallError(null);
     triggerHaptic();
 
     try {
-      await window.electronAPI.installUpdate(updateInfo.downloadUrl);
+      if (updateInfo.platform === 'web') {
+        setInstallProgress(50);
+        setTimeout(() => {
+          setInstallProgress(100);
+          setTimeout(() => {
+            window.location.reload();
+          }, 300);
+        }, 500);
+        return;
+      }
+
+      if (updateInfo.platform === 'android') {
+        const win = window as any;
+        if (win.Capacitor?.Plugins?.AppUpdater?.installUpdate) {
+          setInstallProgress(40);
+          await win.Capacitor.Plugins.AppUpdater.installUpdate({ url: updateInfo.downloadUrl });
+          setInstallProgress(100);
+          return;
+        } else {
+          window.location.href = updateInfo.downloadUrl;
+          setInstallProgress(100);
+          return;
+        }
+      }
+
+      if (window.electronAPI?.installUpdate) {
+        await window.electronAPI.installUpdate(updateInfo.downloadUrl);
+        return;
+      }
+
+      window.location.href = updateInfo.downloadUrl;
+      setInstallProgress(100);
     } catch (err: any) {
       setIsInstalling(false);
       setInstallError(err?.message || 'Failed to install update automatically');
@@ -198,81 +229,54 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
 
               {/* Action Buttons */}
               <div className="pt-2 space-y-2">
-                {(updateInfo.platform === 'mac' || updateInfo.platform === 'windows') &&
-                Boolean(window.electronAPI?.installUpdate) ? (
-                  isInstalling ? (
-                    <div className="space-y-2.5 p-3.5 bg-amber-500/10 dark:bg-amber-500/15 rounded-xl border border-amber-500/25">
-                      <div className="flex items-center justify-between text-xs font-semibold text-neutral-800 dark:text-neutral-100">
-                        <span>
-                          {installProgress >= 100
-                            ? updateInfo.platform === 'mac'
-                              ? 'Restarting Apple Notes...'
-                              : 'Launching installer...'
-                            : 'Downloading & Updating...'}
-                        </span>
-                        <span className="font-mono text-apple-yellow">{Math.round(installProgress)}%</span>
-                      </div>
-                      <div className="w-full h-2 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-apple-yellow transition-all duration-150 rounded-full"
-                          style={{ width: `${installProgress}%` }}
-                        />
-                      </div>
-                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400 text-center">
-                        {updateInfo.platform === 'mac'
-                          ? `The app will automatically update in-place and restart with v${updateInfo.latestVersion}.`
-                          : `The installer will launch automatically to update Apple Notes to v${updateInfo.latestVersion}.`}
-                      </p>
+                {isInstalling ? (
+                  <div className="space-y-2.5 p-3.5 bg-amber-500/10 dark:bg-amber-500/15 rounded-xl border border-amber-500/25">
+                    <div className="flex items-center justify-between text-xs font-semibold text-neutral-800 dark:text-neutral-100">
+                      <span>
+                        {installProgress >= 100
+                          ? updateInfo.platform === 'mac'
+                            ? 'Restarting Apple Notes...'
+                            : updateInfo.platform === 'android'
+                            ? 'Opening system installer...'
+                            : updateInfo.platform === 'web'
+                            ? 'Reloading...'
+                            : 'Launching installer...'
+                          : 'Downloading & Updating...'}
+                      </span>
+                      <span className="font-mono text-apple-yellow">{Math.round(installProgress)}%</span>
                     </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <button
-                        onClick={handleInstallNow}
-                        className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-apple-yellow hover:bg-apple-yellowHover active:scale-98 text-white font-semibold text-xs shadow-md transition-all"
-                      >
-                        <Zap size={16} />
-                        <span>
-                          {updateInfo.platform === 'mac'
-                            ? 'Update & Restart Now'
-                            : 'Download & Install Update'}
-                        </span>
-                      </button>
-
-                      {installError && (
-                        <p className="text-[11px] text-red-500 text-center">{installError}</p>
-                      )}
-
-                      <div className="text-center">
-                        <a
-                          href={updateInfo.downloadUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[10px] text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 underline"
-                        >
-                          {updateInfo.platform === 'mac'
-                            ? 'Or manually download DMG'
-                            : 'Or manually download EXE'}
-                        </a>
-                      </div>
+                    <div className="w-full h-2 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-apple-yellow transition-all duration-150 rounded-full"
+                        style={{ width: `${installProgress}%` }}
+                      />
                     </div>
-                  )
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400 text-center">
+                      {updateInfo.platform === 'mac'
+                        ? `The app will automatically update in-place and restart with v${updateInfo.latestVersion}.`
+                        : updateInfo.platform === 'android'
+                        ? `Downloading update. The Android installer will prompt you to update in-place.`
+                        : updateInfo.platform === 'web'
+                        ? `Applying latest updates to your browser session.`
+                        : `The installer will launch automatically to update Apple Notes to v${updateInfo.latestVersion}.`}
+                    </p>
+                  </div>
                 ) : (
-                  <div>
-                    <a
-                      href={updateInfo.downloadUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => triggerHaptic()}
+                  <div className="space-y-2">
+                    <button
+                      onClick={handleInstallNow}
                       className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-apple-yellow hover:bg-apple-yellowHover active:scale-98 text-white font-semibold text-xs shadow-md transition-all"
                     >
-                      <Download size={16} />
-                      <span>{getPlatformLabel()}</span>
-                      <ExternalLink size={13} className="opacity-70" />
-                    </a>
-                    {updateInfo.assetName && (
-                      <p className="text-center text-[10px] text-neutral-400 mt-1.5">
-                        File: <span className="font-mono">{updateInfo.assetName}</span>
-                      </p>
+                      <Zap size={16} />
+                      <span>
+                        {updateInfo.platform === 'mac'
+                          ? 'Update & Restart Now'
+                          : 'Update App Now'}
+                      </span>
+                    </button>
+
+                    {installError && (
+                      <p className="text-[11px] text-red-500 text-center">{installError}</p>
                     )}
                   </div>
                 )}
