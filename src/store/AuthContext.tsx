@@ -8,6 +8,11 @@ import React, {
 } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import {
+  deriveKeyFromPassword,
+  exportKeyToString,
+  importKeyFromString,
+} from '../utils/crypto';
 
 export type SyncStatus = 'synced' | 'syncing' | 'offline' | 'error';
 
@@ -20,6 +25,9 @@ interface AuthContextType {
   isAuthModalOpen: boolean;
   openAuthModal: () => void;
   closeAuthModal: () => void;
+  encryptionKey: CryptoKey | null;
+  isKeyUnlocked: boolean;
+  unlockWithPassword: (password: string) => Promise<boolean>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signUp: (email: string, password: string) => Promise<{ error: AuthError | null; needsEmailConfirmation?: boolean }>;
   signOut: () => Promise<void>;
@@ -33,13 +41,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('synced');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [encryptionKey, setEncryptionKey] = useState<CryptoKey | null>(null);
+  const [isKeyUnlocked, setIsKeyUnlocked] = useState<boolean>(false);
+
+  // Helper to load stored encryption key from local device storage
+  const loadStoredKey = useCallback(async (userId: string) => {
+    try {
+      const savedKeyStr = localStorage.getItem(`apple_notes_e2ee_${userId}`);
+      if (savedKeyStr) {
+        const key = await importKeyFromString(savedKeyStr);
+        setEncryptionKey(key);
+        setIsKeyUnlocked(true);
+        return key;
+      }
+    } catch (err) {
+      console.warn('Error loading stored encryption key:', err);
+    }
+    setIsKeyUnlocked(false);
+    return null;
+  }, []);
 
   useEffect(() => {
     // 1. Get initial session
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
       if (!error && session) {
         setSession(session);
         setUser(session.user);
+        await loadStoredKey(session.user.id);
       }
       setIsLoading(false);
     });
@@ -47,16 +75,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // 2. Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       setUser(session ? session.user : null);
+      if (session?.user) {
+        await loadStoredKey(session.user.id);
+      } else {
+        setEncryptionKey(null);
+        setIsKeyUnlocked(false);
+      }
       setIsLoading(false);
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [loadStoredKey]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     setSyncStatus('syncing');
@@ -68,6 +102,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setSyncStatus('error');
       return { error };
     }
+
+    // Derive Zero-Knowledge AES-GCM Key locally on this device
+    try {
+      const key = await deriveKeyFromPassword(password, email);
+      setEncryptionKey(key);
+      setIsKeyUnlocked(true);
+      const exported = await exportKeyToString(key);
+      localStorage.setItem(`apple_notes_e2ee_${data.user.id}`, exported);
+    } catch (keyErr) {
+      console.error('Failed to derive encryption key on sign-in:', keyErr);
+    }
+
     setSession(data.session);
     setUser(data.user);
     setSyncStatus('synced');
@@ -85,8 +131,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setSyncStatus('error');
       return { error };
     }
+
     const needsEmailConfirmation = !data.session;
-    if (data.session) {
+    if (data.session && data.user) {
+      // Derive Zero-Knowledge AES-GCM Key locally on this device
+      try {
+        const key = await deriveKeyFromPassword(password, email);
+        setEncryptionKey(key);
+        setIsKeyUnlocked(true);
+        const exported = await exportKeyToString(key);
+        localStorage.setItem(`apple_notes_e2ee_${data.user.id}`, exported);
+      } catch (keyErr) {
+        console.error('Failed to derive encryption key on sign-up:', keyErr);
+      }
+
       setSession(data.session);
       setUser(data.user);
       setIsAuthModalOpen(false);
@@ -95,13 +153,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return { error: null, needsEmailConfirmation };
   }, []);
 
+  const unlockWithPassword = useCallback(async (password: string) => {
+    if (!user || !user.email) return false;
+    try {
+      const key = await deriveKeyFromPassword(password, user.email);
+      setEncryptionKey(key);
+      setIsKeyUnlocked(true);
+      const exported = await exportKeyToString(key);
+      localStorage.setItem(`apple_notes_e2ee_${user.id}`, exported);
+      return true;
+    } catch (err) {
+      console.error('Failed to unlock notes with password:', err);
+      return false;
+    }
+  }, [user]);
+
   const signOut = useCallback(async () => {
     setSyncStatus('syncing');
+    if (user) {
+      localStorage.removeItem(`apple_notes_e2ee_${user.id}`);
+    }
     await supabase.auth.signOut();
     setSession(null);
     setUser(null);
+    setEncryptionKey(null);
+    setIsKeyUnlocked(false);
     setSyncStatus('synced');
-  }, []);
+  }, [user]);
 
   return (
     <AuthContext.Provider
@@ -114,6 +192,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isAuthModalOpen,
         openAuthModal: () => setIsAuthModalOpen(true),
         closeAuthModal: () => setIsAuthModalOpen(false),
+        encryptionKey,
+        isKeyUnlocked,
+        unlockWithPassword,
         signIn,
         signUp,
         signOut,
@@ -131,4 +212,3 @@ export const useAuth = () => {
   }
   return context;
 };
-

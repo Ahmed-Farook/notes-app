@@ -8,20 +8,47 @@ import {
   AlertCircle,
   CheckCircle2,
   Sparkles,
+  ShieldCheck,
+  KeyRound,
 } from 'lucide-react';
 import { useAuth } from '../../store/AuthContext';
 import { triggerHaptic } from '../../utils/haptics';
 
 export const AuthModal: React.FC = () => {
-  const { isAuthModalOpen, closeAuthModal, signIn, signUp, user, signOut } = useAuth();
+  const {
+    isAuthModalOpen,
+    closeAuthModal,
+    signIn,
+    signUp,
+    user,
+    signOut,
+    isKeyUnlocked,
+    unlockWithPassword,
+  } = useAuth();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [unlockPassword, setUnlockPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   if (!isAuthModalOpen) return null;
+
+  const handleUnlock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!unlockPassword.trim()) return;
+    setIsLoading(true);
+    setErrorMsg(null);
+    const ok = await unlockWithPassword(unlockPassword);
+    setIsLoading(false);
+    if (!ok) {
+      setErrorMsg('Invalid password. Unable to unlock encryption key.');
+    } else {
+      setUnlockPassword('');
+      setSuccessMsg('Notes unlocked successfully!');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,8 +137,43 @@ export const AuthModal: React.FC = () => {
                 <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate max-w-xs mx-auto">
                   Signed in as <span className="font-medium text-neutral-800 dark:text-neutral-200">{user.email}</span>
                 </p>
-                <p className="text-[11px] text-neutral-400 pt-1">
-                  Your notes and checklists are synced in real-time across your devices.
+                <div className="pt-2">
+                  {isKeyUnlocked ? (
+                    <div className="inline-flex items-center space-x-1.5 text-[11px] text-emerald-700 dark:text-emerald-300 font-medium bg-emerald-50 dark:bg-emerald-950/40 py-1.5 px-3 rounded-full border border-emerald-200 dark:border-emerald-800/60">
+                      <ShieldCheck size={14} className="text-emerald-500" />
+                      <span>Zero-Knowledge E2EE Active (AES-256)</span>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-xl space-y-2 text-left">
+                      <div className="flex items-center space-x-1.5 text-xs font-semibold text-amber-800 dark:text-amber-200">
+                        <KeyRound size={14} />
+                        <span>Unlock Encrypted Notes</span>
+                      </div>
+                      <p className="text-[11px] text-amber-700 dark:text-amber-300/90 leading-relaxed">
+                        Enter your account password on this device to decrypt your notes:
+                      </p>
+                      <form onSubmit={handleUnlock} className="space-y-2 pt-1">
+                        <input
+                          type="password"
+                          required
+                          placeholder="Your account password"
+                          value={unlockPassword}
+                          onChange={(e) => setUnlockPassword(e.target.value)}
+                          className="w-full text-xs px-3 py-1.5 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 outline-none focus:border-apple-yellow"
+                        />
+                        <button
+                          type="submit"
+                          disabled={isLoading}
+                          className="w-full py-1.5 bg-apple-yellow text-white rounded-lg text-xs font-semibold hover:bg-apple-yellowHover transition-colors"
+                        >
+                          {isLoading ? 'Unlocking...' : 'Unlock Notes'}
+                        </button>
+                      </form>
+                    </div>
+                  )}
+                </div>
+                <p className="text-[11px] text-neutral-400 pt-1 leading-relaxed">
+                  Your notes and checklists are encrypted end-to-end. Nobody — not even the database admin — can read them.
                 </p>
               </div>
 
@@ -243,7 +305,7 @@ export const AuthModal: React.FC = () => {
               </form>
 
               <p className="text-[10px] text-center text-neutral-400 leading-relaxed">
-                Local-first: All your notes remain cached on this device and continue working offline.
+                🛡️ <strong>Zero-Knowledge:</strong> Notes are encrypted with AES-256 on your device before syncing. Even the database admin cannot read your notes.
               </p>
             </>
           )}
