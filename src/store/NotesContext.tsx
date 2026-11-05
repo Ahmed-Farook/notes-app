@@ -15,6 +15,7 @@ import {
   loadStoredFolders,
   saveStoredFolders,
   SYSTEM_FOLDERS,
+  INITIAL_NOTES,
 } from '../utils/storage';
 import { triggerHaptic } from '../utils/haptics';
 import { useAuth } from './AuthContext';
@@ -130,9 +131,24 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
         if (!isMounted) return;
 
+        let effectiveRemoteNotes = remoteNotes;
+        // Clean up legacy 3 default sample notes from Supabase cloud if present
+        const isLegacySampleSet =
+          remoteNotes.length === 3 &&
+          remoteNotes.some(n => n.id === 'note-roadmap') &&
+          remoteNotes.some(n => n.id === 'note-weekend-ideas');
+
+        if (isLegacySampleSet) {
+          await Promise.all([
+            deleteNoteFromCloud('note-roadmap'),
+            deleteNoteFromCloud('note-weekend-ideas'),
+          ]);
+          effectiveRemoteNotes = INITIAL_NOTES;
+        }
+
         const { merged: mergedNotes, toUpload: notesToUpload } = mergeNotes(
           notesRef.current,
-          remoteNotes
+          effectiveRemoteNotes
         );
         const { merged: mergedFolders, toUpload: foldersToUpload } = mergeFolders(
           foldersRef.current,
