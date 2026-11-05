@@ -14,6 +14,12 @@
   <sub>macOS · Apple Silicon DMG &nbsp; / &nbsp; Windows · EXE &nbsp; / &nbsp; Android · APK</sub>
 </p>
 
+> [!TIP]
+> **macOS Gatekeeper notice:** If macOS says *"Apple Notes is damaged and can't be opened"*, this is Apple's standard message for unnotarized open-source apps. Move the app to `/Applications` and run this in Terminal:
+> ```bash
+> xattr -cr "/Applications/Apple Notes.app"
+> ```
+
 <br>
 
 **Write it down.**  
