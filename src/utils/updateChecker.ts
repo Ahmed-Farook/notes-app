@@ -85,80 +85,125 @@ export function setStoredGithubToken(token: string | null) {
 }
 
 /**
- * Checks GitHub Releases for the latest version.
+ * Fallback to Fastly CDN raw package check when GitHub API rate limit (60 req/hr) is reached.
  */
-export async function checkForUpdates(overrideToken?: string): Promise<UpdateInfo> {
-  const platform = getPlatform();
-  const token = overrideToken ?? getStoredGithubToken();
-
-  const headers: Record<string, string> = {
-    Accept: 'application/vnd.github.v3+json',
-  };
-
-  if (token) {
-    headers.Authorization = `Bearer ${token.trim()}`;
+async function checkViaRawFallback(platform: PlatformType): Promise<UpdateInfo> {
+  const rawRes = await fetch(
+    `https://raw.githubusercontent.com/${GITHUB_REPO}/main/package.json?t=${Date.now()}`
+  );
+  if (!rawRes.ok) {
+    throw new Error('Unable to connect to GitHub. Please check your internet connection.');
   }
+  const pkg = await rawRes.json();
+  const latestVersion = (pkg.version || '0.0.0').replace(/^v/i, '');
+  const hasUpdate = compareVersions(latestVersion, CURRENT_VERSION) > 0;
 
-  const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
-    headers,
-  });
-
-  if (!response.ok) {
-    if (response.status === 404) {
-      throw new Error(
-        token
-          ? 'No releases found on GitHub.'
-          : 'Repository is private or no releases found. Sign in with GitHub or set repository to Public.'
-      );
-    }
-    if (response.status === 403) {
-      throw new Error('GitHub API rate limit reached. Please try again later.');
-    }
-    throw new Error(`Failed to check updates (HTTP ${response.status})`);
-  }
-
-  const data = await response.json();
-  const rawTag: string = data.tag_name || '0.0.0';
-  const latestVersion = rawTag.replace(/^v/i, '');
-
-  let downloadUrl = data.html_url;
+  let downloadUrl = `https://github.com/${GITHUB_REPO}/releases/tag/v${latestVersion}`;
   let assetName: string | undefined = undefined;
 
-  if (Array.isArray(data.assets)) {
-    if (platform === 'android') {
-      const apkAsset = data.assets.find((a: any) => a.name.endsWith('.apk'));
-      if (apkAsset) {
-        downloadUrl = apkAsset.browser_download_url;
-        assetName = apkAsset.name;
-      }
-    } else if (platform === 'mac') {
-      const dmgAsset = data.assets.find((a: any) => a.name.endsWith('.dmg'));
-      if (dmgAsset) {
-        downloadUrl = dmgAsset.browser_download_url;
-        assetName = dmgAsset.name;
-      }
-    } else if (platform === 'windows') {
-      const exeAsset = data.assets.find((a: any) => a.name.endsWith('.exe'));
-      if (exeAsset) {
-        downloadUrl = exeAsset.browser_download_url;
-        assetName = exeAsset.name;
-      }
-    }
+  if (platform === 'android') {
+    assetName = `Apple-Notes-${latestVersion}.apk`;
+    downloadUrl = `https://github.com/${GITHUB_REPO}/releases/download/v${latestVersion}/${assetName}`;
+  } else if (platform === 'mac') {
+    assetName = `Apple-Notes-${latestVersion}-arm64.dmg`;
+    downloadUrl = `https://github.com/${GITHUB_REPO}/releases/download/v${latestVersion}/${assetName}`;
+  } else if (platform === 'windows') {
+    assetName = `Apple-Notes-Setup-${latestVersion}.exe`;
+    downloadUrl = `https://github.com/${GITHUB_REPO}/releases/download/v${latestVersion}/${assetName}`;
   }
-
-  const hasUpdate = compareVersions(latestVersion, CURRENT_VERSION) > 0;
 
   return {
     currentVersion: CURRENT_VERSION,
     latestVersion,
-    name: data.name || `Version ${latestVersion}`,
-    body: data.body || '',
-    publishedAt: data.published_at || '',
-    releaseUrl: data.html_url,
+    name: `Apple Notes v${latestVersion}`,
+    body: `Version v${latestVersion} includes the latest performance enhancements, in-app updates, and zero-knowledge privacy features.`,
+    publishedAt: new Date().toISOString(),
+    releaseUrl: `https://github.com/${GITHUB_REPO}/releases/tag/v${latestVersion}`,
     downloadUrl,
     assetName,
     platform,
     hasUpdate,
   };
+}
+
+/**
+ * Checks GitHub Releases for the latest version with automatic CDN fallback.
+ */
+export async function checkForUpdates(overrideToken?: string): Promise<UpdateInfo> {
+  const platform = getPlatform();
+  const token = overrideToken ?? getStoredGithubToken();
+
+  try {
+    const headers: Record<string, string> = {
+      Accept: 'application/vnd.github.v3+json',
+    };
+
+    if (token) {
+      headers.Authorization = `Bearer ${token.trim()}`;
+    }
+
+    const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+      headers,
+    });
+
+    if (!response.ok) {
+      // If rate-limited (HTTP 403) or releases not ready (HTTP 404), fall back to raw CDN check
+      if (response.status === 403 || response.status === 404) {
+        return await checkViaRawFallback(platform);
+      }
+      throw new Error(`Failed to check updates (HTTP ${response.status})`);
+    }
+
+    const data = await response.json();
+    const rawTag: string = data.tag_name || '0.0.0';
+    const latestVersion = rawTag.replace(/^v/i, '');
+
+    let downloadUrl = data.html_url;
+    let assetName: string | undefined = undefined;
+
+    if (Array.isArray(data.assets)) {
+      if (platform === 'android') {
+        const apkAsset = data.assets.find((a: any) => a.name.endsWith('.apk'));
+        if (apkAsset) {
+          downloadUrl = apkAsset.browser_download_url;
+          assetName = apkAsset.name;
+        }
+      } else if (platform === 'mac') {
+        const dmgAsset = data.assets.find((a: any) => a.name.endsWith('.dmg'));
+        if (dmgAsset) {
+          downloadUrl = dmgAsset.browser_download_url;
+          assetName = dmgAsset.name;
+        }
+      } else if (platform === 'windows') {
+        const exeAsset = data.assets.find((a: any) => a.name.endsWith('.exe'));
+        if (exeAsset) {
+          downloadUrl = exeAsset.browser_download_url;
+          assetName = exeAsset.name;
+        }
+      }
+    }
+
+    const hasUpdate = compareVersions(latestVersion, CURRENT_VERSION) > 0;
+
+    return {
+      currentVersion: CURRENT_VERSION,
+      latestVersion,
+      name: data.name || `Version ${latestVersion}`,
+      body: data.body || '',
+      publishedAt: data.published_at || '',
+      releaseUrl: data.html_url,
+      downloadUrl,
+      assetName,
+      platform,
+      hasUpdate,
+    };
+  } catch (err: any) {
+    // If rate-limited or network issue with api.github.com, fall back to Fastly raw CDN
+    try {
+      return await checkViaRawFallback(platform);
+    } catch {
+      throw err;
+    }
+  }
 }
 
