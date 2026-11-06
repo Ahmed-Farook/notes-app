@@ -11,6 +11,8 @@ import {
   Sparkles,
   Cloud,
   Trash2,
+  Folder,
+  ChevronDown,
 } from 'lucide-react';
 import { useNotes } from '../../store/NotesContext';
 import { useAuth } from '../../store/AuthContext';
@@ -40,6 +42,8 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     exportCurrentNote,
     mobileView,
     setMobileView,
+    currentFolder,
+    setIsFolderPickerOpen,
   } = useNotes();
   const { user, openAuthModal, syncStatus } = useAuth();
 
@@ -101,6 +105,21 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           >
             <ChevronLeft size={18} />
             <span>Notes</span>
+          </button>
+        )}
+
+        {/* Mobile Folder Selector Pill (when in list view on phone) */}
+        {mobileView === 'list' && (
+          <button
+            onClick={() => {
+              triggerHaptic();
+              setIsFolderPickerOpen(true);
+            }}
+            className="md:hidden flex items-center space-x-1.5 text-xs font-semibold text-neutral-800 dark:text-neutral-200 bg-neutral-200/70 dark:bg-neutral-800/80 hover:bg-neutral-200 dark:hover:bg-neutral-700/80 px-2.5 py-1 rounded-full transition-all active:scale-95 border border-neutral-300/40 dark:border-neutral-700/50 shadow-xs ml-1"
+          >
+            <Folder size={13} className="text-apple-yellow" />
+            <span className="truncate max-w-[130px]">{currentFolder?.name || 'Notes'}</span>
+            <ChevronDown size={12} className="text-neutral-400" />
           </button>
         )}
 
@@ -207,7 +226,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           )}
         </div>
 
-        {/* Update notification button (if available) */}
+        {/* Update notification button (Desktop only, if available) */}
         {hasUpdate && (
           <button
             onClick={() => {
@@ -215,7 +234,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
               onCheckUpdates?.();
             }}
             title="Software Update Available"
-            className="flex items-center space-x-1 px-2 py-1 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-medium hover:bg-amber-500/25 transition-all active:scale-95"
+            className="hidden md:flex items-center space-x-1 px-2 py-1 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-medium hover:bg-amber-500/25 transition-all active:scale-95"
           >
             <Sparkles size={13} className="text-apple-yellow animate-pulse" />
             <span className="hidden sm:inline">Update</span>
@@ -264,9 +283,9 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
 
         <div className="h-4 w-px bg-neutral-300 dark:bg-neutral-700 mx-1" />
 
-        {/* Action Button: On mobile inside a note, show Delete option. Otherwise New Note */}
-        {mobileView === 'editor' && activeNote ? (
-          <>
+        {/* Mobile: In editor view, show Delete button. In list view, show Software Update button. */}
+        {mobileView === 'editor' ? (
+          activeNote && (
             <button
               onClick={() => {
                 triggerHaptic();
@@ -278,25 +297,34 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             >
               <Trash2 size={17} />
             </button>
-            <button
-              onClick={() => createNote()}
-              title="Create New Note (Cmd/Ctrl + N)"
-              className="hidden md:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-md bg-apple-yellow hover:bg-apple-yellowHover active:scale-95 text-white shadow-sm font-medium text-xs transition-all"
-            >
-              <SquarePen size={15} />
-              <span>New Note</span>
-            </button>
-          </>
+          )
         ) : (
           <button
-            onClick={() => createNote()}
-            title="Create New Note (Cmd/Ctrl + N)"
-            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-md bg-apple-yellow hover:bg-apple-yellowHover active:scale-95 text-white shadow-sm font-medium text-xs transition-all"
+            onClick={() => {
+              triggerHaptic();
+              onCheckUpdates?.();
+            }}
+            title="Check for Software Updates"
+            className={`md:hidden flex items-center space-x-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all active:scale-95 ${
+              hasUpdate
+                ? 'bg-amber-500/20 border border-amber-500/40 text-amber-600 dark:text-amber-400 animate-pulse'
+                : 'bg-neutral-200/60 dark:bg-neutral-800/80 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+            }`}
           >
-            <SquarePen size={15} />
-            <span className="hidden sm:inline">New Note</span>
+            <Sparkles size={14} className={hasUpdate ? 'text-amber-500 animate-spin' : 'text-apple-yellow'} />
+            <span>{hasUpdate ? 'Update' : 'Updates'}</span>
           </button>
         )}
+
+        {/* Desktop New Note Button */}
+        <button
+          onClick={() => createNote()}
+          title="Create New Note (Cmd/Ctrl + N)"
+          className="hidden md:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-md bg-apple-yellow hover:bg-apple-yellowHover active:scale-95 text-white shadow-sm font-medium text-xs transition-all"
+        >
+          <SquarePen size={15} />
+          <span>New Note</span>
+        </button>
       </div>
     </header>
   );

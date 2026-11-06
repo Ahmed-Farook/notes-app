@@ -12,12 +12,11 @@ import {
   Pin,
   RotateCcw,
   FolderInput,
-  Sparkles,
 } from 'lucide-react';
 import { useNotes } from '../../store/NotesContext';
 import { NoteCard } from './NoteCard';
 import { triggerHaptic } from '../../utils/haptics';
-import { CURRENT_VERSION, UpdateInfo } from '../../utils/updateChecker';
+import type { UpdateInfo } from '../../utils/updateChecker';
 
 interface NotesListProps {
   onCheckUpdates?: () => void;
@@ -99,33 +98,20 @@ export const NotesList: React.FC<NotesListProps> = ({
         </div>
       ) : (
         <div className="px-3.5 py-2 flex items-center justify-between border-b border-apple-border dark:border-apple-borderDark bg-[#fafafa]/90 dark:bg-[#1c1c1e]/90 backdrop-blur-md">
-          <button
-            onClick={() => {
-              triggerHaptic();
-              setIsFolderPickerOpen(true);
-            }}
-            className="flex items-center space-x-2 text-xs font-semibold text-neutral-800 dark:text-neutral-200 bg-neutral-200/60 dark:bg-neutral-800/80 hover:bg-neutral-200 dark:hover:bg-neutral-700/80 px-3 py-1.5 rounded-full transition-all active:scale-95 border border-neutral-300/40 dark:border-neutral-700/50 shadow-xs"
-          >
-            <Folder size={13} className="text-apple-yellow" />
-            <span className="truncate max-w-[140px]">{currentFolder?.name || 'Notes'}</span>
-            <ChevronDown size={12} className="text-neutral-400" />
-          </button>
-          <div className="flex items-center space-x-2">
-            {filteredNotes.length > 0 && (
-              <button
-                onClick={() => {
-                  triggerHaptic();
-                  enterSelectionMode();
-                }}
-                className="text-xs font-semibold text-apple-yellow hover:text-apple-yellowHover px-1.5 py-0.5 rounded transition-colors"
-              >
-                Select
-              </button>
-            )}
-            <span className="text-[11px] font-medium text-neutral-400">
-              {filteredNotes.length} {filteredNotes.length === 1 ? 'note' : 'notes'}
-            </span>
-          </div>
+          <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+            {filteredNotes.length} {filteredNotes.length === 1 ? 'note' : 'notes'}
+          </span>
+          {filteredNotes.length > 0 && (
+            <button
+              onClick={() => {
+                triggerHaptic();
+                enterSelectionMode();
+              }}
+              className="text-xs font-semibold text-apple-yellow hover:text-apple-yellowHover px-2 py-0.5 rounded transition-colors active:scale-95"
+            >
+              Select
+            </button>
+          )}
         </div>
       )}
 
@@ -263,39 +249,6 @@ export const NotesList: React.FC<NotesListProps> = ({
                     <span className="text-[11px] text-neutral-400 font-mono">{trashCount}</span>
                     {selectedFolderId === 'trash' && (
                       <Check size={15} className="text-red-500 stroke-[2.5]" />
-                    )}
-                  </div>
-                </button>
-              </div>
-
-              {/* Software Update Group on Mobile */}
-              <div className="bg-white dark:bg-[#2c2c2e] rounded-xl overflow-hidden shadow-xs">
-                <button
-                  onClick={() => {
-                    triggerHaptic();
-                    setIsFolderPickerOpen(false);
-                    onCheckUpdates?.();
-                  }}
-                  className="w-full px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors text-left hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
-                >
-                  <div className="flex items-center space-x-2.5">
-                    <div className="w-6 h-6 rounded-md bg-amber-500/15 text-apple-yellow flex items-center justify-center shrink-0">
-                      <Sparkles size={14} className={hasUpdate ? 'animate-pulse text-amber-500' : ''} />
-                    </div>
-                    <div>
-                      <span className="font-semibold text-neutral-800 dark:text-neutral-200">Software Update</span>
-                      <p className="text-[10px] text-neutral-400 font-mono">Installed: v{CURRENT_VERSION}</p>
-                    </div>
-                  </div>
-                  <div>
-                    {hasUpdate ? (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/20 text-amber-600 dark:text-amber-400 animate-pulse">
-                        v{updateInfo?.latestVersion} Available
-                      </span>
-                    ) : (
-                      <span className="text-[11px] font-semibold text-apple-yellow hover:underline">
-                        Check
-                      </span>
                     )}
                   </div>
                 </button>
