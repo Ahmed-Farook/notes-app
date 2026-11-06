@@ -43,6 +43,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     mobileView,
     setMobileView,
     currentFolder,
+    selectedFolderId,
     setIsFolderPickerOpen,
   } = useNotes();
   const { user, openAuthModal, syncStatus } = useAuth();
@@ -316,11 +317,24 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           </button>
         )}
 
-        {/* Desktop New Note Button */}
+        {/* Desktop New Note Button (greyed out when in Recently Deleted) */}
         <button
-          onClick={() => createNote()}
-          title="Create New Note (Cmd/Ctrl + N)"
-          className="hidden md:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-md bg-apple-yellow hover:bg-apple-yellowHover active:scale-95 text-white shadow-sm font-medium text-xs transition-all"
+          onClick={() => {
+            if (selectedFolderId !== 'trash') {
+              createNote();
+            }
+          }}
+          disabled={selectedFolderId === 'trash'}
+          title={
+            selectedFolderId === 'trash'
+              ? 'Cannot create new notes in Recently Deleted'
+              : 'Create New Note (Cmd/Ctrl + N)'
+          }
+          className={`hidden md:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-md font-medium text-xs transition-all ${
+            selectedFolderId === 'trash'
+              ? 'bg-neutral-200/80 dark:bg-neutral-800/80 text-neutral-400 dark:text-neutral-500 cursor-not-allowed border border-neutral-300/40 dark:border-neutral-700/40'
+              : 'bg-apple-yellow hover:bg-apple-yellowHover active:scale-95 text-white shadow-sm cursor-pointer'
+          }`}
         >
           <SquarePen size={15} />
           <span>New Note</span>

@@ -125,8 +125,10 @@ export const Layout: React.FC = () => {
       const isCmdOrCtrl = e.metaKey || e.ctrlKey;
 
       if (isCmdOrCtrl && e.key.toLowerCase() === 'n') {
-        e.preventDefault();
-        createNote();
+        if (selectedFolderIdRef.current !== 'trash') {
+          e.preventDefault();
+          createNote();
+        }
       }
     };
 
@@ -196,8 +198,8 @@ export const Layout: React.FC = () => {
                 hasUpdate={Boolean(updater.updateInfo?.hasUpdate)}
                 updateInfo={updater.updateInfo}
               />
-              {/* Android Floating Action Button (FAB) */}
-              {!isSelectionMode && (
+              {/* Android Floating Action Button (FAB) - hidden when in Recycle Bin or Selection Mode */}
+              {!isSelectionMode && selectedFolderId !== 'trash' && (
                 <button
                   onClick={() => {
                     triggerHaptic();

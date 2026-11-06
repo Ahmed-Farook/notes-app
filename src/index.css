@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply antialiased select-none;
+    @apply antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
@@ -40,9 +40,19 @@
 }
 
 /* TipTap Editor Styles */
-.tiptap {
-  outline: none;
+.tiptap,
+.ProseMirror {
+  outline: none !important;
   min-height: 100%;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  cursor: text;
+  caret-color: auto;
+}
+
+.ProseMirror * {
+  user-select: text !important;
+  -webkit-user-select: text !important;
 }
 
 .tiptap p.is-editor-empty:first-child::before {

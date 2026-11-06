@@ -51,6 +51,11 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     ],
     content: activeNote ? activeNote.content : '',
     editable: Boolean(activeNote && !activeNote.isTrash),
+    editorProps: {
+      attributes: {
+        class: 'focus:outline-none min-h-[60vh] cursor-text select-text',
+      },
+    },
     onUpdate: ({ editor, transaction }) => {
       const currentNote = activeNoteRef.current;
       // Only process when document actually changed from user edits
@@ -100,7 +105,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
       }
       editor.setEditable(!activeNote.isTrash);
     }
-  }, [activeNote?.id, editor]);
+  }, [activeNote?.id, activeNote?.isTrash, editor]);
 
   if (!activeNote) {
     return (
@@ -171,16 +176,19 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
 
       {/* Editor Content Body */}
       <div
-        className="flex-1 overflow-y-auto px-8 md:px-14 py-4 cursor-text"
-        onClick={() => {
-          if (editor && !editor.isFocused && !activeNote.isTrash) {
-            editor.commands.focus('end');
+        className="flex-1 overflow-y-auto px-8 md:px-14 py-4 cursor-text select-text"
+        onClick={(e) => {
+          if (editor && !activeNote.isTrash) {
+            const target = e.target as HTMLElement;
+            if (!target.closest('.ProseMirror') || target.classList.contains('ProseMirror')) {
+              editor.commands.focus('end');
+            }
           }
         }}
       >
         <EditorContent
           editor={editor}
-          className="prose prose-neutral dark:prose-invert max-w-3xl mx-auto focus:outline-none min-h-[500px]"
+          className="prose prose-neutral dark:prose-invert max-w-3xl mx-auto focus:outline-none min-h-[60vh] select-text"
         />
       </div>
     </div>

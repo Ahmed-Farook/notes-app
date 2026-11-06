@@ -89,10 +89,10 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
           isSelectionMode
             ? isChecked
               ? 'border-apple-yellow bg-apple-yellowLight/40 dark:bg-apple-yellow/20 shadow-sm ring-2 ring-apple-yellow'
-              : 'border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-850 hover:border-neutral-300'
+              : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-[#2c2c2e] hover:border-neutral-300 dark:hover:border-neutral-600'
             : isSelected
-            ? 'border-apple-yellow bg-apple-yellowLight/40 dark:bg-apple-yellow/10 shadow-sm ring-1 ring-apple-yellow'
-            : 'border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-850 hover:border-neutral-300 dark:hover:border-neutral-700 shadow-[0_1px_3px_rgba(0,0,0,0.05)]'
+            ? 'border-apple-yellow bg-apple-yellowLight/40 dark:bg-apple-yellow/15 shadow-sm ring-1 ring-apple-yellow'
+            : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-[#2c2c2e] hover:border-neutral-300 dark:hover:border-neutral-600 shadow-[0_1px_3px_rgba(0,0,0,0.05)]'
         }`}
       >
         <div className="space-y-1.5 overflow-hidden">
@@ -171,14 +171,14 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
           enterSelectionMode(note.id);
         }
       }}
-      className={`group relative px-3 py-3 md:py-2.5 rounded-lg transition-all cursor-pointer select-none active:scale-[0.99] flex items-center ${
+      className={`group relative px-3 py-3 md:py-2.5 rounded-xl transition-all cursor-pointer select-none active:scale-[0.99] flex items-center border ${
         isSelectionMode
           ? isChecked
-            ? 'bg-apple-yellow/15 dark:bg-apple-yellow/25 ring-1 ring-apple-yellow text-neutral-900 dark:text-neutral-100'
-            : 'hover:bg-neutral-100 dark:hover:bg-neutral-800/70 text-neutral-900 dark:text-neutral-100'
+            ? 'border-apple-yellow bg-apple-yellowLight/40 dark:bg-apple-yellow/20 shadow-xs text-neutral-900 dark:text-neutral-100 ring-1 ring-apple-yellow'
+            : 'border-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800/70 text-neutral-900 dark:text-neutral-100'
           : isSelected
-          ? 'bg-apple-yellow text-white shadow-sm'
-          : 'hover:bg-neutral-100 dark:hover:bg-neutral-800/70 text-neutral-900 dark:text-neutral-100'
+          ? 'border-transparent bg-apple-yellow text-white shadow-sm'
+          : 'border-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800/70 text-neutral-900 dark:text-neutral-100'
       }`}
     >
       {/* Checkbox circle when in multi-select mode */}
