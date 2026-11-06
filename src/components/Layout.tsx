@@ -143,7 +143,7 @@ export const Layout: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#f6f6f6] dark:bg-[#1e1e1e] font-sans pb-[env(safe-area-inset-bottom)] select-none">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#f6f6f6] dark:bg-[#1e1e1e] font-sans pb-[env(safe-area-inset-bottom)]">
       {/* Top Navbar */}
       <TopNavbar
         onToggleChecklist={handleToggleChecklist}

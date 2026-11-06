@@ -6,8 +6,6 @@
   body {
     @apply antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
   }
 
   button, a, input, select {
@@ -41,16 +39,18 @@
 
 /* TipTap Editor Styles */
 .tiptap,
-.ProseMirror {
+.ProseMirror,
+[contenteditable="true"] {
   outline: none !important;
   min-height: 100%;
   user-select: text !important;
   -webkit-user-select: text !important;
-  cursor: text;
-  caret-color: auto;
+  cursor: text !important;
+  caret-color: auto !important;
 }
 
-.ProseMirror * {
+.ProseMirror *,
+[contenteditable="true"] * {
   user-select: text !important;
   -webkit-user-select: text !important;
 }

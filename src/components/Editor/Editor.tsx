@@ -20,6 +20,7 @@ interface EditorProps {
 export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChecklist }) => {
   const {
     activeNote,
+    createNote,
     updateNote,
     folders,
     moveNoteToFolder,
@@ -90,27 +91,36 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     }
   }, [editor, onRegisterToggleChecklist]);
 
-  // Update editor content when active note changes
+  // Update editor content and editable state when active note changes
   useEffect(() => {
-    if (editor && activeNote) {
-      const currentHTML = editor.getHTML();
-      if (currentHTML !== activeNote.content) {
-        isUpdatingRef.current = true;
-        editor.commands.setContent(activeNote.content, false);
-        // Allow ProseMirror transactions and microtasks to settle before accepting edits
-        const timer = setTimeout(() => {
-          isUpdatingRef.current = false;
-        }, 80);
-        return () => clearTimeout(timer);
-      }
-      editor.setEditable(!activeNote.isTrash);
+    if (!editor || !activeNote) return;
+
+    editor.setEditable(!activeNote.isTrash);
+
+    const currentHTML = editor.getHTML();
+    if (currentHTML !== activeNote.content) {
+      isUpdatingRef.current = true;
+      editor.commands.setContent(activeNote.content, false);
+      const timer = setTimeout(() => {
+        isUpdatingRef.current = false;
+      }, 50);
+      return () => {
+        clearTimeout(timer);
+        isUpdatingRef.current = false;
+      };
     }
   }, [activeNote?.id, activeNote?.isTrash, editor]);
 
   if (!activeNote) {
     return (
-      <div className="flex-1 bg-white dark:bg-[#1e1e1e] flex flex-col items-center justify-center text-neutral-400 dark:text-neutral-600 select-none">
-        <p className="text-sm">Select a note or create a new one</p>
+      <div className="flex-1 bg-white dark:bg-[#1e1e1e] flex flex-col items-center justify-center text-neutral-400 dark:text-neutral-600 select-none p-6 text-center">
+        <p className="text-sm mb-3">Select a note or create a new one</p>
+        <button
+          onClick={() => createNote()}
+          className="px-3 py-1.5 rounded-md bg-apple-yellow hover:bg-apple-yellowHover text-white text-xs font-semibold shadow-sm transition-all active:scale-95"
+        >
+          Create Note
+        </button>
       </div>
     );
   }
@@ -118,7 +128,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
   const noteFolder = folders.find(f => f.id === activeNote.folderId);
 
   return (
-    <div className="flex-1 bg-white dark:bg-[#1e1e1e] flex flex-col h-full overflow-hidden relative">
+    <div className="flex-1 bg-white dark:bg-[#1e1e1e] flex flex-col h-full overflow-hidden relative select-text">
       {/* Optional Toolbar */}
       <EditorToolbar editor={editor} isVisible={showToolbar} />
 
@@ -180,6 +190,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
         onClick={(e) => {
           if (editor && !activeNote.isTrash) {
             const target = e.target as HTMLElement;
+            // If clicked on empty space around or below the text, focus the editor at the end
             if (!target.closest('.ProseMirror') || target.classList.contains('ProseMirror')) {
               editor.commands.focus('end');
             }
@@ -188,7 +199,12 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
       >
         <EditorContent
           editor={editor}
-          className="prose prose-neutral dark:prose-invert max-w-3xl mx-auto focus:outline-none min-h-[60vh] select-text"
+          className="prose prose-neutral dark:prose-invert max-w-3xl mx-auto focus:outline-none min-h-[60vh] select-text cursor-text"
+          onClick={() => {
+            if (editor && !editor.isFocused && !activeNote.isTrash) {
+              editor.commands.focus();
+            }
+          }}
         />
       </div>
     </div>
