@@ -52,6 +52,19 @@ interface NotesContextType {
   currentFolder: Folder | undefined;
   isFolderPickerOpen: boolean;
 
+  // Multi-selection state & actions
+  isSelectionMode: boolean;
+  selectedNoteIds: string[];
+  enterSelectionMode: (initialNoteId?: string) => void;
+  exitSelectionMode: () => void;
+  toggleSelectNote: (noteId: string) => void;
+  selectAllNotes: () => void;
+  deselectAllNotes: () => void;
+  deleteSelectedNotes: () => void;
+  togglePinSelectedNotes: () => void;
+  moveSelectedNotesToFolder: (folderId: string) => void;
+  restoreSelectedNotes: () => void;
+
   // Actions
   setActiveNoteId: (id: string | null) => void;
   setSelectedFolderId: (id: string) => void;
@@ -95,6 +108,8 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   });
   const [mobileView, setMobileView] = useState<'list' | 'editor'>('list');
   const [isFolderPickerOpen, setIsFolderPickerOpen] = useState<boolean>(false);
+  const [isSelectionMode, setIsSelectionMode] = useState<boolean>(false);
+  const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('apple_notes_theme');
@@ -596,6 +611,132 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     URL.revokeObjectURL(url);
   }, [activeNote]);
 
+  // Auto-exit selection mode if active folder changes
+  useEffect(() => {
+    setIsSelectionMode(false);
+    setSelectedNoteIds([]);
+  }, [selectedFolderId]);
+
+  // Multi-selection actions
+  const enterSelectionMode = useCallback((initialNoteId?: string) => {
+    triggerHaptic();
+    setIsSelectionMode(true);
+    setSelectedNoteIds(initialNoteId ? [initialNoteId] : []);
+  }, []);
+
+  const exitSelectionMode = useCallback(() => {
+    triggerHaptic();
+    setIsSelectionMode(false);
+    setSelectedNoteIds([]);
+  }, []);
+
+  const toggleSelectNote = useCallback((noteId: string) => {
+    triggerHaptic();
+    setSelectedNoteIds(prev =>
+      prev.includes(noteId) ? prev.filter(id => id !== noteId) : [...prev, noteId]
+    );
+  }, []);
+
+  const selectAllNotes = useCallback(() => {
+    triggerHaptic();
+    setSelectedNoteIds(filteredNotes.map(n => n.id));
+  }, [filteredNotes]);
+
+  const deselectAllNotes = useCallback(() => {
+    triggerHaptic();
+    setSelectedNoteIds([]);
+  }, []);
+
+  const deleteSelectedNotes = useCallback(() => {
+    if (selectedNoteIds.length === 0) return;
+    triggerHaptic();
+    const idsToDelete = new Set(selectedNoteIds);
+
+    setNotes(prev =>
+      prev
+        .map(note => {
+          if (idsToDelete.has(note.id)) {
+            if (note.isTrash) {
+              if (user) deleteNoteFromCloud(note.id);
+              return null as unknown as Note;
+            } else {
+              const trashed: Note = { ...note, isTrash: true, isPinned: false };
+              if (user) upsertNoteToCloud(trashed, user.id, encryptionKeyRef.current);
+              return trashed;
+            }
+          }
+          return note;
+        })
+        .filter(Boolean)
+    );
+
+    setIsSelectionMode(false);
+    setSelectedNoteIds([]);
+  }, [selectedNoteIds, user]);
+
+  const restoreSelectedNotes = useCallback(() => {
+    if (selectedNoteIds.length === 0) return;
+    triggerHaptic();
+    const idsToRestore = new Set(selectedNoteIds);
+
+    setNotes(prev =>
+      prev.map(note => {
+        if (idsToRestore.has(note.id)) {
+          const restored: Note = { ...note, isTrash: false };
+          if (user) upsertNoteToCloud(restored, user.id, encryptionKeyRef.current);
+          return restored;
+        }
+        return note;
+      })
+    );
+
+    setIsSelectionMode(false);
+    setSelectedNoteIds([]);
+  }, [selectedNoteIds, user]);
+
+  const togglePinSelectedNotes = useCallback(() => {
+    if (selectedNoteIds.length === 0) return;
+    triggerHaptic();
+    const idsToToggle = new Set(selectedNoteIds);
+    const selectedNotes = notes.filter(n => idsToToggle.has(n.id));
+    const allPinned = selectedNotes.every(n => n.isPinned);
+    const targetPinned = !allPinned;
+
+    setNotes(prev =>
+      prev.map(note => {
+        if (idsToToggle.has(note.id)) {
+          const updated: Note = { ...note, isPinned: targetPinned };
+          if (user) upsertNoteToCloud(updated, user.id, encryptionKeyRef.current);
+          return updated;
+        }
+        return note;
+      })
+    );
+
+    setIsSelectionMode(false);
+    setSelectedNoteIds([]);
+  }, [selectedNoteIds, notes, user]);
+
+  const moveSelectedNotesToFolder = useCallback((folderId: string) => {
+    if (selectedNoteIds.length === 0) return;
+    triggerHaptic();
+    const idsToMove = new Set(selectedNoteIds);
+
+    setNotes(prev =>
+      prev.map(note => {
+        if (idsToMove.has(note.id)) {
+          const updated: Note = { ...note, folderId };
+          if (user) upsertNoteToCloud(updated, user.id, encryptionKeyRef.current);
+          return updated;
+        }
+        return note;
+      })
+    );
+
+    setIsSelectionMode(false);
+    setSelectedNoteIds([]);
+  }, [selectedNoteIds, user]);
+
   return (
     <NotesContext.Provider
       value={{
@@ -615,6 +756,17 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         currentFolder,
         isFolderPickerOpen,
         setIsFolderPickerOpen,
+        isSelectionMode,
+        selectedNoteIds,
+        enterSelectionMode,
+        exitSelectionMode,
+        toggleSelectNote,
+        selectAllNotes,
+        deselectAllNotes,
+        deleteSelectedNotes,
+        togglePinSelectedNotes,
+        moveSelectedNotesToFolder,
+        restoreSelectedNotes,
         setActiveNoteId: (id) => {
           setActiveNoteId(id);
           if (id) setMobileView('editor');

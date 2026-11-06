@@ -25,6 +25,8 @@ export const Layout: React.FC = () => {
     setSearchQuery,
     selectedFolderId,
     setSelectedFolderId,
+    isSelectionMode,
+    exitSelectionMode,
   } = useNotes();
   const { isAuthModalOpen, closeAuthModal } = useAuth();
   const [showFormatToolbar, setShowFormatToolbar] = useState(true);
@@ -50,6 +52,9 @@ export const Layout: React.FC = () => {
   const isUpdaterModalOpenRef = useRef(updater.isModalOpen);
   isUpdaterModalOpenRef.current = updater.isModalOpen;
 
+  const isSelectionModeRef = useRef(isSelectionMode);
+  isSelectionModeRef.current = isSelectionMode;
+
   // Android Hardware Back Button navigation
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -58,6 +63,12 @@ export const Layout: React.FC = () => {
 
     const setupListener = async () => {
       listenerHandle = await CapApp.addListener('backButton', () => {
+        // 0. Exit multi-selection mode if active
+        if (isSelectionModeRef.current) {
+          exitSelectionMode();
+          return;
+        }
+
         // 1. Close updater modal if open
         if (isUpdaterModalOpenRef.current) {
           updater.closeModal();
@@ -178,16 +189,18 @@ export const Layout: React.FC = () => {
             <div className="w-full h-full flex flex-col relative">
               <NotesList />
               {/* Android Floating Action Button (FAB) */}
-              <button
-                onClick={() => {
-                  triggerHaptic();
-                  createNote();
-                }}
-                className="absolute right-5 bottom-6 w-14 h-14 rounded-full bg-apple-yellow text-white shadow-lg flex items-center justify-center active:scale-90 transition-transform z-30"
-                title="New Note"
-              >
-                <Plus size={28} />
-              </button>
+              {!isSelectionMode && (
+                <button
+                  onClick={() => {
+                    triggerHaptic();
+                    createNote();
+                  }}
+                  className="absolute right-5 bottom-6 w-14 h-14 rounded-full bg-apple-yellow text-white shadow-lg flex items-center justify-center active:scale-90 transition-transform z-30"
+                  title="New Note"
+                >
+                  <Plus size={28} />
+                </button>
+              )}
             </div>
           ) : (
             <div className="w-full h-full flex flex-col">
