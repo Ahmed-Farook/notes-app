@@ -34,9 +34,9 @@ export const NotesList: React.FC = () => {
   const [showFolderPicker, setShowFolderPicker] = useState(false);
 
   // Folder note counts
-  const allNotesCount = notes.filter(n => !n.isTrash).length;
-  const quickNotesCount = notes.filter(n => !n.isTrash && n.folderId === 'quick').length;
-  const defaultNotesCount = notes.filter(n => !n.isTrash && n.folderId === 'default').length;
+  const defaultNotesCount = notes.filter(
+    n => !n.isTrash && (n.folderId === 'default' || n.folderId === 'quick' || n.folderId === 'all' || !n.folderId)
+  ).length;
   const trashCount = notes.filter(n => n.isTrash).length;
   const getFolderCount = (folderId: string) =>
     notes.filter(n => !n.isTrash && n.folderId === folderId).length;
@@ -53,7 +53,7 @@ export const NotesList: React.FC = () => {
           className="flex items-center space-x-2 text-xs font-semibold text-neutral-800 dark:text-neutral-200 bg-neutral-200/60 dark:bg-neutral-800/80 hover:bg-neutral-200 dark:hover:bg-neutral-700/80 px-3 py-1.5 rounded-full transition-all active:scale-95 border border-neutral-300/40 dark:border-neutral-700/50 shadow-xs"
         >
           <Folder size={13} className="text-apple-yellow" />
-          <span className="truncate max-w-[150px]">{currentFolder?.name || 'All Notes'}</span>
+          <span className="truncate max-w-[150px]">{currentFolder?.name || 'Notes'}</span>
           <ChevronDown size={12} className="text-neutral-400" />
         </button>
         <span className="text-[11px] font-medium text-neutral-400">
@@ -98,62 +98,8 @@ export const NotesList: React.FC = () => {
 
             {/* Folder List Group */}
             <div className="p-3 space-y-3 overflow-y-auto">
-              {/* System Folders Group */}
+              {/* Main Notes Group */}
               <div className="bg-white dark:bg-[#2c2c2e] rounded-xl overflow-hidden shadow-xs divide-y divide-neutral-100 dark:divide-neutral-800/60">
-                {/* All Notes */}
-                <button
-                  onClick={() => {
-                    triggerHaptic();
-                    setSelectedFolderId('all');
-                    setShowFolderPicker(false);
-                  }}
-                  className={`w-full px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors text-left ${
-                    selectedFolderId === 'all'
-                      ? 'bg-apple-yellow/10 dark:bg-apple-yellow/15 text-apple-yellow font-semibold'
-                      : 'text-neutral-800 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800/50'
-                  }`}
-                >
-                  <div className="flex items-center space-x-2.5">
-                    <div className="w-6 h-6 rounded-md bg-amber-500/15 text-apple-yellow flex items-center justify-center shrink-0">
-                      <Folder size={14} />
-                    </div>
-                    <span>All Notes</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-[11px] text-neutral-400 font-mono">{allNotesCount}</span>
-                    {selectedFolderId === 'all' && (
-                      <Check size={15} className="text-apple-yellow stroke-[2.5]" />
-                    )}
-                  </div>
-                </button>
-
-                {/* Quick Notes */}
-                <button
-                  onClick={() => {
-                    triggerHaptic();
-                    setSelectedFolderId('quick');
-                    setShowFolderPicker(false);
-                  }}
-                  className={`w-full px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors text-left ${
-                    selectedFolderId === 'quick'
-                      ? 'bg-apple-yellow/10 dark:bg-apple-yellow/15 text-apple-yellow font-semibold'
-                      : 'text-neutral-800 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800/50'
-                  }`}
-                >
-                  <div className="flex items-center space-x-2.5">
-                    <div className="w-6 h-6 rounded-md bg-amber-500/15 text-apple-yellow flex items-center justify-center shrink-0">
-                      <Zap size={14} />
-                    </div>
-                    <span>Quick Notes</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-[11px] text-neutral-400 font-mono">{quickNotesCount}</span>
-                    {selectedFolderId === 'quick' && (
-                      <Check size={15} className="text-apple-yellow stroke-[2.5]" />
-                    )}
-                  </div>
-                </button>
-
                 {/* Notes (Default) */}
                 <button
                   onClick={() => {
@@ -169,7 +115,7 @@ export const NotesList: React.FC = () => {
                 >
                   <div className="flex items-center space-x-2.5">
                     <div className="w-6 h-6 rounded-md bg-amber-500/15 text-apple-yellow flex items-center justify-center shrink-0">
-                      <FileText size={14} />
+                      <Folder size={14} />
                     </div>
                     <span>Notes</span>
                   </div>

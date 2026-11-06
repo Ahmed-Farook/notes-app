@@ -36,9 +36,9 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
   const [newFolderName, setNewFolderName] = useState('');
 
   // Calculate note counts
-  const allNotesCount = notes.filter(n => !n.isTrash).length;
-  const quickNotesCount = notes.filter(n => !n.isTrash && n.folderId === 'quick').length;
-  const defaultNotesCount = notes.filter(n => !n.isTrash && n.folderId === 'default').length;
+  const defaultNotesCount = notes.filter(
+    n => !n.isTrash && (n.folderId === 'default' || n.folderId === 'quick' || n.folderId === 'all' || !n.folderId)
+  ).length;
   const trashCount = notes.filter(n => n.isTrash).length;
 
   const getFolderCount = (folderId: string) => {
@@ -95,48 +95,17 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
           </button>
         </div>
 
-        {/* System Folders Group */}
+        {/* Main Notes Section */}
         <div>
           <div className="px-2 pb-1 text-[11px] font-semibold tracking-wider text-neutral-400 dark:text-neutral-500 uppercase">
-            iCloud &amp; Local
+            Notes
           </div>
           <div className="space-y-0.5">
             <button
-              onClick={() => setSelectedFolderId('all')}
-              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors ${
-                selectedFolderId === 'all'
-                  ? 'bg-apple-yellow text-white font-medium'
-                  : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200/60 dark:hover:bg-neutral-800/60'
-              }`}
-            >
-              <div className="flex items-center space-x-2 truncate">
-                <FileText size={15} className={selectedFolderId === 'all' ? 'text-white' : 'text-apple-yellow'} />
-                <span className="truncate">All Notes</span>
-              </div>
-              <span className={`text-[11px] ${selectedFolderId === 'all' ? 'text-white/80' : 'text-neutral-400'}`}>
-                {allNotesCount}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setSelectedFolderId('quick')}
-              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors ${
-                selectedFolderId === 'quick'
-                  ? 'bg-apple-yellow text-white font-medium'
-                  : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200/60 dark:hover:bg-neutral-800/60'
-              }`}
-            >
-              <div className="flex items-center space-x-2 truncate">
-                <Zap size={15} className={selectedFolderId === 'quick' ? 'text-white' : 'text-apple-yellow'} />
-                <span className="truncate">Quick Notes</span>
-              </div>
-              <span className={`text-[11px] ${selectedFolderId === 'quick' ? 'text-white/80' : 'text-neutral-400'}`}>
-                {quickNotesCount}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setSelectedFolderId('default')}
+              onClick={() => {
+                triggerHaptic();
+                setSelectedFolderId('default');
+              }}
               className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors ${
                 selectedFolderId === 'default'
                   ? 'bg-apple-yellow text-white font-medium'

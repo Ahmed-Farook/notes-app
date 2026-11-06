@@ -4,8 +4,6 @@ const NOTES_STORAGE_KEY = 'apple_notes_data_v1';
 const FOLDERS_STORAGE_KEY = 'apple_notes_folders_v1';
 
 export const SYSTEM_FOLDERS: Folder[] = [
-  { id: 'all', name: 'All Notes', isSystem: true },
-  { id: 'quick', name: 'Quick Notes', isSystem: true },
   { id: 'default', name: 'Notes', isSystem: true },
   { id: 'trash', name: 'Recently Deleted', isSystem: true },
 ];
@@ -43,6 +41,21 @@ export const loadStoredNotes = (): Note[] => {
     if (isLegacyDefault) {
       saveStoredNotes(INITIAL_NOTES);
       return INITIAL_NOTES;
+    }
+
+    // Migrate legacy notes with 'quick' or 'all' folderId to 'default'
+    let hasFolderMigration = false;
+    const migratedNotes = parsed.map((n: Note) => {
+      if (n.folderId === 'quick' || n.folderId === 'all' || !n.folderId) {
+        hasFolderMigration = true;
+        return { ...n, folderId: 'default' };
+      }
+      return n;
+    });
+
+    if (hasFolderMigration) {
+      saveStoredNotes(migratedNotes);
+      return migratedNotes;
     }
 
     return parsed;

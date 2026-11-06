@@ -70,7 +70,7 @@ interface NotesContextType {
 
   createFolder: (name: string) => void;
   deleteFolder: (id: string) => void;
-  exportCurrentNote: (formatType: 'markdown' | 'txt' | 'html') => void;
+  exportCurrentNote: (formatType: 'markdown' | 'txt' | 'html', noteToExport?: Note) => void;
 }
 
 const NotesContext = createContext<NotesContextType | undefined>(undefined);
@@ -78,7 +78,7 @@ const NotesContext = createContext<NotesContextType | undefined>(undefined);
 export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [notes, setNotes] = useState<Note[]>(() => loadStoredNotes());
   const [folders, setFolders] = useState<Folder[]>(() => loadStoredFolders());
-  const [selectedFolderId, setSelectedFolderId] = useState<string>('all');
+  const [selectedFolderId, setSelectedFolderId] = useState<string>('default');
   const [activeNoteId, setActiveNoteId] = useState<string | null>(() => {
     const initial = loadStoredNotes();
     return initial.length > 0 ? initial[0].id : null;
@@ -309,12 +309,14 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         if (!note.isTrash) return false;
       } else {
         if (note.isTrash) return false;
-        if (selectedFolderId === 'all') {
-          // all non-trash notes
-        } else if (selectedFolderId === 'quick') {
-          if (note.folderId !== 'quick') return false;
+        const noteFolder = note.folderId || 'default';
+        if (selectedFolderId === 'default') {
+          // Main Notes section contains default notes and legacy quick/all
+          if (noteFolder !== 'default' && noteFolder !== 'quick' && noteFolder !== 'all') {
+            return false;
+          }
         } else {
-          if (note.folderId !== selectedFolderId) return false;
+          if (noteFolder !== selectedFolderId) return false;
         }
       }
 
@@ -343,12 +345,24 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return notes.find(n => n.id === activeNoteId) || null;
   }, [notes, activeNoteId]);
 
+  // Keep active note synced to the first note of the current folder if current activeNote is not in folder
+  useEffect(() => {
+    if (filteredNotes.length > 0) {
+      const activeStillInList = filteredNotes.some(n => n.id === activeNoteId);
+      if (!activeStillInList) {
+        setActiveNoteId(filteredNotes[0].id);
+      }
+    } else {
+      setActiveNoteId(null);
+    }
+  }, [filteredNotes, activeNoteId]);
+
   // Create new note
   const createNote = useCallback((folderId?: string): Note => {
     triggerHaptic();
     const targetFolder =
       folderId ||
-      (selectedFolderId === 'trash' || selectedFolderId === 'all'
+      (selectedFolderId === 'trash'
         ? 'default'
         : selectedFolderId);
 
@@ -516,7 +530,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       prev.map(n => (n.folderId === id ? { ...n, folderId: 'default' } : n))
     );
     if (selectedFolderId === id) {
-      setSelectedFolderId('all');
+      setSelectedFolderId('default');
     }
     if (user) {
       deleteFolderFromCloud(id);
@@ -524,21 +538,22 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }, [selectedFolderId, user]);
 
   // Export current note
-  const exportCurrentNote = useCallback((formatType: 'markdown' | 'txt' | 'html') => {
-    if (!activeNote) return;
+  const exportCurrentNote = useCallback((formatType: 'markdown' | 'txt' | 'html', specificNote?: Note) => {
+    const targetNote = specificNote || activeNote;
+    if (!targetNote) return;
 
-    let contentToExport = activeNote.content;
-    const filename = `${activeNote.title || 'Untitled'}.${
+    let contentToExport = targetNote.content;
+    const filename = `${targetNote.title || 'Untitled'}.${
       formatType === 'markdown' ? 'md' : formatType
     }`;
     let mimeType = 'text/plain';
 
     if (formatType === 'txt') {
       const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = activeNote.content;
+      tempDiv.innerHTML = targetNote.content;
       contentToExport = tempDiv.textContent || tempDiv.innerText || '';
     } else if (formatType === 'markdown') {
-      contentToExport = activeNote.content
+      contentToExport = targetNote.content
         .replace(/<h1>(.*?)<\/h1>/gi, '# $1\n\n')
         .replace(/<h2>(.*?)<\/h2>/gi, '## $1\n\n')
         .replace(/<h3>(.*?)<\/h3>/gi, '### $1\n\n')
@@ -551,7 +566,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         .replace(/<[^>]+>/g, '');
       mimeType = 'text/markdown';
     } else if (formatType === 'html') {
-      contentToExport = `<!DOCTYPE html><html><head><title>${activeNote.title}</title><meta charset="utf-8"></head><body>${activeNote.content}</body></html>`;
+      contentToExport = `<!DOCTYPE html><html><head><title>${targetNote.title}</title><meta charset="utf-8"></head><body>${targetNote.content}</body></html>`;
       mimeType = 'text/html';
     }
 

@@ -151,7 +151,6 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
               className="bg-transparent border-none outline-none cursor-pointer text-neutral-600 dark:text-neutral-300 pr-1"
             >
               <option value="default">Notes</option>
-              <option value="quick">Quick Notes</option>
               {folders.map(f => (
                 <option key={f.id} value={f.id}>{f.name}</option>
               ))}

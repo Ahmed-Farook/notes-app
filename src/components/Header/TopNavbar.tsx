@@ -3,14 +3,10 @@ import {
   PanelLeft,
   LayoutGrid,
   List as ListIcon,
-  Trash2,
   SquarePen,
   Sun,
   Moon,
   Download,
-  CheckSquare,
-  Type,
-  FolderOpen,
   ChevronLeft,
   Sparkles,
   Cloud,
@@ -27,8 +23,6 @@ interface TopNavbarProps {
 }
 
 export const TopNavbar: React.FC<TopNavbarProps> = ({
-  onToggleChecklist,
-  onFormatClick,
   onCheckUpdates,
   hasUpdate,
 }) => {
@@ -38,12 +32,10 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     viewMode,
     setViewMode,
     activeNote,
-    deleteNote,
     createNote,
     theme,
     toggleTheme,
     exportCurrentNote,
-    currentFolder,
     mobileView,
     setMobileView,
   } = useNotes();
@@ -65,19 +57,28 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     }
   }, []);
 
-  // Close export dropdown when clicking outside
+  // Close export dropdown when clicking or tapping outside
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    if (!showExportMenu) return;
+
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
         setShowExportMenu(false);
       }
     };
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [showExportMenu]);
+
+  const noteToExport = activeNote;
 
   return (
-    <header className="h-12 border-b border-apple-border dark:border-apple-borderDark bg-[#f6f6f6]/95 dark:bg-[#1e1e1e]/95 backdrop-blur-md flex items-center justify-between pr-3 shrink-0 select-none transition-colors pt-[env(safe-area-inset-top)] [app-region:drag]">
+    <header className="h-12 border-b border-apple-border dark:border-apple-borderDark bg-[#f6f6f6]/95 dark:bg-[#1e1e1e]/95 backdrop-blur-md flex items-center justify-between pr-3 shrink-0 select-none transition-colors pt-[env(safe-area-inset-top)] [app-region:drag] relative z-40">
       {/* Left controls: Traffic light clearance on Mac + navigation */}
       <div className="flex items-center space-x-1.5 [app-region:no-drag]">
         {/* Dedicated clearance spacer for macOS window traffic lights */}
@@ -145,94 +146,60 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             <LayoutGrid size={15} />
           </button>
         </div>
-
-        {/* Delete note button */}
-        {activeNote && (
-          <button
-            onClick={() => deleteNote(activeNote.id)}
-            title={activeNote.isTrash ? 'Permanently Delete' : 'Move Note to Trash'}
-            className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-950/40 text-neutral-600 dark:text-neutral-300 hover:text-red-600 dark:hover:text-red-400 transition-colors ml-1 active:scale-95"
-          >
-            <Trash2 size={17} />
-          </button>
-        )}
-      </div>
-
-      {/* Center: Folder / App title */}
-      <div className="flex items-center space-x-1.5 text-xs font-medium text-neutral-500 dark:text-neutral-400 pointer-events-none">
-        <FolderOpen size={14} className="text-apple-yellow" />
-        <span className="truncate max-w-[140px] sm:max-w-xs">{currentFolder?.name || 'Notes'}</span>
       </div>
 
       {/* Right controls */}
       <div className="flex items-center space-x-1 sm:space-x-1.5 [app-region:no-drag]">
-        {/* Format toolbar toggle */}
-        <button
-          onClick={() => {
-            triggerHaptic();
-            onFormatClick?.();
-          }}
-          title="Text Formatting"
-          disabled={!activeNote || activeNote.isTrash}
-          className="p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 disabled:opacity-30 disabled:pointer-events-none transition-colors active:scale-95"
-        >
-          <Type size={17} />
-        </button>
-
         {/* Export dropdown */}
         <div className="relative" ref={exportRef}>
           <button
-            onClick={() => setShowExportMenu(!showExportMenu)}
-            disabled={!activeNote}
-            title="Export Note"
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              triggerHaptic();
+              setShowExportMenu((prev) => !prev);
+            }}
+            disabled={!noteToExport}
+            title={noteToExport ? `Export "${noteToExport.title || 'Untitled'}"` : 'Select a note to export'}
             className="p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 disabled:opacity-30 disabled:pointer-events-none transition-colors active:scale-95"
           >
             <Download size={17} />
           </button>
 
-          {showExportMenu && activeNote && (
-            <div className="absolute right-0 mt-1 w-44 bg-white dark:bg-neutral-800 rounded-lg shadow-xl border border-neutral-200 dark:border-neutral-700 py-1 z-50 text-xs animate-in fade-in zoom-in-95 duration-100">
+          {showExportMenu && noteToExport && (
+            <div className="absolute right-0 top-full mt-1.5 w-48 bg-white dark:bg-[#252525] rounded-xl shadow-2xl border border-neutral-200/90 dark:border-neutral-700/80 py-1.5 z-50 text-xs backdrop-blur-md animate-in fade-in zoom-in-95 duration-100">
               <div className="px-3 py-1 font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider text-[10px]">
                 Export Note As
               </div>
               <button
+                type="button"
                 onClick={() => {
-                  exportCurrentNote('markdown');
+                  exportCurrentNote('markdown', noteToExport);
                   setShowExportMenu(false);
                 }}
-                className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-200"
+                className="w-full text-left px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-700 dark:text-neutral-200 transition-colors"
               >
                 Markdown (.md)
               </button>
               <button
+                type="button"
                 onClick={() => {
-                  exportCurrentNote('txt');
+                  exportCurrentNote('txt', noteToExport);
                   setShowExportMenu(false);
                 }}
-                className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-200"
+                className="w-full text-left px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-700 dark:text-neutral-200 transition-colors"
               >
                 Plain Text (.txt)
               </button>
               <button
+                type="button"
                 onClick={() => {
-                  exportCurrentNote('html');
+                  exportCurrentNote('html', noteToExport);
                   setShowExportMenu(false);
                 }}
-                className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-200"
+                className="w-full text-left px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-700 dark:text-neutral-200 transition-colors"
               >
                 HTML (.html)
-              </button>
-              <div className="border-t border-neutral-100 dark:border-neutral-700 my-1" />
-              <button
-                onClick={() => {
-                  triggerHaptic();
-                  setShowExportMenu(false);
-                  onCheckUpdates?.();
-                }}
-                className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300 flex items-center justify-between"
-              >
-                <span>Check for Updates...</span>
-                {hasUpdate && <span className="w-1.5 h-1.5 rounded-full bg-apple-yellow animate-ping" />}
               </button>
             </div>
           )}
