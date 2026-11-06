@@ -28,6 +28,8 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
   } = useNotes();
 
   const isUpdatingRef = useRef(false);
+  const activeNoteRef = useRef(activeNote);
+  activeNoteRef.current = activeNote;
 
   const editor = useEditor({
     extensions: [
@@ -49,10 +51,14 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     ],
     content: activeNote ? activeNote.content : '',
     editable: Boolean(activeNote && !activeNote.isTrash),
-    onUpdate: ({ editor }) => {
-      if (!activeNote || isUpdatingRef.current) return;
+    onUpdate: ({ editor, transaction }) => {
+      const currentNote = activeNoteRef.current;
+      // Only process when document actually changed from user edits
+      if (!currentNote || isUpdatingRef.current || !transaction.docChanged) return;
 
       const html = editor.getHTML();
+      if (html === currentNote.content) return;
+
       const text = editor.getText();
 
       // Extract title and snippet preview from text
@@ -62,7 +68,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
         ? lines.slice(1).join(' ').substring(0, 150)
         : (lines.length === 1 && lines[0] !== title ? lines[0] : 'No additional text');
 
-      updateNote(activeNote.id, {
+      updateNote(currentNote.id, {
         content: html,
         title,
         plainTextPreview,
@@ -86,7 +92,11 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
       if (currentHTML !== activeNote.content) {
         isUpdatingRef.current = true;
         editor.commands.setContent(activeNote.content, false);
-        isUpdatingRef.current = false;
+        // Allow ProseMirror transactions and microtasks to settle before accepting edits
+        const timer = setTimeout(() => {
+          isUpdatingRef.current = false;
+        }, 80);
+        return () => clearTimeout(timer);
       }
       editor.setEditable(!activeNote.isTrash);
     }

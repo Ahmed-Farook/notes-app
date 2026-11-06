@@ -50,6 +50,7 @@ interface NotesContextType {
   pinnedNotes: Note[];
   unpinnedNotes: Note[];
   currentFolder: Folder | undefined;
+  isFolderPickerOpen: boolean;
 
   // Actions
   setActiveNoteId: (id: string | null) => void;
@@ -57,6 +58,7 @@ interface NotesContextType {
   setSearchQuery: (query: string) => void;
   setViewMode: (mode: ViewMode) => void;
   setMobileView: (view: 'list' | 'editor') => void;
+  setIsFolderPickerOpen: (open: boolean) => void;
   toggleSidebar: () => void;
   toggleTheme: () => void;
 
@@ -92,6 +94,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return true;
   });
   const [mobileView, setMobileView] = useState<'list' | 'editor'>('list');
+  const [isFolderPickerOpen, setIsFolderPickerOpen] = useState<boolean>(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('apple_notes_theme');
@@ -332,12 +335,14 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }, [notes, selectedFolderId, searchQuery]);
 
   const pinnedNotes = useMemo(() => {
+    if (selectedFolderId === 'trash') return [];
     return filteredNotes.filter(n => n.isPinned);
-  }, [filteredNotes]);
+  }, [filteredNotes, selectedFolderId]);
 
   const unpinnedNotes = useMemo(() => {
+    if (selectedFolderId === 'trash') return filteredNotes;
     return filteredNotes.filter(n => !n.isPinned);
-  }, [filteredNotes]);
+  }, [filteredNotes, selectedFolderId]);
 
   // Active note instance
   const activeNote = useMemo(() => {
@@ -393,13 +398,20 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setNotes(prev =>
       prev.map(note => {
         if (note.id === id) {
+          const hasContentChanged =
+            (updates.content !== undefined && updates.content !== note.content) ||
+            (updates.title !== undefined && updates.title !== note.title) ||
+            (updates.plainTextPreview !== undefined && updates.plainTextPreview !== note.plainTextPreview);
+
+          const newUpdatedAt = hasContentChanged ? Date.now() : (updates.updatedAt ?? note.updatedAt);
+
           const updated: Note = {
             ...note,
             ...updates,
-            updatedAt: Date.now(),
+            updatedAt: newUpdatedAt,
           };
 
-          if (user) {
+          if (user && hasContentChanged) {
             if (cloudSaveTimers.current[id]) {
               clearTimeout(cloudSaveTimers.current[id]);
             }
@@ -429,7 +441,8 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
         return prev.filter(n => n.id !== id);
       } else {
-        const trashed: Note = { ...note, isTrash: true, updatedAt: Date.now() };
+        // Automatically unpin note when moving to trash
+        const trashed: Note = { ...note, isTrash: true, isPinned: false };
         if (user) {
           upsertNoteToCloud(trashed, user.id, encryptionKeyRef.current);
         }
@@ -482,7 +495,8 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setNotes(prev =>
       prev.map(n => {
         if (n.id === id) {
-          const updated: Note = { ...n, isPinned: !n.isPinned, updatedAt: Date.now() };
+          // Do not bump updatedAt when toggling pin (ordering based on edit time)
+          const updated: Note = { ...n, isPinned: !n.isPinned };
           if (user) {
             upsertNoteToCloud(updated, user.id, encryptionKeyRef.current);
           }
@@ -497,7 +511,8 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setNotes(prev =>
       prev.map(n => {
         if (n.id === noteId) {
-          const updated: Note = { ...n, folderId, updatedAt: Date.now() };
+          // Do not bump updatedAt when moving folders
+          const updated: Note = { ...n, folderId };
           if (user) {
             upsertNoteToCloud(updated, user.id, encryptionKeyRef.current);
           }
@@ -598,6 +613,8 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         pinnedNotes,
         unpinnedNotes,
         currentFolder,
+        isFolderPickerOpen,
+        setIsFolderPickerOpen,
         setActiveNoteId: (id) => {
           setActiveNoteId(id);
           if (id) setMobileView('editor');

@@ -29,9 +29,9 @@ export const NotesList: React.FC = () => {
     folders,
     selectedFolderId,
     setSelectedFolderId,
+    isFolderPickerOpen,
+    setIsFolderPickerOpen,
   } = useNotes();
-
-  const [showFolderPicker, setShowFolderPicker] = useState(false);
 
   // Folder note counts
   const defaultNotesCount = notes.filter(
@@ -48,7 +48,7 @@ export const NotesList: React.FC = () => {
         <button
           onClick={() => {
             triggerHaptic();
-            setShowFolderPicker(true);
+            setIsFolderPickerOpen(true);
           }}
           className="flex items-center space-x-2 text-xs font-semibold text-neutral-800 dark:text-neutral-200 bg-neutral-200/60 dark:bg-neutral-800/80 hover:bg-neutral-200 dark:hover:bg-neutral-700/80 px-3 py-1.5 rounded-full transition-all active:scale-95 border border-neutral-300/40 dark:border-neutral-700/50 shadow-xs"
         >
@@ -62,12 +62,12 @@ export const NotesList: React.FC = () => {
       </div>
 
       {/* Apple-style Mobile Folder Bottom Sheet */}
-      {showFolderPicker && (
+      {isFolderPickerOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
           {/* Backdrop click dismiss */}
           <div
             className="absolute inset-0"
-            onClick={() => setShowFolderPicker(false)}
+            onClick={() => setIsFolderPickerOpen(false)}
           />
 
           <div
@@ -89,7 +89,7 @@ export const NotesList: React.FC = () => {
                 </h3>
               </div>
               <button
-                onClick={() => setShowFolderPicker(false)}
+                onClick={() => setIsFolderPickerOpen(false)}
                 className="text-xs font-semibold text-apple-yellow hover:text-apple-yellowHover py-1 px-2 rounded-lg transition-colors"
               >
                 Done
@@ -105,7 +105,7 @@ export const NotesList: React.FC = () => {
                   onClick={() => {
                     triggerHaptic();
                     setSelectedFolderId('default');
-                    setShowFolderPicker(false);
+                    setIsFolderPickerOpen(false);
                   }}
                   className={`w-full px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors text-left ${
                     selectedFolderId === 'default'
@@ -144,7 +144,7 @@ export const NotesList: React.FC = () => {
                           onClick={() => {
                             triggerHaptic();
                             setSelectedFolderId(f.id);
-                            setShowFolderPicker(false);
+                            setIsFolderPickerOpen(false);
                           }}
                           className={`w-full px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors text-left ${
                             isSelected
@@ -177,7 +177,7 @@ export const NotesList: React.FC = () => {
                   onClick={() => {
                     triggerHaptic();
                     setSelectedFolderId('trash');
-                    setShowFolderPicker(false);
+                    setIsFolderPickerOpen(false);
                   }}
                   className={`w-full px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors text-left ${
                     selectedFolderId === 'trash'

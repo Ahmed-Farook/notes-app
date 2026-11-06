@@ -43,14 +43,19 @@ export const loadStoredNotes = (): Note[] => {
       return INITIAL_NOTES;
     }
 
-    // Migrate legacy notes with 'quick' or 'all' folderId to 'default'
+    // Migrate legacy notes with 'quick' or 'all' folderId to 'default', and ensure trashed notes are unpinned
     let hasFolderMigration = false;
     const migratedNotes = parsed.map((n: Note) => {
+      let updated = n;
       if (n.folderId === 'quick' || n.folderId === 'all' || !n.folderId) {
         hasFolderMigration = true;
-        return { ...n, folderId: 'default' };
+        updated = { ...updated, folderId: 'default' };
       }
-      return n;
+      if (updated.isTrash && updated.isPinned) {
+        hasFolderMigration = true;
+        updated = { ...updated, isPinned: false };
+      }
+      return updated;
     });
 
     if (hasFolderMigration) {

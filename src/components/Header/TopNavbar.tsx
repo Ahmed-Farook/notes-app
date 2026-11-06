@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   Sparkles,
   Cloud,
+  Trash2,
 } from 'lucide-react';
 import { useNotes } from '../../store/NotesContext';
 import { useAuth } from '../../store/AuthContext';
@@ -33,6 +34,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     setViewMode,
     activeNote,
     createNote,
+    deleteNote,
     theme,
     toggleTheme,
     exportCurrentNote,
@@ -262,15 +264,39 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
 
         <div className="h-4 w-px bg-neutral-300 dark:bg-neutral-700 mx-1" />
 
-        {/* New Note Button */}
-        <button
-          onClick={() => createNote()}
-          title="Create New Note (Cmd/Ctrl + N)"
-          className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-md bg-apple-yellow hover:bg-apple-yellowHover active:scale-95 text-white shadow-sm font-medium text-xs transition-all"
-        >
-          <SquarePen size={15} />
-          <span className="hidden sm:inline">New Note</span>
-        </button>
+        {/* Action Button: On mobile inside a note, show Delete option. Otherwise New Note */}
+        {mobileView === 'editor' && activeNote ? (
+          <>
+            <button
+              onClick={() => {
+                triggerHaptic();
+                deleteNote(activeNote.id);
+                setMobileView('list');
+              }}
+              title="Delete Note"
+              className="md:hidden flex items-center justify-center p-2 rounded-md text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 active:scale-95 transition-all"
+            >
+              <Trash2 size={17} />
+            </button>
+            <button
+              onClick={() => createNote()}
+              title="Create New Note (Cmd/Ctrl + N)"
+              className="hidden md:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-md bg-apple-yellow hover:bg-apple-yellowHover active:scale-95 text-white shadow-sm font-medium text-xs transition-all"
+            >
+              <SquarePen size={15} />
+              <span>New Note</span>
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => createNote()}
+            title="Create New Note (Cmd/Ctrl + N)"
+            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-md bg-apple-yellow hover:bg-apple-yellowHover active:scale-95 text-white shadow-sm font-medium text-xs transition-all"
+          >
+            <SquarePen size={15} />
+            <span className="hidden sm:inline">New Note</span>
+          </button>
+        )}
       </div>
     </header>
   );
