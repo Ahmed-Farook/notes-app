@@ -172,7 +172,11 @@ export const Layout: React.FC = () => {
           )}
 
           {/* Pane 2: Notes List & Search */}
-          <NotesList />
+          <NotesList
+            onCheckUpdates={updater.openModal}
+            hasUpdate={Boolean(updater.updateInfo?.hasUpdate)}
+            updateInfo={updater.updateInfo}
+          />
 
           {/* Pane 3: Rich Text Editor */}
           <Editor
@@ -187,7 +191,11 @@ export const Layout: React.FC = () => {
         <div className="flex md:hidden flex-1 overflow-hidden relative">
           {mobileView === 'list' ? (
             <div className="w-full h-full flex flex-col relative">
-              <NotesList />
+              <NotesList
+                onCheckUpdates={updater.openModal}
+                hasUpdate={Boolean(updater.updateInfo?.hasUpdate)}
+                updateInfo={updater.updateInfo}
+              />
               {/* Android Floating Action Button (FAB) */}
               {!isSelectionMode && (
                 <button

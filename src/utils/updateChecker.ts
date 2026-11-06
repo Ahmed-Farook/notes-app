@@ -89,7 +89,8 @@ export function setStoredGithubToken(token: string | null) {
  */
 async function checkViaRawFallback(platform: PlatformType): Promise<UpdateInfo> {
   const rawRes = await fetch(
-    `https://raw.githubusercontent.com/${GITHUB_REPO}/main/package.json?t=${Date.now()}`
+    `https://raw.githubusercontent.com/${GITHUB_REPO}/main/package.json?t=${Date.now()}`,
+    { cache: 'no-store' }
   );
   if (!rawRes.ok) {
     throw new Error('Unable to connect to GitHub. Please check your internet connection.');
@@ -165,9 +166,13 @@ export async function checkForUpdates(overrideToken?: string): Promise<UpdateInf
       headers.Authorization = `Bearer ${token.trim()}`;
     }
 
-    const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
-      headers,
-    });
+    const response = await fetch(
+      `https://api.github.com/repos/${GITHUB_REPO}/releases/latest?t=${Date.now()}`,
+      {
+        headers,
+        cache: 'no-store',
+      }
+    );
 
     if (!response.ok) {
       // If rate-limited (HTTP 403) or releases not ready (HTTP 404), fall back to raw CDN check

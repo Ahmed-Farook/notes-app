@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { App as CapApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import {
   UpdateInfo,
   checkForUpdates as fetchUpdates,
@@ -37,6 +39,39 @@ export function useAppUpdater() {
       runCheck(undefined, false);
     }, 2000);
     return () => clearTimeout(timer);
+  }, [runCheck]);
+
+  // Periodic background check every 15 minutes and on window visibility / resume
+  useEffect(() => {
+    const interval = setInterval(() => {
+      runCheck(undefined, false);
+    }, 15 * 60 * 1000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        runCheck(undefined, false);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    let appResumeHandle: any = null;
+    if (Capacitor.isNativePlatform()) {
+      CapApp.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) {
+          runCheck(undefined, false);
+        }
+      }).then(h => {
+        appResumeHandle = h;
+      });
+    }
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (appResumeHandle?.remove) {
+        appResumeHandle.remove();
+      }
+    };
   }, [runCheck]);
 
   // Listen to native macOS Menu item "Check for Updates..."
