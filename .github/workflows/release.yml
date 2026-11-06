@@ -9,8 +9,34 @@ permissions:
   contents: write
 
 jobs:
+  create-release:
+    name: Ensure GitHub Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Extract Version
+        id: meta
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create or Verify GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          gh release view "$TAG" || gh release create "$TAG" --title "Apple Notes $TAG" --notes "Release $TAG for Windows, macOS, and Android"
+
   build-android:
     name: Build Android APK
+    needs: create-release
     runs-on: ubuntu-latest
 
     steps:
@@ -59,6 +85,7 @@ jobs:
       - name: Prepare APK for Release
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk Apple-Notes-${{ steps.meta.outputs.version }}.apk
+          ls -lh Apple-Notes-${{ steps.meta.outputs.version }}.apk
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -71,11 +98,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v${{ steps.meta.outputs.version }}"
-          gh release view "$TAG" || gh release create "$TAG" --title "Apple Notes $TAG" --notes "Release $TAG for Android and macOS"
           gh release upload "$TAG" Apple-Notes-${{ steps.meta.outputs.version }}.apk --clobber
 
   build-mac:
     name: Build macOS DMG
+    needs: create-release
     runs-on: macos-14
 
     steps:
@@ -109,8 +136,10 @@ jobs:
       - name: Rename and Prepare DMG
         run: |
           VERSION="${{ steps.meta.outputs.version }}"
-          find release -name "*.dmg" -exec cp {} "Apple-Notes-${VERSION}-arm64.dmg" \;
-          ls -lh Apple-Notes-${VERSION}-arm64.dmg
+          DMG_FILE=$(find release -maxdepth 1 -name "*.dmg" | head -n 1)
+          echo "Found DMG: $DMG_FILE"
+          cp "$DMG_FILE" "Apple-Notes-${VERSION}-arm64.dmg"
+          ls -lh "Apple-Notes-${VERSION}-arm64.dmg"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -123,11 +152,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v${{ steps.meta.outputs.version }}"
-          gh release view "$TAG" || gh release create "$TAG" --title "Apple Notes $TAG" --notes "Release $TAG for Windows, macOS, and Android"
           gh release upload "$TAG" "Apple-Notes-${{ steps.meta.outputs.version }}-arm64.dmg" --clobber
 
   build-win:
     name: Build Windows Setup EXE
+    needs: create-release
     runs-on: windows-latest
 
     steps:
@@ -163,8 +192,13 @@ jobs:
         shell: bash
         run: |
           VERSION="${{ steps.meta.outputs.version }}"
-          find release -name "*.exe" -exec cp {} "Apple-Notes-Setup-${VERSION}.exe" \;
-          ls -lh Apple-Notes-Setup-${VERSION}.exe
+          SETUP_EXE=$(find release -maxdepth 1 -name "*Setup*.exe" | head -n 1)
+          if [ -z "$SETUP_EXE" ]; then
+            SETUP_EXE=$(find release -maxdepth 1 -name "*.exe" | head -n 1)
+          fi
+          echo "Found real installer: $SETUP_EXE"
+          cp "$SETUP_EXE" "Apple-Notes-Setup-${VERSION}.exe"
+          ls -lh "Apple-Notes-Setup-${VERSION}.exe"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -178,6 +212,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v${{ steps.meta.outputs.version }}"
-          gh release view "$TAG" || gh release create "$TAG" --title "Apple Notes $TAG" --notes "Release $TAG for Windows, macOS, and Android"
           gh release upload "$TAG" "Apple-Notes-Setup-${{ steps.meta.outputs.version }}.exe" --clobber
-
