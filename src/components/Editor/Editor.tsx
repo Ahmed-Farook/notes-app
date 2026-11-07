@@ -72,12 +72,23 @@ const CustomTaskItem = TaskItem.extend({
         const { checked } = event.target as any;
 
         if (editor.isEditable && typeof getPos === 'function') {
-          // Check if editor was ALREADY focused before clicking the checkbox
-          const wasFocused = editor.isFocused;
+          const isMobile =
+            Capacitor.isNativePlatform() ||
+            /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+            ('ontouchstart' in window && window.innerWidth < 768);
 
+          // Find the scroll container and capture current scroll position
+          const scrollContainer = listItem.closest('.overflow-y-auto') as HTMLElement | null;
+          const targetScrollTop = scrollContainer
+            ? scrollContainer.scrollTop
+            : (window.scrollY || document.documentElement.scrollTop);
+
+          const wasFocused = editor.isFocused;
           let chain = editor.chain();
-          if (wasFocused) {
-            // Only keep focus if user was already typing
+
+          // Only refocus on desktop platforms where this behavior is expected
+          // NEVER refocus on mobile, so the viewport never scrolls away to an off-screen cursor
+          if (!isMobile && wasFocused) {
             chain = chain.focus(undefined, { scrollIntoView: false });
           }
 
@@ -96,8 +107,41 @@ const CustomTaskItem = TaskItem.extend({
             })
             .run();
 
-          // If the editor was NOT already open with keyboard, ensure no stray focus
-          if (!wasFocused) {
+          if (isMobile) {
+            // On mobile, blur the editor so no off-screen caret pulls the view back
+            editor.commands.blur();
+
+            if (
+              document.activeElement &&
+              (document.activeElement === checkbox ||
+                document.activeElement.classList.contains('ProseMirror') ||
+                document.activeElement.tagName === 'INPUT')
+            ) {
+              (document.activeElement as HTMLElement).blur();
+            }
+
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0) {
+              sel.removeAllRanges();
+            }
+
+            // Lock scroll position immediately and in animation frames to prevent any browser scroll jump
+            if (scrollContainer) {
+              scrollContainer.scrollTop = targetScrollTop;
+              requestAnimationFrame(() => {
+                scrollContainer.scrollTop = targetScrollTop;
+              });
+              setTimeout(() => {
+                scrollContainer.scrollTop = targetScrollTop;
+              }, 40);
+            } else {
+              window.scrollTo(0, targetScrollTop);
+              requestAnimationFrame(() => {
+                window.scrollTo(0, targetScrollTop);
+              });
+            }
+          } else if (!wasFocused) {
+            // Desktop when not previously focused
             if (
               document.activeElement &&
               (document.activeElement === checkbox ||
