@@ -6,7 +6,7 @@ import TaskItem from '@tiptap/extension-task-item';
 import Underline from '@tiptap/extension-underline';
 import Highlight from '@tiptap/extension-highlight';
 import Placeholder from '@tiptap/extension-placeholder';
-import { RotateCcw, Trash2, Folder as FolderIcon } from 'lucide-react';
+import { RotateCcw, Trash2 } from 'lucide-react';
 
 import { useNotes } from '../../store/NotesContext';
 import { formatEditorDate } from '../../utils/dateUtils';
@@ -22,8 +22,6 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     activeNote,
     createNote,
     updateNote,
-    folders,
-    moveNoteToFolder,
     restoreNote,
     permanentlyDeleteNote,
   } = useNotes();
@@ -125,8 +123,6 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     );
   }
 
-  const noteFolder = folders.find(f => f.id === activeNote.folderId);
-
   return (
     <div className="flex-1 bg-white dark:bg-[#1e1e1e] flex flex-col h-full overflow-hidden relative select-text">
       {/* Optional Toolbar */}
@@ -173,29 +169,11 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
         }}
       >
         <div className="max-w-3xl mx-auto">
-          {/* Note Meta Header: Date & Folder selector scrolls away with note content */}
-          <div className="pt-2 pb-3 flex items-center justify-between text-[11px] text-neutral-400 dark:text-neutral-500 select-none relative">
-            {/* Date Stamp */}
-            <span className="mx-auto font-medium text-center">
+          {/* Note Date Header: scrolls away with note content */}
+          <div className="pt-2 pb-3 flex items-center justify-center text-[11px] text-neutral-400 dark:text-neutral-500 select-none">
+            <span className="font-medium text-center">
               {formatEditorDate(activeNote.updatedAt)}
             </span>
-
-            {/* Folder Mover Dropdown */}
-            {!activeNote.isTrash && (
-              <div className="absolute right-0 top-1.5 flex items-center space-x-1 bg-neutral-100 dark:bg-neutral-800/80 px-2 py-0.5 rounded-full text-[11px] text-neutral-600 dark:text-neutral-400 shadow-xs border border-neutral-200/50 dark:border-neutral-700/50">
-                <FolderIcon size={11} className="text-apple-yellow shrink-0" />
-                <select
-                  value={activeNote.folderId}
-                  onChange={(e) => moveNoteToFolder(activeNote.id, e.target.value)}
-                  className="bg-transparent border-none outline-none cursor-pointer text-neutral-600 dark:text-neutral-300 pr-1 text-[11px]"
-                >
-                  <option value="default">Notes</option>
-                  {folders.map(f => (
-                    <option key={f.id} value={f.id}>{f.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
           </div>
 
           <EditorContent

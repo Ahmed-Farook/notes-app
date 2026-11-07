@@ -91,7 +91,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
               ? 'border-2 border-apple-yellow bg-apple-yellowLight/40 dark:bg-apple-yellow/20 shadow-sm'
               : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-[#2c2c2e] hover:border-neutral-300 dark:hover:border-neutral-600'
             : isSelected
-            ? 'border-neutral-200 dark:border-neutral-700 md:border-apple-yellow bg-white dark:bg-[#2c2c2e] md:bg-apple-yellowLight/40 md:dark:bg-apple-yellow/15 md:shadow-sm'
+            ? 'border-apple-yellow bg-apple-yellowLight/40 dark:bg-apple-yellow/15 shadow-sm'
             : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-[#2c2c2e] hover:border-neutral-300 dark:hover:border-neutral-600 shadow-[0_1px_3px_rgba(0,0,0,0.05)]'
         }`}
       >
@@ -182,7 +182,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
             ? 'border-2 border-apple-yellow bg-apple-yellowLight/40 dark:bg-apple-yellow/20 shadow-xs text-neutral-900 dark:text-neutral-100'
             : 'border-2 border-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800/70 text-neutral-900 dark:text-neutral-100'
           : isSelected
-          ? 'border-transparent md:bg-apple-yellow md:text-white md:shadow-sm hover:bg-neutral-100 dark:hover:bg-neutral-800/70 text-neutral-900 dark:text-neutral-100 md:dark:text-white'
+          ? 'border-transparent bg-apple-yellow text-white shadow-sm'
           : 'border-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800/70 text-neutral-900 dark:text-neutral-100'
       }`}
     >
@@ -203,7 +203,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
         <div className="flex items-center justify-between mb-0.5">
           <h4
             className={`font-semibold text-xs truncate pr-2 ${
-              !isSelectionMode && isSelected ? 'md:text-white text-neutral-900 dark:text-neutral-100' : 'text-neutral-900 dark:text-neutral-100'
+              !isSelectionMode && isSelected ? 'text-white' : 'text-neutral-900 dark:text-neutral-100'
             }`}
           >
             {note.title || 'New Note'}
@@ -217,11 +217,11 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
                 className={`p-1 rounded hover:scale-110 active:scale-95 transition-all ${
                   note.isPinned
                     ? !isSelectionMode && isSelected
-                      ? 'md:text-white text-apple-yellow'
+                      ? 'text-white'
                       : 'text-apple-yellow'
                     : `hidden md:inline-flex opacity-0 group-hover:opacity-100 ${
                         !isSelectionMode && isSelected
-                          ? 'md:text-white/80 hover:md:text-white text-neutral-400 hover:text-apple-yellow'
+                          ? 'text-white/80 hover:text-white'
                           : 'text-neutral-400 hover:text-apple-yellow'
                       }`
                 }`}
@@ -231,7 +231,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
                   className={
                     note.isPinned
                       ? !isSelectionMode && isSelected
-                        ? 'md:fill-white md:text-white fill-apple-yellow text-apple-yellow'
+                        ? 'fill-white text-white'
                         : 'fill-apple-yellow text-apple-yellow'
                       : ''
                   }
@@ -242,7 +242,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
             {/* Desktop-only hover actions (hidden on mobile to prevent misclicks) */}
             <div
               className={`hidden md:flex items-center opacity-0 group-hover:opacity-100 transition-opacity ${
-                !isSelectionMode && isSelected ? 'md:text-white' : 'text-neutral-400'
+                !isSelectionMode && isSelected ? 'text-white' : 'text-neutral-400'
               }`}
             >
               {note.isTrash ? (
@@ -270,7 +270,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
           <span
             className={`shrink-0 font-medium ${
               !isSelectionMode && isSelected
-                ? 'md:text-white/80 text-neutral-500 dark:text-neutral-400'
+                ? 'text-white/80'
                 : 'text-neutral-500 dark:text-neutral-400'
             }`}
           >
@@ -279,7 +279,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
           <span
             className={`truncate ${
               !isSelectionMode && isSelected
-                ? 'md:text-white/70 text-neutral-400 dark:text-neutral-500'
+                ? 'text-white/70'
                 : 'text-neutral-400 dark:text-neutral-500'
             }`}
           >
