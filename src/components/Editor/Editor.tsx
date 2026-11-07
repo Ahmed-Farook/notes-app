@@ -10,7 +10,142 @@ import { RotateCcw, Trash2 } from 'lucide-react';
 
 import { useNotes } from '../../store/NotesContext';
 import { formatEditorDate } from '../../utils/dateUtils';
+import { triggerHaptic } from '../../utils/haptics';
 import { EditorToolbar } from './EditorToolbar';
+
+/**
+ * CustomTaskItem: Toggles checkbox without opening virtual keyboard or stealing cursor focus
+ * unless the editor was already focused (e.g. user already open with keyboard).
+ */
+const CustomTaskItem = TaskItem.extend({
+  addNodeView() {
+    return ({ node, HTMLAttributes, getPos, editor }) => {
+      const listItem = document.createElement('li');
+      const checkboxWrapper = document.createElement('label');
+      const checkboxStyler = document.createElement('span');
+      const checkbox = document.createElement('input');
+      const content = document.createElement('div');
+
+      const updateA11Y = () => {
+        checkbox.ariaLabel =
+          this.options.a11y?.checkboxLabel?.(node, checkbox.checked) ||
+          `Task item checkbox for ${node.textContent || 'empty task item'}`;
+      };
+
+      updateA11Y();
+
+      checkboxWrapper.contentEditable = 'false';
+      checkbox.type = 'checkbox';
+      checkbox.tabIndex = -1;
+
+      // Stop propagation so clicking checkbox does not trigger outer container or editor focus listeners
+      const stopBubbling = (event: Event) => {
+        event.stopPropagation();
+      };
+
+      checkboxWrapper.addEventListener('click', stopBubbling);
+      checkboxWrapper.addEventListener('touchstart', stopBubbling, { passive: true });
+      checkboxWrapper.addEventListener('touchend', stopBubbling);
+      checkboxWrapper.addEventListener('pointerdown', stopBubbling);
+
+      // Prevent mousedown from causing contenteditable / input to steal cursor focus
+      checkboxWrapper.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      });
+      checkbox.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      });
+      checkbox.addEventListener('click', stopBubbling);
+
+      checkbox.addEventListener('change', (event) => {
+        triggerHaptic();
+
+        if (!editor.isEditable && !this.options.onReadOnlyChecked) {
+          checkbox.checked = !checkbox.checked;
+          return;
+        }
+
+        const { checked } = event.target as any;
+
+        if (editor.isEditable && typeof getPos === 'function') {
+          // Check if editor was ALREADY focused before clicking the checkbox
+          const wasFocused = editor.isFocused;
+
+          let chain = editor.chain();
+          if (wasFocused) {
+            // Only keep focus if user was already typing
+            chain = chain.focus(undefined, { scrollIntoView: false });
+          }
+
+          chain
+            .command(({ tr }) => {
+              const position = getPos();
+              if (typeof position !== 'number') {
+                return false;
+              }
+              const currentNode = tr.doc.nodeAt(position);
+              tr.setNodeMarkup(position, undefined, {
+                ...currentNode?.attrs,
+                checked,
+              });
+              return true;
+            })
+            .run();
+
+          // If the editor was NOT already open with keyboard, ensure no stray focus
+          if (!wasFocused) {
+            if (
+              document.activeElement &&
+              (document.activeElement === checkbox ||
+                document.activeElement.classList.contains('ProseMirror') ||
+                document.activeElement.tagName === 'INPUT')
+            ) {
+              (document.activeElement as HTMLElement).blur();
+            }
+          }
+        }
+
+        if (!editor.isEditable && this.options.onReadOnlyChecked) {
+          if (!this.options.onReadOnlyChecked(node, checked)) {
+            checkbox.checked = !checkbox.checked;
+          }
+        }
+      });
+
+      Object.entries(this.options.HTMLAttributes).forEach(([key, value]) => {
+        listItem.setAttribute(key, value);
+      });
+
+      listItem.dataset.checked = String(node.attrs.checked);
+      checkbox.checked = Boolean(node.attrs.checked);
+
+      checkboxWrapper.append(checkbox, checkboxStyler);
+      listItem.append(checkboxWrapper, content);
+
+      Object.entries(HTMLAttributes).forEach(([key, value]) => {
+        listItem.setAttribute(key, value);
+      });
+
+      return {
+        dom: listItem,
+        contentDOM: content,
+        update: (updatedNode) => {
+          if (updatedNode.type !== this.type) {
+            return false;
+          }
+
+          listItem.dataset.checked = String(updatedNode.attrs.checked);
+          checkbox.checked = Boolean(updatedNode.attrs.checked);
+          updateA11Y();
+
+          return true;
+        },
+      };
+    };
+  },
+});
 
 interface EditorProps {
   showToolbar: boolean;
@@ -40,7 +175,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
       Underline,
       Highlight.configure({ multicolor: false }),
       TaskList,
-      TaskItem.configure({
+      CustomTaskItem.configure({
         nested: true,
       }),
       Placeholder.configure({
@@ -130,28 +265,29 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
 
       {/* Trash Warning Banner */}
       {activeNote.isTrash && (
-        <div className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-900/60 px-4 py-2 flex items-center justify-between text-xs text-amber-800 dark:text-amber-200">
-          <span>This note is in Recently Deleted.</span>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => restoreNote(activeNote.id)}
-              className="flex items-center space-x-1 px-2 py-1 rounded bg-amber-200/60 dark:bg-amber-800/60 hover:bg-amber-300 dark:hover:bg-amber-700 font-medium transition-colors"
-            >
-              <RotateCcw size={14} />
-              <span>Restore</span>
-            </button>
-            <button
-              onClick={() => {
-                if (confirm('Permanently delete this note? This action cannot be undone.')) {
-                  permanentlyDeleteNote(activeNote.id);
-                }
-              }}
-              className="flex items-center space-x-1 px-2 py-1 rounded bg-red-100 dark:bg-red-900/60 hover:bg-red-200 dark:hover:bg-red-800 text-red-700 dark:text-red-200 font-medium transition-colors"
-            >
-              <Trash2 size={14} />
-              <span>Delete Permanently</span>
-            </button>
-          </div>
+        <div className="bg-[#EFE7D8] dark:bg-[#16202A] border-b border-[#DFD3C0] dark:border-[#223344] px-4 md:px-8 py-2.5 flex items-center justify-between text-xs transition-colors">
+          <button
+            onClick={() => {
+              triggerHaptic();
+              restoreNote(activeNote.id);
+            }}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-[#DFD3C0] dark:border-[#2A3E52] bg-[#FAF6EF] dark:bg-[#1C2733] hover:bg-[#E5DCCB] dark:hover:bg-[#25394C] text-[#213A50] dark:text-[#7EAAD0] font-medium transition-all shadow-xs active:scale-95"
+          >
+            <RotateCcw size={14} className="stroke-[2.2]" />
+            <span>Restore</span>
+          </button>
+          <button
+            onClick={() => {
+              triggerHaptic();
+              if (confirm('Permanently delete this note? This action cannot be undone.')) {
+                permanentlyDeleteNote(activeNote.id);
+              }
+            }}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900/60 bg-red-500/10 dark:bg-red-950/40 hover:bg-red-500/20 dark:hover:bg-red-900/60 text-red-600 dark:text-red-400 font-medium transition-all shadow-xs active:scale-95"
+          >
+            <Trash2 size={14} className="stroke-[2.2]" />
+            <span>Delete Permanently</span>
+          </button>
         </div>
       )}
 
@@ -161,8 +297,17 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
         onClick={(e) => {
           if (editor && !activeNote.isTrash) {
             const target = e.target as HTMLElement;
+            // Ignore if clicked on checkbox, label, select, or button
+            if (
+              target.closest('label') ||
+              target.tagName === 'INPUT' ||
+              target.closest('select') ||
+              target.closest('button')
+            ) {
+              return;
+            }
             // If clicked on empty space around or below the text, focus the editor at the end
-            if (!target.closest('.ProseMirror') && !target.closest('select') && !target.closest('button')) {
+            if (!target.closest('.ProseMirror')) {
               editor.commands.focus('end');
             }
           }
@@ -179,7 +324,16 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
           <EditorContent
             editor={editor}
             className="prose prose-neutral dark:prose-invert focus:outline-none min-h-[60vh] select-text cursor-text"
-            onClick={() => {
+            onClick={(e) => {
+              const target = e.target as HTMLElement;
+              // If click was on a checkbox or its label, do NOT trigger focus or open keyboard
+              if (
+                target.tagName === 'INPUT' ||
+                target.closest('label') ||
+                target.closest('[data-type="taskItem"] > label')
+              ) {
+                return;
+              }
               if (editor && !editor.isFocused && !activeNote.isTrash) {
                 editor.commands.focus();
               }

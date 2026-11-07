@@ -161,14 +161,18 @@ ul[data-type="taskList"] li > label {
   flex: 0 0 auto;
   margin-right: 0.65rem;
   user-select: none;
+  -webkit-user-select: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   margin-top: 0.2rem;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 ul[data-type="taskList"] li > label input[type="checkbox"] {
   appearance: none;
+  -webkit-appearance: none;
   width: 1.15rem;
   height: 1.15rem;
   border: 1.5px solid #c2b5a1;
@@ -179,6 +183,8 @@ ul[data-type="taskList"] li > label input[type="checkbox"] {
   place-content: center;
   transition: all 0.15s ease-in-out;
   background-color: transparent;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 ul[data-type="taskList"] li > label input[type="checkbox"]:hover {
