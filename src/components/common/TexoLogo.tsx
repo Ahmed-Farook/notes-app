@@ -37,3 +37,4 @@ export const TexoLogo: React.FC<TexoLogoProps> = ({ size = 28, className = '' })
     </svg>
   );
 };
+
