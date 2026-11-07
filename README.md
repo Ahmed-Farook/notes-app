@@ -1,11 +1,12 @@
 <p align="center">
-  <sub>NOTES &nbsp; / &nbsp; macOS · Windows · Android · Web</sub>
+  <img src="public/logo.svg" width="96" height="96" alt="texō logo" /><br>
+  <sub>texō &nbsp; / &nbsp; macOS · Windows · Android · Web</sub>
 </p>
 
-<h1 align="center">One less thing<br>to keep in your head.</h1>
+<h1 align="center">texō<br>One less thing to keep in your head.</h1>
 
 <p align="center">
-  Inspired by Apple Notes. For thoughts to keep and things to get done.<br>
+  For thoughts to keep and things to get done.<br>
   Write offline. Save locally. Sign in to sync across devices.
 </p>
 
@@ -15,9 +16,9 @@
 </p>
 
 > [!TIP]
-> **macOS Gatekeeper notice:** If macOS says *"Apple Notes is damaged and can't be opened"*, this is Apple's standard message for unnotarized open-source apps. Move the app to `/Applications` and run this in Terminal:
+> **macOS Gatekeeper notice:** If macOS says *"texō is damaged and can't be opened"*, this is Apple's standard message for unnotarized open-source apps. Move the app to `/Applications` and run this in Terminal:
 > ```bash
-> xattr -cr "/Applications/Apple Notes.app"
+> xattr -cr "/Applications/texō.app"
 > ```
 
 <br>

@@ -16,7 +16,8 @@ function createWindow() {
     height: 760,
     minWidth: 720,
     minHeight: 480,
-    title: 'Apple Notes',
+    title: 'texō',
+    icon: path.join(__dirname, '..', 'build', 'icon.png'),
     titleBarStyle: isMac ? 'hiddenInset' : 'default',
     trafficLightPosition: isMac ? { x: 16, y: 14 } : undefined,
     vibrancy: isMac ? 'under-window' : undefined,
@@ -286,7 +287,7 @@ ipcMain.handle('updater:check', async (_event, token) => {
 
       return {
         latestVersion,
-        name: `Apple Notes v${latestVersion}`,
+        name: `texō v${latestVersion}`,
         body: `Version v${latestVersion} includes the latest performance enhancements, in-app updates, and zero-knowledge privacy features.`,
         publishedAt: new Date().toISOString(),
         releaseUrl: `https://github.com/${repo}/releases/tag/v${latestVersion}`,
@@ -361,7 +362,13 @@ ipcMain.handle('updater:install-update', async (_event, downloadUrl) => {
     // 4. Determine current installed app path (or default to /Applications)
     let targetApp = process.execPath.replace(/\/Contents\/MacOS\/.*$/, '');
     if (!targetApp.endsWith('.app') || !fs.existsSync(targetApp)) {
-      targetApp = '/Applications/Apple Notes.app';
+      if (fs.existsSync('/Applications/texō.app')) {
+        targetApp = '/Applications/texō.app';
+      } else if (fs.existsSync('/Applications/Apple Notes.app')) {
+        targetApp = '/Applications/Apple Notes.app';
+      } else {
+        targetApp = '/Applications/texō.app';
+      }
     }
 
     // 5. Generate bash script to swap the app and restart after current PID exits

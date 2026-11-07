@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.ahmedfarook.notesapp',
-  appName: 'Apple Notes',
+  appName: 'texō',
   webDir: 'dist',
   server: {
     androidScheme: 'https'

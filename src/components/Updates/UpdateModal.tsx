@@ -10,6 +10,7 @@ import {
   Key,
   Zap,
 } from 'lucide-react';
+import { TexoLogo } from '../common/TexoLogo';
 import {
   UpdateInfo,
   CURRENT_VERSION,
@@ -124,8 +125,8 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
         {/* Modal Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-apple-border dark:border-apple-borderDark bg-[#EFE7D8]/80 dark:bg-[#131B24]/80">
           <div className="flex items-center space-x-2">
-            <Sparkles size={18} className="text-[#395060] dark:text-[#7EAAD0]" />
-            <h3 className="text-sm font-semibold">Software Update</h3>
+            <TexoLogo size={18} />
+            <h3 className="text-sm font-semibold">texō Update</h3>
           </div>
           <button
             onClick={onClose}
@@ -235,7 +236,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                       <span>
                         {installProgress >= 100
                           ? updateInfo.platform === 'mac'
-                            ? 'Restarting Apple Notes...'
+                            ? 'Restarting texō...'
                             : updateInfo.platform === 'android'
                             ? 'Opening system installer...'
                             : updateInfo.platform === 'web'
@@ -258,7 +259,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                         ? `Downloading update. The Android installer will prompt you to update in-place.`
                         : updateInfo.platform === 'web'
                         ? `Applying latest updates to your browser session.`
-                        : `The installer will launch automatically to update Apple Notes to v${updateInfo.latestVersion}.`}
+                        : `The installer will launch automatically to update texō to v${updateInfo.latestVersion}.`}
                     </p>
                   </div>
                 ) : (
@@ -288,7 +289,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                 <CheckCircle2 size={26} />
               </div>
               <h4 className="text-sm font-semibold text-[#1C2B36] dark:text-[#E8EEF3]">
-                Apple Notes is up to date
+                texō is up to date
               </h4>
               <p className="text-xs text-[#6E7E8E] dark:text-[#8AA0B4]">
                 Version <span className="font-mono font-medium text-[#1C2B36] dark:text-[#CBD8E3]">v{CURRENT_VERSION}</span> is currently the newest version available.

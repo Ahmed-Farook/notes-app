@@ -1,7 +1,7 @@
 {
   "name": "apple-notes-crossplatform",
-  "version": "0.2.20",
-  "description": "Apple Notes cross-platform note taking application",
+  "version": "0.2.21",
+  "description": "texō cross-platform note taking application",
   "author": "Ahmed Farook",
   "private": true,
   "type": "module",
@@ -20,7 +20,7 @@
   "main": "electron/main.cjs",
   "build": {
     "appId": "com.ahmedfarook.notesapp",
-    "productName": "Apple Notes",
+    "productName": "texō",
     "directories": {
       "output": "release"
     },
@@ -44,7 +44,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Apple Notes"
+      "shortcutName": "texō"
     }
   },
   "dependencies": {

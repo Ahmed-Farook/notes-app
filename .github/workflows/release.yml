@@ -32,7 +32,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ steps.meta.outputs.tag }}"
-          gh release view "$TAG" || gh release create "$TAG" --title "Apple Notes $TAG" --notes "Release $TAG for Windows, macOS, and Android"
+          gh release view "$TAG" || gh release create "$TAG" --title "texō $TAG" --notes "Release $TAG for Windows, macOS, and Android"
 
   build-android:
     name: Build Android APK
@@ -84,20 +84,22 @@ jobs:
 
       - name: Prepare APK for Release
         run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk texo-${{ steps.meta.outputs.version }}.apk
           cp android/app/build/outputs/apk/debug/app-debug.apk Apple-Notes-${{ steps.meta.outputs.version }}.apk
-          ls -lh Apple-Notes-${{ steps.meta.outputs.version }}.apk
+          ls -lh texo-${{ steps.meta.outputs.version }}.apk
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Apple-Notes-${{ steps.meta.outputs.version }}-apk
-          path: Apple-Notes-${{ steps.meta.outputs.version }}.apk
+          name: texo-${{ steps.meta.outputs.version }}-apk
+          path: texo-${{ steps.meta.outputs.version }}.apk
 
       - name: Upload to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v${{ steps.meta.outputs.version }}"
+          gh release upload "$TAG" texo-${{ steps.meta.outputs.version }}.apk --clobber
           gh release upload "$TAG" Apple-Notes-${{ steps.meta.outputs.version }}.apk --clobber
 
   build-mac:
@@ -138,20 +140,22 @@ jobs:
           VERSION="${{ steps.meta.outputs.version }}"
           DMG_FILE=$(find release -maxdepth 1 -name "*.dmg" | head -n 1)
           echo "Found DMG: $DMG_FILE"
+          cp "$DMG_FILE" "texo-${VERSION}-arm64.dmg"
           cp "$DMG_FILE" "Apple-Notes-${VERSION}-arm64.dmg"
-          ls -lh "Apple-Notes-${VERSION}-arm64.dmg"
+          ls -lh "texo-${VERSION}-arm64.dmg"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Apple-Notes-${{ steps.meta.outputs.version }}-arm64-dmg
-          path: Apple-Notes-${{ steps.meta.outputs.version }}-arm64.dmg
+          name: texo-${{ steps.meta.outputs.version }}-arm64-dmg
+          path: texo-${{ steps.meta.outputs.version }}-arm64.dmg
 
       - name: Upload to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v${{ steps.meta.outputs.version }}"
+          gh release upload "$TAG" "texo-${{ steps.meta.outputs.version }}-arm64.dmg" --clobber
           gh release upload "$TAG" "Apple-Notes-${{ steps.meta.outputs.version }}-arm64.dmg" --clobber
 
   build-win:
@@ -197,14 +201,15 @@ jobs:
             SETUP_EXE=$(find release -maxdepth 1 -name "*.exe" | head -n 1)
           fi
           echo "Found real installer: $SETUP_EXE"
+          cp "$SETUP_EXE" "texo-Setup-${VERSION}.exe"
           cp "$SETUP_EXE" "Apple-Notes-Setup-${VERSION}.exe"
-          ls -lh "Apple-Notes-Setup-${VERSION}.exe"
+          ls -lh "texo-Setup-${VERSION}.exe"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Apple-Notes-${{ steps.meta.outputs.version }}-win-exe
-          path: Apple-Notes-Setup-${{ steps.meta.outputs.version }}.exe
+          name: texo-${{ steps.meta.outputs.version }}-win-exe
+          path: texo-Setup-${{ steps.meta.outputs.version }}.exe
 
       - name: Upload to GitHub Release
         shell: bash
@@ -212,4 +217,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v${{ steps.meta.outputs.version }}"
+          gh release upload "$TAG" "texo-Setup-${{ steps.meta.outputs.version }}.exe" --clobber
           gh release upload "$TAG" "Apple-Notes-Setup-${{ steps.meta.outputs.version }}.exe" --clobber

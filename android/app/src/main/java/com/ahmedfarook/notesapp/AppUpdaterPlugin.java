@@ -37,17 +37,17 @@ public class AppUpdaterPlugin extends Plugin {
             return;
         }
 
-        File targetFile = new File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "Apple-Notes-update.apk");
+        File targetFile = new File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "texo-update.apk");
         if (targetFile.exists()) {
             targetFile.delete();
         }
 
         Uri uri = Uri.parse(downloadUrl);
         DownloadManager.Request request = new DownloadManager.Request(uri);
-        request.setTitle("Apple Notes Update");
+        request.setTitle("texō Update");
         request.setDescription("Downloading latest update...");
         request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-        request.setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, "Apple-Notes-update.apk");
+        request.setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, "texo-update.apk");
         request.setMimeType("application/vnd.android.package-archive");
 
         try {

@@ -29,7 +29,7 @@ export const UpdateBanner: React.FC<UpdateBannerProps> = ({
       <div className="flex items-center space-x-2 truncate">
         <Sparkles size={14} className="text-[#395060] dark:text-[#7EAAD0] shrink-0 animate-pulse" />
         <span className="truncate">
-          <strong>Apple Notes v{updateInfo.latestVersion}</strong> is available (you have v
+          <strong>texō v{updateInfo.latestVersion}</strong> is available (you have v
           {updateInfo.currentVersion}).
         </span>
       </div>

@@ -103,20 +103,20 @@ async function checkViaRawFallback(platform: PlatformType): Promise<UpdateInfo> 
   let assetName: string | undefined = undefined;
 
   if (platform === 'android') {
-    assetName = `Apple-Notes-${latestVersion}.apk`;
+    assetName = `texo-${latestVersion}.apk`;
     downloadUrl = `https://github.com/${GITHUB_REPO}/releases/download/v${latestVersion}/${assetName}`;
   } else if (platform === 'mac') {
-    assetName = `Apple-Notes-${latestVersion}-arm64.dmg`;
+    assetName = `texo-${latestVersion}-arm64.dmg`;
     downloadUrl = `https://github.com/${GITHUB_REPO}/releases/download/v${latestVersion}/${assetName}`;
   } else if (platform === 'windows') {
-    assetName = `Apple-Notes-Setup-${latestVersion}.exe`;
+    assetName = `texo-Setup-${latestVersion}.exe`;
     downloadUrl = `https://github.com/${GITHUB_REPO}/releases/download/v${latestVersion}/${assetName}`;
   }
 
   return {
     currentVersion: CURRENT_VERSION,
     latestVersion,
-    name: `Apple Notes v${latestVersion}`,
+    name: `texō v${latestVersion}`,
     body: `Version v${latestVersion} includes the latest performance enhancements, in-app updates, and zero-knowledge privacy features.`,
     publishedAt: new Date().toISOString(),
     releaseUrl: `https://github.com/${GITHUB_REPO}/releases/tag/v${latestVersion}`,

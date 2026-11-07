@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../store/AuthContext';
 import { triggerHaptic } from '../../utils/haptics';
+import { TexoLogo } from '../common/TexoLogo';
 
 export const AuthModal: React.FC = () => {
   const {
@@ -111,9 +112,9 @@ export const AuthModal: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-apple-border dark:border-apple-borderDark bg-[#EFE7D8]/80 dark:bg-[#131B24]/80">
           <div className="flex items-center space-x-2">
-            <Cloud size={18} className="text-[#395060] dark:text-[#7EAAD0]" />
+            <TexoLogo size={18} />
             <h3 className="text-sm font-semibold">
-              {user ? 'Cloud Sync Account' : 'Apple Notes Cloud'}
+              {user ? 'Cloud Sync Account' : 'texō Cloud'}
             </h3>
           </div>
           <button
@@ -189,11 +190,11 @@ export const AuthModal: React.FC = () => {
             /* Sign in / Sign up form */
             <>
               <div className="text-center space-y-1">
-                <div className="w-10 h-10 mx-auto rounded-full bg-amber-100 dark:bg-amber-950/40 text-apple-yellow flex items-center justify-center">
-                  <Sparkles size={20} />
+                <div className="flex justify-center mb-1">
+                  <TexoLogo size={36} />
                 </div>
                 <h4 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-                  {mode === 'signin' ? 'Sign in to Apple Notes' : 'Create Free Sync Account'}
+                  {mode === 'signin' ? 'Sign in to texō' : 'Create Free Sync Account'}
                 </h4>
                 <p className="text-xs text-neutral-500 dark:text-neutral-400">
                   Instant real-time sync between your Mac, Android, and Web devices.
