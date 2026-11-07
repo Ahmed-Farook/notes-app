@@ -13,7 +13,6 @@ import {
 import { useNotes } from '../../store/NotesContext';
 import { CURRENT_VERSION } from '../../utils/updateChecker';
 import { triggerHaptic } from '../../utils/haptics';
-import { TexoLogo } from '../common/TexoLogo';
 
 interface FolderListProps {
   onCheckUpdates?: () => void;
@@ -55,14 +54,6 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
   return (
     <aside className="w-56 bg-[#EFE7D8] dark:bg-[#101720] border-r border-apple-border dark:border-apple-borderDark h-full flex flex-col justify-between select-none shrink-0 text-sm">
       <div className="overflow-y-auto px-2 py-3 space-y-4">
-        {/* Brand Header */}
-        <div className="px-2 pt-0.5 pb-2 flex items-center space-x-2.5 border-b border-[#DFD3C0]/60 dark:border-[#223344]/60">
-          <TexoLogo size={22} className="shadow-xs rounded-md" />
-          <span className="font-semibold text-sm tracking-tight text-[#1C2B36] dark:text-[#E8EEF3]">
-            texō
-          </span>
-        </div>
-
         {/* Main Notes Section */}
         <div>
           <div className="px-2 pb-1 text-[11px] font-semibold tracking-wider text-neutral-400 dark:text-neutral-500 uppercase">

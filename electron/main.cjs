@@ -5,6 +5,9 @@ const fs = require('fs');
 const https = require('https');
 const { spawn, execSync } = require('child_process');
 
+// Set application display name
+app.setName('texō');
+
 let mainWindow = null;
 const isDev = !app.isPackaged && process.env.VITE_DEV_SERVER === 'true';
 
@@ -362,12 +365,14 @@ ipcMain.handle('updater:install-update', async (_event, downloadUrl) => {
     // 4. Determine current installed app path (or default to /Applications)
     let targetApp = process.execPath.replace(/\/Contents\/MacOS\/.*$/, '');
     if (!targetApp.endsWith('.app') || !fs.existsSync(targetApp)) {
-      if (fs.existsSync('/Applications/texō.app')) {
+      if (fs.existsSync('/Applications/texo.app')) {
+        targetApp = '/Applications/texo.app';
+      } else if (fs.existsSync('/Applications/texō.app')) {
         targetApp = '/Applications/texō.app';
       } else if (fs.existsSync('/Applications/Apple Notes.app')) {
         targetApp = '/Applications/Apple Notes.app';
       } else {
-        targetApp = '/Applications/texō.app';
+        targetApp = '/Applications/texo.app';
       }
     }
 
@@ -386,7 +391,7 @@ done
 
 # Replace installed application bundle
 rm -rf "$TARGET_APP"
-cp -R "$SOURCE_APP" "$TARGET_APP"
+cp -a "$SOURCE_APP" "$TARGET_APP"
 
 # Detach DMG and cleanup
 hdiutil detach "$MOUNT_POINT" -force >/dev/null 2>&1

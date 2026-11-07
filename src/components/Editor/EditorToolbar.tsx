@@ -35,7 +35,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible 
     }`;
 
   return (
-    <div className="flex flex-nowrap items-center gap-1 px-3 py-1.5 border-b border-apple-border dark:border-apple-borderDark bg-[#F2ECE0]/95 dark:bg-[#151E28]/95 backdrop-blur sticky top-0 z-20 select-none text-xs overflow-x-auto no-scrollbar">
+    <div className="h-10 flex flex-nowrap items-center gap-1 px-3 border-b border-apple-border dark:border-apple-borderDark bg-[#F2ECE0]/95 dark:bg-[#151E28]/95 backdrop-blur sticky top-0 z-20 select-none text-xs overflow-x-auto no-scrollbar shrink-0">
       {/* Text Style Headings */}
       <button
         onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}

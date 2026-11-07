@@ -17,6 +17,7 @@ import {
 import { useNotes } from '../../store/NotesContext';
 import { useAuth } from '../../store/AuthContext';
 import { triggerHaptic } from '../../utils/haptics';
+import { TexoLogo } from '../common/TexoLogo';
 
 interface TopNavbarProps {
   onToggleChecklist?: () => void;
@@ -170,6 +171,14 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             <LayoutGrid size={15} />
           </button>
         </div>
+      </div>
+
+      {/* Center Brand Logo & Name (Desktop & Web only - untouched on mobile) */}
+      <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center space-x-2 select-none [app-region:drag] pointer-events-none">
+        <TexoLogo size={20} className="shadow-xs rounded-md" />
+        <span className="font-bold text-sm tracking-tight text-[#1C2B36] dark:text-[#E8EEF3]">
+          texō
+        </span>
       </div>
 
       {/* Right controls */}

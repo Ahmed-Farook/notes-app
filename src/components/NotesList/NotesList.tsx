@@ -73,7 +73,7 @@ export const NotesList: React.FC<NotesListProps> = ({
     <section className="w-full md:w-72 bg-[#F6EFE4] dark:bg-[#16202A] md:border-r border-apple-border dark:border-apple-borderDark h-full flex flex-col select-none shrink-0 relative">
       {/* Top Header: Selection Header vs Normal Folder Selector Pill */}
       {isSelectionMode ? (
-        <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-apple-border dark:border-apple-borderDark bg-[#EFE7D8]/95 dark:bg-[#131B24]/95 backdrop-blur-md">
+        <div className="h-10 px-3.5 flex items-center justify-between border-b border-apple-border dark:border-apple-borderDark bg-[#EFE7D8]/95 dark:bg-[#131B24]/95 backdrop-blur-md shrink-0">
           <button
             onClick={() => {
               triggerHaptic();
@@ -97,7 +97,7 @@ export const NotesList: React.FC<NotesListProps> = ({
           </button>
         </div>
       ) : (
-        <div className="px-3.5 py-2 flex items-center justify-between border-b border-apple-border dark:border-apple-borderDark bg-[#EFE7D8]/90 dark:bg-[#131B24]/90 backdrop-blur-md">
+        <div className="h-10 px-3.5 flex items-center justify-between border-b border-apple-border dark:border-apple-borderDark bg-[#EFE7D8]/90 dark:bg-[#131B24]/90 backdrop-blur-md shrink-0">
           <span className="text-xs font-medium text-[#6E7E8E] dark:text-[#8AA0B4]">
             {filteredNotes.length} {filteredNotes.length === 1 ? 'note' : 'notes'}
           </span>

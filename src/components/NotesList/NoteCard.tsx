@@ -209,6 +209,31 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
             {note.title || 'New Note'}
           </h4>
           <div className="flex items-center space-x-1 shrink-0">
+            {/* Desktop-only hover actions (hidden on mobile to prevent misclicks) */}
+            <div
+              className={`hidden md:flex items-center opacity-0 group-hover:opacity-100 transition-opacity ${
+                !isSelectionMode && isSelected ? 'text-white' : 'text-neutral-400'
+              }`}
+            >
+              {note.isTrash ? (
+                <button
+                  onClick={handleRestore}
+                  title="Restore note"
+                  className="p-1 hover:scale-110 active:scale-95 hover:text-green-500 transition-all"
+                >
+                  <RotateCcw size={15} />
+                </button>
+              ) : (
+                <button
+                  onClick={handleDelete}
+                  title="Delete note"
+                  className="p-1 hover:scale-110 active:scale-95 hover:text-red-500 transition-all"
+                >
+                  <Trash2 size={15} />
+                </button>
+              )}
+            </div>
+
             {/* Pin Button: Single button for both pinning and unpinning */}
             {!note.isTrash && (
               <button
@@ -238,31 +263,6 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
                 />
               </button>
             )}
-
-            {/* Desktop-only hover actions (hidden on mobile to prevent misclicks) */}
-            <div
-              className={`hidden md:flex items-center opacity-0 group-hover:opacity-100 transition-opacity ${
-                !isSelectionMode && isSelected ? 'text-white' : 'text-neutral-400'
-              }`}
-            >
-              {note.isTrash ? (
-                <button
-                  onClick={handleRestore}
-                  title="Restore note"
-                  className="p-1 hover:scale-110 active:scale-95 hover:text-green-500 transition-all"
-                >
-                  <RotateCcw size={15} />
-                </button>
-              ) : (
-                <button
-                  onClick={handleDelete}
-                  title="Delete note"
-                  className="p-1 hover:scale-110 active:scale-95 hover:text-red-500 transition-all"
-                >
-                  <Trash2 size={15} />
-                </button>
-              )}
-            </div>
           </div>
         </div>
 

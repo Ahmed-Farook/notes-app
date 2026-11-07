@@ -20,7 +20,7 @@
   "main": "electron/main.cjs",
   "build": {
     "appId": "com.ahmedfarook.notesapp",
-    "productName": "texō",
+    "productName": "texo",
     "directories": {
       "output": "release"
     },
@@ -32,7 +32,14 @@
       "category": "public.app-category.productivity",
       "target": [
         "dmg"
-      ]
+      ],
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": "-",
+      "extendInfo": {
+        "CFBundleDisplayName": "texō",
+        "CFBundleName": "texo"
+      }
     },
     "win": {
       "target": [
