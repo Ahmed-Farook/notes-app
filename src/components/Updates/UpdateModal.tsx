@@ -139,11 +139,11 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
         <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
           {isChecking ? (
             <div className="py-8 flex flex-col items-center justify-center space-y-3 text-center">
-              <RefreshCw size={28} className="animate-spin text-apple-yellow" />
-              <p className="text-sm font-medium text-neutral-600 dark:text-neutral-300">
+              <RefreshCw size={28} className="animate-spin text-[#395060] dark:text-[#7EAAD0]" />
+              <p className="text-sm font-medium text-[#1C2B36] dark:text-[#CBD8E3]">
                 Checking for updates...
               </p>
-              <p className="text-xs text-neutral-400">Connecting to GitHub Releases</p>
+              <p className="text-xs text-[#6E7E8E] dark:text-[#8AA0B4]">Connecting to GitHub Releases</p>
             </div>
           ) : error ? (
             <div className="space-y-4">
@@ -287,19 +287,19 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
               <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-1">
                 <CheckCircle2 size={26} />
               </div>
-              <h4 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+              <h4 className="text-sm font-semibold text-[#1C2B36] dark:text-[#E8EEF3]">
                 Apple Notes is up to date
               </h4>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                Version <span className="font-mono font-medium">v{CURRENT_VERSION}</span> is currently the newest version available.
+              <p className="text-xs text-[#6E7E8E] dark:text-[#8AA0B4]">
+                Version <span className="font-mono font-medium text-[#1C2B36] dark:text-[#CBD8E3]">v{CURRENT_VERSION}</span> is currently the newest version available.
               </p>
             </div>
           )}
         </div>
 
         {/* Modal Footer */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-neutral-100 dark:border-neutral-800 bg-[#f9f9f9]/80 dark:bg-[#1f1f1f]/80 text-xs">
-          <span className="text-[11px] text-neutral-400 font-mono">v{CURRENT_VERSION}</span>
+        <div className="flex items-center justify-between px-5 py-3 border-t border-[#DFD3C0]/70 dark:border-[#223344] bg-[#EFE7D8]/80 dark:bg-[#131B24]/90 text-xs">
+          <span className="text-[11px] text-[#6E7E8E] dark:text-[#8AA0B4] font-mono">v{CURRENT_VERSION}</span>
           <div className="flex items-center space-x-2">
             <button
               onClick={() => {
@@ -307,14 +307,14 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                 onCheckAgain();
               }}
               disabled={isChecking}
-              className="flex items-center space-x-1 px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-colors disabled:opacity-50"
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-[#DFD3C0] dark:border-[#2A3E52] bg-[#FAF6EF]/60 dark:bg-[#1C2733] hover:bg-[#FAF6EF] dark:hover:bg-[#25394C] text-[#1C2B36] dark:text-[#E8EEF3] transition-colors disabled:opacity-50 text-xs font-medium shadow-xs"
             >
               <RefreshCw size={12} className={isChecking ? 'animate-spin' : ''} />
               <span>Check Again</span>
             </button>
             <button
               onClick={onClose}
-              className="px-3 py-1.5 rounded-lg bg-[#E5DCCB] dark:bg-[#1C2733] hover:bg-[#DCD0BC] dark:hover:bg-[#25394C] text-[#1C2B36] dark:text-[#E8EEF3] font-medium transition-colors"
+              className="px-3.5 py-1.5 rounded-lg border border-[#DFD3C0] dark:border-[#2A3E52] bg-[#E5DCCB] dark:bg-[#253D56] hover:bg-[#DCD0BC] dark:hover:bg-[#2E4A68] text-[#1C2B36] dark:text-white font-medium transition-colors text-xs shadow-xs"
             >
               Close
             </button>

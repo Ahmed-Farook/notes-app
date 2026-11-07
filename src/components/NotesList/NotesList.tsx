@@ -125,7 +125,7 @@ export const NotesList: React.FC<NotesListProps> = ({
           />
 
           <div
-            className="relative w-full max-w-sm bg-[#f2f2f7] dark:bg-[#1c1c1e] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-neutral-200/80 dark:border-neutral-800/80 overflow-hidden flex flex-col max-h-[82vh] animate-in slide-in-from-bottom duration-250 z-10"
+            className="relative w-full max-w-sm bg-[#EFE7D8] dark:bg-[#131B24] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-[#DFD3C0] dark:border-[#223344] overflow-hidden flex flex-col max-h-[82vh] animate-in slide-in-from-bottom duration-250 z-10"
             role="dialog"
             aria-modal="true"
           >
@@ -135,16 +135,16 @@ export const NotesList: React.FC<NotesListProps> = ({
             </div>
 
             {/* Sheet Header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-neutral-200/70 dark:border-neutral-800/80">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-[#DFD3C0]/70 dark:border-[#223344] bg-[#EFE7D8] dark:bg-[#131B24]">
               <div className="flex items-center space-x-2">
-                <Folder size={17} className="text-apple-yellow" />
-                <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                <Folder size={17} className="text-[#395060] dark:text-[#7EAAD0]" />
+                <h3 className="text-sm font-semibold text-[#1C2B36] dark:text-[#E8EEF3]">
                   Folders
                 </h3>
               </div>
               <button
                 onClick={() => setIsFolderPickerOpen(false)}
-                className="text-xs font-semibold text-apple-yellow hover:text-apple-yellowHover py-1 px-2 rounded-lg transition-colors"
+                className="text-xs font-semibold text-[#213A50] hover:text-[#172A3C] dark:text-[#7EAAD0] dark:hover:text-[#9DC3E6] py-1 px-2.5 rounded-lg transition-colors"
               >
                 Done
               </button>
@@ -153,7 +153,7 @@ export const NotesList: React.FC<NotesListProps> = ({
             {/* Folder List Group */}
             <div className="p-3 space-y-3 overflow-y-auto">
               {/* Main Notes Group */}
-              <div className="bg-white dark:bg-[#2c2c2e] rounded-xl overflow-hidden shadow-xs divide-y divide-neutral-100 dark:divide-neutral-800/60">
+              <div className="bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0]/60 dark:border-[#223344] rounded-xl overflow-hidden shadow-xs divide-y divide-[#DFD3C0]/40 dark:divide-[#223344]">
                 {/* Notes (Default) */}
                 <button
                   onClick={() => {
@@ -163,20 +163,26 @@ export const NotesList: React.FC<NotesListProps> = ({
                   }}
                   className={`w-full px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors text-left ${
                     selectedFolderId === 'default'
-                      ? 'bg-apple-yellow/10 dark:bg-apple-yellow/15 text-apple-yellow font-semibold'
-                      : 'text-neutral-800 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800/50'
+                      ? 'bg-apple-yellow dark:bg-[#253D56] text-white font-medium shadow-xs'
+                      : 'text-[#1C2B36] dark:text-[#CBD8E3] hover:bg-[#E5DCCB] dark:hover:bg-[#223344]'
                   }`}
                 >
                   <div className="flex items-center space-x-2.5">
-                    <div className="w-6 h-6 rounded-md bg-amber-500/15 text-apple-yellow flex items-center justify-center shrink-0">
+                    <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
+                      selectedFolderId === 'default'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-[#E8F1F7] dark:bg-[#203448] text-[#395060] dark:text-[#7EAAD0]'
+                    }`}>
                       <Folder size={14} />
                     </div>
                     <span>Notes</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className="text-[11px] text-neutral-400 font-mono">{defaultNotesCount}</span>
+                    <span className={`text-[11px] font-mono ${
+                      selectedFolderId === 'default' ? 'text-white/80' : 'text-[#8A9BA8] dark:text-[#6E8092]'
+                    }`}>{defaultNotesCount}</span>
                     {selectedFolderId === 'default' && (
-                      <Check size={15} className="text-apple-yellow stroke-[2.5]" />
+                      <Check size={15} className="text-white stroke-[2.5]" />
                     )}
                   </div>
                 </button>
@@ -185,10 +191,10 @@ export const NotesList: React.FC<NotesListProps> = ({
               {/* Custom Folders Group */}
               {folders.length > 0 && (
                 <div className="space-y-1">
-                  <span className="px-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                  <span className="px-2 text-[10px] font-semibold uppercase tracking-wider text-[#6E7E8E] dark:text-[#8AA0B4]">
                     Custom Folders
                   </span>
-                  <div className="bg-white dark:bg-[#2c2c2e] rounded-xl overflow-hidden shadow-xs divide-y divide-neutral-100 dark:divide-neutral-800/60">
+                  <div className="bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0]/60 dark:border-[#223344] rounded-xl overflow-hidden shadow-xs divide-y divide-[#DFD3C0]/40 dark:divide-[#223344]">
                     {folders.map(f => {
                       const count = getFolderCount(f.id);
                       const isSelected = selectedFolderId === f.id;
@@ -202,20 +208,26 @@ export const NotesList: React.FC<NotesListProps> = ({
                           }}
                           className={`w-full px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors text-left ${
                             isSelected
-                              ? 'bg-apple-yellow/10 dark:bg-apple-yellow/15 text-apple-yellow font-semibold'
-                              : 'text-neutral-800 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800/50'
+                              ? 'bg-apple-yellow dark:bg-[#253D56] text-white font-medium shadow-xs'
+                              : 'text-[#1C2B36] dark:text-[#CBD8E3] hover:bg-[#E5DCCB] dark:hover:bg-[#223344]'
                           }`}
                         >
                           <div className="flex items-center space-x-2.5 truncate pr-2">
-                            <div className="w-6 h-6 rounded-md bg-blue-500/15 text-blue-500 flex items-center justify-center shrink-0">
+                            <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
+                              isSelected
+                                ? 'bg-white/20 text-white'
+                                : 'bg-[#E8F1F7] dark:bg-[#203448] text-[#395060] dark:text-[#7EAAD0]'
+                            }`}>
                               <Folder size={14} />
                             </div>
                             <span className="truncate">{f.name}</span>
                           </div>
                           <div className="flex items-center space-x-2 shrink-0">
-                            <span className="text-[11px] text-neutral-400 font-mono">{count}</span>
+                            <span className={`text-[11px] font-mono ${
+                              isSelected ? 'text-white/80' : 'text-[#8A9BA8] dark:text-[#6E8092]'
+                            }`}>{count}</span>
                             {isSelected && (
-                              <Check size={15} className="text-apple-yellow stroke-[2.5]" />
+                              <Check size={15} className="text-white stroke-[2.5]" />
                             )}
                           </div>
                         </button>
@@ -226,7 +238,7 @@ export const NotesList: React.FC<NotesListProps> = ({
               )}
 
               {/* Trash Folder Group */}
-              <div className="bg-white dark:bg-[#2c2c2e] rounded-xl overflow-hidden shadow-xs">
+              <div className="bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0]/60 dark:border-[#223344] rounded-xl overflow-hidden shadow-xs">
                 <button
                   onClick={() => {
                     triggerHaptic();
@@ -235,8 +247,8 @@ export const NotesList: React.FC<NotesListProps> = ({
                   }}
                   className={`w-full px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors text-left ${
                     selectedFolderId === 'trash'
-                      ? 'bg-red-500/10 text-red-600 dark:text-red-400 font-semibold'
-                      : 'text-neutral-800 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800/50'
+                      ? 'bg-red-500/15 dark:bg-red-950/40 text-red-600 dark:text-red-400 font-medium'
+                      : 'text-[#1C2B36] dark:text-[#CBD8E3] hover:bg-[#E5DCCB] dark:hover:bg-[#223344]'
                   }`}
                 >
                   <div className="flex items-center space-x-2.5">
@@ -246,7 +258,7 @@ export const NotesList: React.FC<NotesListProps> = ({
                     <span>Recently Deleted</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className="text-[11px] text-neutral-400 font-mono">{trashCount}</span>
+                    <span className="text-[11px] text-[#8A9BA8] dark:text-[#6E8092] font-mono">{trashCount}</span>
                     {selectedFolderId === 'trash' && (
                       <Check size={15} className="text-red-500 stroke-[2.5]" />
                     )}
