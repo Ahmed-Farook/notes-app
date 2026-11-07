@@ -169,7 +169,7 @@ export const Layout: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#f6f6f6] dark:bg-[#1e1e1e] font-sans pb-[env(safe-area-inset-bottom)]">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#F7F2EA] dark:bg-[#131B24] font-sans pb-[env(safe-area-inset-bottom)]">
       {/* Top Navbar */}
       <TopNavbar
         onToggleChecklist={handleToggleChecklist}
@@ -231,7 +231,7 @@ export const Layout: React.FC = () => {
                     triggerHaptic();
                     createNote();
                   }}
-                  className="absolute right-5 bottom-6 w-14 h-14 rounded-full bg-apple-yellow text-white shadow-lg flex items-center justify-center active:scale-90 transition-transform z-30"
+                  className="absolute right-5 bottom-6 w-14 h-14 rounded-full bg-apple-yellow dark:bg-[#345A7D] text-white shadow-lg flex items-center justify-center active:scale-90 transition-transform z-30"
                   title="New Note"
                 >
                   <Plus size={28} />

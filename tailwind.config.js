@@ -9,20 +9,33 @@ export default {
     extend: {
       colors: {
         apple: {
-          yellow: '#E6A700',
-          yellowHover: '#D19600',
-          yellowLight: '#FFF8E1',
-          sidebarBg: '#F6F6F6',
-          sidebarDark: '#1E1E1E',
-          listBg: '#FFFFFF',
-          listDark: '#262626',
-          editorBg: '#FFFFFF',
-          editorDark: '#1E1E1E',
-          border: '#E5E5E5',
-          borderDark: '#333333',
-          textMuted: '#8E8E93',
-          selected: '#EAEAEA',
-          selectedDark: '#3A3A3C'
+          yellow: '#213A50', // Kyoto Deep Indigo Blue
+          yellowHover: '#172A3C', // Deep Indigo Hover
+          yellowLight: '#E8F1F7', // Soft Kyoto Blue Tint
+          sidebarBg: '#EFE7D8', // Warm parchment sidebar
+          sidebarDark: '#101720', // Kyoto midnight slate
+          listBg: '#F6EFE4', // Parchment list
+          listDark: '#16202A', // Kyoto twilight list
+          editorBg: '#FAF6EF', // Stationery cream
+          editorDark: '#131B24', // Kyoto night canvas
+          border: '#DFD3C0', // Warm washi border
+          borderDark: '#223344', // Slate border
+          textMuted: '#6E7E8E', // Slate muted text
+          selected: '#E5DCCB', // Parchment selected
+          selectedDark: '#233242' // Slate selected
+        },
+        kyoto: {
+          indigo: '#213A50',
+          indigoHover: '#172A3C',
+          slate: '#395060',
+          slateLight: '#4B708B',
+          cream: '#FAF6EF',
+          creamDark: '#EFE7D8',
+          border: '#DFD3C0',
+          lantern: '#D4A359',
+          night: '#131B24',
+          nightCard: '#1C2733',
+          nightBorder: '#223344',
         }
       },
       fontFamily: {

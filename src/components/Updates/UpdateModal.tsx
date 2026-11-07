@@ -118,13 +118,13 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150">
       <div
-        className="w-full max-w-md bg-white dark:bg-[#252525] rounded-2xl shadow-2xl border border-neutral-200 dark:border-neutral-700/80 overflow-hidden flex flex-col text-neutral-800 dark:text-neutral-100 animate-in zoom-in-95 duration-150"
+        className="w-full max-w-md bg-[#FAF6EF] dark:bg-[#16202A] rounded-2xl shadow-2xl border border-apple-border dark:border-apple-borderDark overflow-hidden flex flex-col text-[#1C2B36] dark:text-[#E8EEF3] animate-in zoom-in-95 duration-150"
         role="dialog"
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-neutral-100 dark:border-neutral-800 bg-[#f9f9f9]/80 dark:bg-[#1f1f1f]/80">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-apple-border dark:border-apple-borderDark bg-[#EFE7D8]/80 dark:bg-[#131B24]/80">
           <div className="flex items-center space-x-2">
-            <Sparkles size={18} className="text-apple-yellow" />
+            <Sparkles size={18} className="text-[#395060] dark:text-[#7EAAD0]" />
             <h3 className="text-sm font-semibold">Software Update</h3>
           </div>
           <button
@@ -265,7 +265,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                   <div className="space-y-2">
                     <button
                       onClick={handleInstallNow}
-                      className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-apple-yellow hover:bg-apple-yellowHover active:scale-98 text-white font-semibold text-xs shadow-md transition-all"
+                      className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-apple-yellow dark:bg-[#2C4A68] hover:bg-apple-yellowHover dark:hover:bg-[#35587C] active:scale-98 text-white font-semibold text-xs shadow-md transition-all"
                     >
                       <Zap size={16} />
                       <span>
@@ -314,7 +314,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
             </button>
             <button
               onClick={onClose}
-              className="px-3 py-1.5 rounded-lg bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 font-medium transition-colors"
+              className="px-3 py-1.5 rounded-lg bg-[#E5DCCB] dark:bg-[#1C2733] hover:bg-[#DCD0BC] dark:hover:bg-[#25394C] text-[#1C2B36] dark:text-[#E8EEF3] font-medium transition-colors"
             >
               Close
             </button>

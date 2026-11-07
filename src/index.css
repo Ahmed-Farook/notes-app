@@ -107,21 +107,21 @@
 }
 
 .tiptap blockquote {
-  border-left: 3px solid #eab308;
+  border-left: 3px solid #213A50;
   padding-left: 1rem;
   margin-top: 0.75rem;
   margin-bottom: 0.75rem;
   font-style: italic;
-  color: #4b5563;
+  color: #395060;
 }
 
 .dark .tiptap blockquote {
-  border-left-color: #facc15;
-  color: #9ca3af;
+  border-left-color: #4B708B;
+  color: #9cb3c9;
 }
 
 .tiptap pre {
-  background: #1e293b;
+  background: #192531;
   color: #f8fafc;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   padding: 0.75rem 1rem;
@@ -131,8 +131,8 @@
 }
 
 .tiptap code:not(pre code) {
-  background: #f1f5f9;
-  color: #d97706;
+  background: #E8F1F7;
+  color: #213A50;
   padding: 0.15rem 0.35rem;
   border-radius: 0.25rem;
   font-size: 0.875em;
@@ -140,8 +140,8 @@
 }
 
 .dark .tiptap code:not(pre code) {
-  background: #27272a;
-  color: #fbbf24;
+  background: #1C2733;
+  color: #8bb1d4;
 }
 
 /* Apple Notes Checklist / TaskList styling */
@@ -171,8 +171,8 @@ ul[data-type="taskList"] li > label input[type="checkbox"] {
   appearance: none;
   width: 1.15rem;
   height: 1.15rem;
-  border: 1.5px solid #d1d5db;
-  border-radius: 9999px; /* circular checkboxes like Apple Notes */
+  border: 1.5px solid #c2b5a1;
+  border-radius: 9999px; /* circular checkboxes */
   outline: none;
   cursor: pointer;
   display: grid;
@@ -182,12 +182,12 @@ ul[data-type="taskList"] li > label input[type="checkbox"] {
 }
 
 ul[data-type="taskList"] li > label input[type="checkbox"]:hover {
-  border-color: #eab308;
+  border-color: #213A50;
 }
 
 ul[data-type="taskList"] li > label input[type="checkbox"]:checked {
-  background-color: #eab308;
-  border-color: #eab308;
+  background-color: #213A50;
+  border-color: #213A50;
 }
 
 ul[data-type="taskList"] li > label input[type="checkbox"]:checked::before {
@@ -201,25 +201,35 @@ ul[data-type="taskList"] li > label input[type="checkbox"]:checked::before {
 
 ul[data-type="taskList"] li[data-checked="true"] > div {
   text-decoration: line-through;
-  color: #9ca3af;
+  color: #8a9ba8;
 }
 
 .dark ul[data-type="taskList"] li > label input[type="checkbox"] {
-  border-color: #52525b;
+  border-color: #3b5062;
+}
+
+.dark ul[data-type="taskList"] li > label input[type="checkbox"]:hover {
+  border-color: #4B708B;
+}
+
+.dark ul[data-type="taskList"] li > label input[type="checkbox"]:checked {
+  background-color: #4B708B;
+  border-color: #4B708B;
 }
 
 .dark ul[data-type="taskList"] li[data-checked="true"] > div {
-  color: #71717a;
+  color: #627788;
 }
 
 mark {
-  background-color: #fef08a;
+  background-color: #E8F1F7;
+  color: #213A50;
   padding: 0.1rem 0.2rem;
   border-radius: 0.2rem;
 }
 
 .dark mark {
-  background-color: #854d0e;
-  color: #fef08a;
+  background-color: #203446;
+  color: #d1e5f5;
 }
 

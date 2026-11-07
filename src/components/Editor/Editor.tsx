@@ -111,7 +111,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
 
   if (!activeNote) {
     return (
-      <div className="flex-1 bg-white dark:bg-[#1e1e1e] flex flex-col items-center justify-center text-neutral-400 dark:text-neutral-600 select-none p-6 text-center">
+      <div className="flex-1 bg-[#FAF6EF] dark:bg-[#131B24] flex flex-col items-center justify-center text-[#6E7E8E] dark:text-[#8AA0B4] select-none p-6 text-center">
         <p className="text-sm mb-3">Select a note or create a new one</p>
         <button
           onClick={() => createNote()}
@@ -124,7 +124,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
   }
 
   return (
-    <div className="flex-1 bg-white dark:bg-[#1e1e1e] flex flex-col h-full overflow-hidden relative select-text">
+    <div className="flex-1 bg-[#FAF6EF] dark:bg-[#131B24] flex flex-col h-full overflow-hidden relative select-text">
       {/* Optional Toolbar */}
       <EditorToolbar editor={editor} isVisible={showToolbar} />
 

@@ -70,20 +70,20 @@ export const NotesList: React.FC<NotesListProps> = ({
   const allSelected = filteredNotes.length > 0 && selectedNoteIds.length === filteredNotes.length;
 
   return (
-    <section className="w-full md:w-72 bg-white dark:bg-[#202020] md:border-r border-apple-border dark:border-apple-borderDark h-full flex flex-col select-none shrink-0 relative">
+    <section className="w-full md:w-72 bg-[#F6EFE4] dark:bg-[#16202A] md:border-r border-apple-border dark:border-apple-borderDark h-full flex flex-col select-none shrink-0 relative">
       {/* Top Header: Selection Header vs Normal Folder Selector Pill */}
       {isSelectionMode ? (
-        <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-apple-border dark:border-apple-borderDark bg-[#fafafa]/95 dark:bg-[#1c1c1e]/95 backdrop-blur-md">
+        <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-apple-border dark:border-apple-borderDark bg-[#EFE7D8]/95 dark:bg-[#131B24]/95 backdrop-blur-md">
           <button
             onClick={() => {
               triggerHaptic();
               allSelected ? deselectAllNotes() : selectAllNotes();
             }}
-            className="text-xs font-semibold text-apple-yellow hover:text-apple-yellowHover"
+            className="text-xs font-semibold text-apple-yellow hover:text-apple-yellowHover dark:text-[#7EAAD0] dark:hover:text-[#9DC3E6]"
           >
             {allSelected ? 'Deselect All' : 'Select All'}
           </button>
-          <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+          <span className="text-xs font-semibold text-[#1C2B36] dark:text-[#E8EEF3]">
             {selectedNoteIds.length} Selected
           </span>
           <button
@@ -91,14 +91,14 @@ export const NotesList: React.FC<NotesListProps> = ({
               triggerHaptic();
               exitSelectionMode();
             }}
-            className="text-xs font-semibold text-apple-yellow hover:text-apple-yellowHover"
+            className="text-xs font-semibold text-apple-yellow hover:text-apple-yellowHover dark:text-[#7EAAD0] dark:hover:text-[#9DC3E6]"
           >
             Done
           </button>
         </div>
       ) : (
-        <div className="px-3.5 py-2 flex items-center justify-between border-b border-apple-border dark:border-apple-borderDark bg-[#fafafa]/90 dark:bg-[#1c1c1e]/90 backdrop-blur-md">
-          <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+        <div className="px-3.5 py-2 flex items-center justify-between border-b border-apple-border dark:border-apple-borderDark bg-[#EFE7D8]/90 dark:bg-[#131B24]/90 backdrop-blur-md">
+          <span className="text-xs font-medium text-[#6E7E8E] dark:text-[#8AA0B4]">
             {filteredNotes.length} {filteredNotes.length === 1 ? 'note' : 'notes'}
           </span>
           {filteredNotes.length > 0 && (
@@ -107,7 +107,7 @@ export const NotesList: React.FC<NotesListProps> = ({
                 triggerHaptic();
                 enterSelectionMode();
               }}
-              className="text-xs font-semibold text-apple-yellow hover:text-apple-yellowHover px-2 py-0.5 rounded transition-colors active:scale-95"
+              className="text-xs font-semibold text-apple-yellow hover:text-apple-yellowHover dark:text-[#7EAAD0] dark:hover:text-[#9DC3E6] px-2 py-0.5 rounded transition-colors active:scale-95"
             >
               Select
             </button>
@@ -266,7 +266,7 @@ export const NotesList: React.FC<NotesListProps> = ({
             placeholder="Search all notes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8 pr-7 py-1 text-xs rounded-md bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-apple-yellow transition-all"
+            className="w-full pl-8 pr-7 py-1 text-xs rounded-md bg-[#EFE7D8]/80 dark:bg-[#1C2733] border border-[#DFD3C0]/70 dark:border-[#223344] text-[#1C2B36] dark:text-[#E8EEF3] placeholder-[#8A9BA8] focus:outline-none focus:ring-1 focus:ring-apple-yellow transition-all"
           />
           {searchQuery && (
             <button
@@ -355,7 +355,7 @@ export const NotesList: React.FC<NotesListProps> = ({
 
       {/* Bulk Action Bottom Toolbar (Active during Multi-Select) */}
       {isSelectionMode && (
-        <div className="border-t border-apple-border dark:border-apple-borderDark bg-[#fafafa]/95 dark:bg-[#1e1e1e]/95 backdrop-blur-md px-6 py-2.5 flex items-center justify-between shrink-0 z-30 shadow-lg">
+        <div className="border-t border-apple-border dark:border-apple-borderDark bg-[#EFE7D8]/95 dark:bg-[#131B24]/95 backdrop-blur-md px-6 py-2.5 flex items-center justify-between shrink-0 z-30 shadow-lg">
           {selectedFolderId === 'trash' ? (
             <>
               {/* Restore */}
@@ -387,7 +387,7 @@ export const NotesList: React.FC<NotesListProps> = ({
                   setShowMovePicker(true);
                 }}
                 disabled={selectedNoteIds.length === 0}
-                className="flex flex-col items-center space-y-1 text-neutral-700 dark:text-neutral-300 hover:text-apple-yellow disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                className="flex flex-col items-center space-y-1 text-neutral-700 dark:text-[#CBD8E3] hover:text-apple-yellow dark:hover:text-[#7EAAD0] disabled:opacity-30 disabled:pointer-events-none transition-colors"
               >
                 <FolderInput size={18} />
                 <span className="text-[10px] font-medium">Move</span>
@@ -397,7 +397,7 @@ export const NotesList: React.FC<NotesListProps> = ({
               <button
                 onClick={togglePinSelectedNotes}
                 disabled={selectedNoteIds.length === 0}
-                className="flex flex-col items-center space-y-1 text-neutral-700 dark:text-neutral-300 hover:text-apple-yellow disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                className="flex flex-col items-center space-y-1 text-neutral-700 dark:text-[#CBD8E3] hover:text-apple-yellow dark:hover:text-[#7EAAD0] disabled:opacity-30 disabled:pointer-events-none transition-colors"
               >
                 <Pin size={18} />
                 <span className="text-[10px] font-medium">Pin / Unpin</span>
@@ -426,7 +426,7 @@ export const NotesList: React.FC<NotesListProps> = ({
           />
 
           <div
-            className="relative w-full max-w-sm bg-[#f2f2f7] dark:bg-[#1c1c1e] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-neutral-200/80 dark:border-neutral-800/80 overflow-hidden flex flex-col max-h-[82vh] animate-in slide-in-from-bottom duration-250 z-10"
+            className="relative w-full max-w-sm bg-[#EFE7D8] dark:bg-[#131B24] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-[#DFD3C0] dark:border-[#223344] overflow-hidden flex flex-col max-h-[82vh] animate-in slide-in-from-bottom duration-250 z-10"
             role="dialog"
             aria-modal="true"
           >
@@ -436,16 +436,16 @@ export const NotesList: React.FC<NotesListProps> = ({
             </div>
 
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-neutral-200/70 dark:border-neutral-800/80">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-[#DFD3C0]/70 dark:border-[#223344]">
               <div className="flex items-center space-x-2">
-                <FolderInput size={17} className="text-apple-yellow" />
-                <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                <FolderInput size={17} className="text-[#395060] dark:text-[#7EAAD0]" />
+                <h3 className="text-sm font-semibold text-[#1C2B36] dark:text-[#E8EEF3]">
                   Move {selectedNoteIds.length} {selectedNoteIds.length === 1 ? 'Note' : 'Notes'} To
                 </h3>
               </div>
               <button
                 onClick={() => setShowMovePicker(false)}
-                className="text-xs font-semibold text-apple-yellow hover:text-apple-yellowHover py-1 px-2 rounded-lg transition-colors"
+                className="text-xs font-semibold text-apple-yellow hover:text-apple-yellowHover dark:text-[#7EAAD0] dark:hover:text-[#9DC3E6] py-1 px-2 rounded-lg transition-colors"
               >
                 Cancel
               </button>
@@ -453,16 +453,16 @@ export const NotesList: React.FC<NotesListProps> = ({
 
             {/* Folder choices */}
             <div className="p-3 space-y-3 overflow-y-auto">
-              <div className="bg-white dark:bg-[#2c2c2e] rounded-xl overflow-hidden shadow-xs divide-y divide-neutral-100 dark:divide-neutral-800/60">
+              <div className="bg-[#FAF6EF] dark:bg-[#1C2733] rounded-xl overflow-hidden shadow-xs divide-y divide-[#DFD3C0]/50 dark:divide-[#223344]">
                 <button
                   onClick={() => {
                     moveSelectedNotesToFolder('default');
                     setShowMovePicker(false);
                   }}
-                  className="w-full px-3.5 py-2.5 flex items-center justify-between text-xs text-neutral-800 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors text-left"
+                  className="w-full px-3.5 py-2.5 flex items-center justify-between text-xs text-[#1C2B36] dark:text-[#E8EEF3] hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors text-left"
                 >
                   <div className="flex items-center space-x-2.5">
-                    <div className="w-6 h-6 rounded-md bg-amber-500/15 text-apple-yellow flex items-center justify-center shrink-0">
+                    <div className="w-6 h-6 rounded-md bg-[#E8F1F7] dark:bg-[#203448] text-[#213A50] dark:text-[#7EAAD0] flex items-center justify-center shrink-0">
                       <Folder size={14} />
                     </div>
                     <span className="font-medium">Notes</span>

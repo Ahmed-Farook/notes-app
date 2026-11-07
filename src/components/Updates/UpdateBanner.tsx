@@ -27,7 +27,7 @@ export const UpdateBanner: React.FC<UpdateBannerProps> = ({
       className="bg-amber-500/10 dark:bg-amber-500/15 border-b border-amber-500/30 px-3.5 py-1.5 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200 select-none animate-in slide-in-from-top-2 duration-200 shrink-0 [app-region:no-drag]"
     >
       <div className="flex items-center space-x-2 truncate">
-        <Sparkles size={14} className="text-apple-yellow shrink-0 animate-pulse" />
+        <Sparkles size={14} className="text-[#395060] dark:text-[#7EAAD0] shrink-0 animate-pulse" />
         <span className="truncate">
           <strong>Apple Notes v{updateInfo.latestVersion}</strong> is available (you have v
           {updateInfo.currentVersion}).
@@ -50,7 +50,7 @@ export const UpdateBanner: React.FC<UpdateBannerProps> = ({
             triggerHaptic();
             onOpenDetails();
           }}
-          className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-apple-yellow hover:bg-apple-yellowHover text-white font-medium text-[11px] shadow-sm active:scale-95 transition-all"
+          className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-apple-yellow dark:bg-[#2C4A68] hover:bg-apple-yellowHover dark:hover:bg-[#35587C] text-white font-medium text-[11px] shadow-sm active:scale-95 transition-all"
         >
           <Zap size={12} />
           <span>Update Now</span>

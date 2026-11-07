@@ -105,13 +105,13 @@ export const AuthModal: React.FC = () => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150">
       <div
-        className="w-full max-w-sm bg-white dark:bg-[#252525] rounded-2xl shadow-2xl border border-neutral-200 dark:border-neutral-700/80 overflow-hidden flex flex-col text-neutral-800 dark:text-neutral-100 animate-in zoom-in-95 duration-150"
+        className="w-full max-w-sm bg-[#FAF6EF] dark:bg-[#16202A] rounded-2xl shadow-2xl border border-apple-border dark:border-apple-borderDark overflow-hidden flex flex-col text-[#1C2B36] dark:text-[#E8EEF3] animate-in zoom-in-95 duration-150"
         role="dialog"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-neutral-100 dark:border-neutral-800 bg-[#f9f9f9]/80 dark:bg-[#1f1f1f]/80">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-apple-border dark:border-apple-borderDark bg-[#EFE7D8]/80 dark:bg-[#131B24]/80">
           <div className="flex items-center space-x-2">
-            <Cloud size={18} className="text-apple-yellow" />
+            <Cloud size={18} className="text-[#395060] dark:text-[#7EAAD0]" />
             <h3 className="text-sm font-semibold">
               {user ? 'Cloud Sync Account' : 'Apple Notes Cloud'}
             </h3>

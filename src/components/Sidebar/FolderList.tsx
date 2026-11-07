@@ -52,7 +52,7 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
   };
 
   return (
-    <aside className="w-56 bg-[#f6f6f6] dark:bg-[#191919] border-r border-apple-border dark:border-apple-borderDark h-full flex flex-col justify-between select-none shrink-0 text-sm">
+    <aside className="w-56 bg-[#EFE7D8] dark:bg-[#101720] border-r border-apple-border dark:border-apple-borderDark h-full flex flex-col justify-between select-none shrink-0 text-sm">
       <div className="overflow-y-auto px-2 py-3 space-y-4">
         {/* Main Notes Section */}
         <div>
@@ -67,15 +67,15 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
               }}
               className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors ${
                 selectedFolderId === 'default'
-                  ? 'bg-apple-yellow text-white font-medium'
-                  : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200/60 dark:hover:bg-neutral-800/60'
+                  ? 'bg-apple-yellow dark:bg-[#253D56] text-white font-medium shadow-xs'
+                  : 'text-[#1C2B36] dark:text-[#CBD8E3] hover:bg-[#E5DCCB] dark:hover:bg-[#1A2530]'
               }`}
             >
               <div className="flex items-center space-x-2 truncate">
-                <FolderIcon size={15} className={selectedFolderId === 'default' ? 'text-white' : 'text-apple-yellow'} />
+                <FolderIcon size={15} className={selectedFolderId === 'default' ? 'text-white' : 'text-[#395060] dark:text-[#7EAAD0]'} />
                 <span className="truncate">Notes</span>
               </div>
-              <span className={`text-[11px] ${selectedFolderId === 'default' ? 'text-white/80' : 'text-neutral-400'}`}>
+              <span className={`text-[11px] ${selectedFolderId === 'default' ? 'text-white/80' : 'text-[#8A9BA8] dark:text-[#6E8092]'}`}>
                 {defaultNotesCount}
               </span>
             </button>
@@ -105,19 +105,19 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
                   key={folder.id}
                   className={`group flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors ${
                     isSelected
-                      ? 'bg-apple-yellow text-white font-medium'
-                      : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200/60 dark:hover:bg-neutral-800/60'
+                      ? 'bg-apple-yellow dark:bg-[#253D56] text-white font-medium shadow-xs'
+                      : 'text-[#1C2B36] dark:text-[#CBD8E3] hover:bg-[#E5DCCB] dark:hover:bg-[#1A2530]'
                   }`}
                 >
                   <button
                     onClick={() => setSelectedFolderId(folder.id)}
                     className="flex items-center space-x-2 truncate flex-1 text-left"
                   >
-                    <FolderIcon size={15} className={isSelected ? 'text-white' : 'text-apple-yellow'} />
+                    <FolderIcon size={15} className={isSelected ? 'text-white' : 'text-[#395060] dark:text-[#7EAAD0]'} />
                     <span className="truncate">{folder.name}</span>
                   </button>
                   <div className="flex items-center space-x-1.5">
-                    <span className={`text-[11px] ${isSelected ? 'text-white/80' : 'text-neutral-400'}`}>
+                    <span className={`text-[11px] ${isSelected ? 'text-white/80' : 'text-[#8A9BA8] dark:text-[#6E8092]'}`}>
                       {getFolderCount(folder.id)}
                     </span>
                     <button
@@ -146,7 +146,7 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
                   placeholder="Folder name"
                   value={newFolderName}
                   onChange={(e) => setNewFolderName(e.target.value)}
-                  className="w-full text-xs px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 outline-none focus:border-apple-yellow"
+                  className="w-full text-xs px-2 py-1 rounded bg-[#FAF6EF] dark:bg-[#1C2733] border border-apple-border dark:border-apple-borderDark outline-none focus:border-apple-yellow"
                 />
                 <button
                   type="submit"
@@ -176,15 +176,15 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
             onClick={() => setSelectedFolderId('trash')}
             className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors ${
               selectedFolderId === 'trash'
-                ? 'bg-apple-yellow text-white font-medium'
-                : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200/60 dark:hover:bg-neutral-800/60'
+                ? 'bg-apple-yellow dark:bg-[#253D56] text-white font-medium shadow-xs'
+                : 'text-[#1C2B36] dark:text-[#CBD8E3] hover:bg-[#E5DCCB] dark:hover:bg-[#1A2530]'
             }`}
           >
             <div className="flex items-center space-x-2 truncate">
-              <Trash size={15} className={selectedFolderId === 'trash' ? 'text-white' : 'text-neutral-400'} />
+              <Trash size={15} className={selectedFolderId === 'trash' ? 'text-white' : 'text-[#8A9BA8] dark:text-[#6E8092]'} />
               <span className="truncate">Recently Deleted</span>
             </div>
-            <span className={`text-[11px] ${selectedFolderId === 'trash' ? 'text-white/80' : 'text-neutral-400'}`}>
+            <span className={`text-[11px] ${selectedFolderId === 'trash' ? 'text-white/80' : 'text-[#8A9BA8] dark:text-[#6E8092]'}`}>
               {trashCount}
             </span>
           </button>

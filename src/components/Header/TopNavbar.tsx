@@ -86,7 +86,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
   const noteToExport = activeNote;
 
   return (
-    <header className="h-12 border-b border-apple-border dark:border-apple-borderDark bg-[#f6f6f6]/95 dark:bg-[#1e1e1e]/95 backdrop-blur-md flex items-center justify-between pr-3 shrink-0 select-none transition-colors pt-[env(safe-area-inset-top)] [app-region:drag] relative z-40">
+    <header className="h-12 border-b border-apple-border dark:border-apple-borderDark bg-[#F2ECE0]/95 dark:bg-[#151E28]/95 backdrop-blur-md flex items-center justify-between pr-3 shrink-0 select-none transition-colors pt-[env(safe-area-inset-top)] [app-region:drag] relative z-40">
       {/* Left controls: Traffic light clearance on Mac + navigation */}
       <div className="flex items-center space-x-1.5 [app-region:no-drag]">
         {/* Dedicated clearance spacer for macOS window traffic lights */}
@@ -104,7 +104,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
               setMobileView('list');
               setActiveNoteId(null);
             }}
-            className="md:hidden flex items-center space-x-1 text-apple-yellow hover:text-apple-yellowHover text-xs font-semibold py-1 px-1 rounded active:opacity-70"
+            className="md:hidden flex items-center space-x-1 text-apple-yellow hover:text-apple-yellowHover dark:text-[#7EAAD0] dark:hover:text-[#9DC3E6] text-xs font-semibold py-1 px-1 rounded active:opacity-70"
           >
             <ChevronLeft size={18} />
             <span>Notes</span>
@@ -118,11 +118,11 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
               triggerHaptic();
               setIsFolderPickerOpen(true);
             }}
-            className="md:hidden flex items-center space-x-1.5 text-xs font-semibold text-neutral-800 dark:text-neutral-200 bg-neutral-200/70 dark:bg-neutral-800/80 hover:bg-neutral-200 dark:hover:bg-neutral-700/80 px-2.5 py-1 rounded-full transition-all active:scale-95 border border-neutral-300/40 dark:border-neutral-700/50 shadow-xs ml-1"
+            className="md:hidden flex items-center space-x-1.5 text-xs font-semibold text-[#1C2B36] dark:text-[#E8EEF3] bg-[#E5DCCB]/80 dark:bg-[#1C2733] hover:bg-[#E5DCCB] dark:hover:bg-[#223344] px-2.5 py-1 rounded-full transition-all active:scale-95 border border-[#DFD3C0] dark:border-[#263747] shadow-xs ml-1"
           >
-            <Folder size={13} className="text-apple-yellow" />
+            <Folder size={13} className="text-[#395060] dark:text-[#7EAAD0]" />
             <span className="truncate max-w-[130px]">{currentFolder?.name || 'Notes'}</span>
-            <ChevronDown size={12} className="text-neutral-400" />
+            <ChevronDown size={12} className="text-[#8A9BA8] dark:text-[#6E8092]" />
           </button>
         )}
 
@@ -130,17 +130,17 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         <button
           onClick={toggleSidebar}
           title={isSidebarOpen ? 'Hide Folders' : 'Show Folders'}
-          className={`hidden md:flex p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 transition-colors ${
-            isSidebarOpen ? 'bg-neutral-200/60 dark:bg-neutral-800/60' : ''
+          className={`hidden md:flex p-1.5 rounded-md hover:bg-[#E5DCCB] dark:hover:bg-[#1C2733] text-[#5A6D7E] dark:text-[#8AA0B4] transition-colors ${
+            isSidebarOpen ? 'bg-[#E5DCCB]/80 dark:bg-[#1E2D3B] text-[#213A50] dark:text-[#E8EEF3]' : ''
           }`}
         >
           <PanelLeft size={18} />
         </button>
 
-        <div className="hidden md:block h-4 w-px bg-neutral-300 dark:bg-neutral-700 mx-1" />
+        <div className="hidden md:block h-4 w-px bg-[#DFD3C0] dark:bg-[#223344] mx-1" />
 
         {/* View Mode Toggle (Desktop only) */}
-        <div className="hidden md:flex bg-neutral-200 dark:bg-neutral-800 rounded-md p-0.5">
+        <div className="hidden md:flex bg-[#E5DCCB] dark:bg-[#1A2530] border border-[#DFD3C0] dark:border-[#223344] rounded-md p-0.5">
           <button
             onClick={() => {
               triggerHaptic();
@@ -149,8 +149,8 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             title="List View"
             className={`p-1 rounded text-xs transition-colors ${
               viewMode === 'list'
-                ? 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-sm'
-                : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'
+                ? 'bg-[#FAF6EF] dark:bg-[#25394C] text-[#213A50] dark:text-[#E8EEF3] shadow-xs'
+                : 'text-[#6E7E8E] dark:text-[#7A8F9F] hover:text-[#213A50] dark:hover:text-white'
             }`}
           >
             <ListIcon size={15} />
@@ -163,8 +163,8 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             title="Gallery View"
             className={`p-1 rounded text-xs transition-colors ${
               viewMode === 'gallery'
-                ? 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-sm'
-                : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'
+                ? 'bg-[#FAF6EF] dark:bg-[#25394C] text-[#213A50] dark:text-[#E8EEF3] shadow-xs'
+                : 'text-[#6E7E8E] dark:text-[#7A8F9F] hover:text-[#213A50] dark:hover:text-white'
             }`}
           >
             <LayoutGrid size={15} />
@@ -191,7 +191,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           </button>
 
           {showExportMenu && noteToExport && (
-            <div className="absolute right-0 top-full mt-1.5 w-48 bg-white dark:bg-[#252525] rounded-xl shadow-2xl border border-neutral-200/90 dark:border-neutral-700/80 py-1.5 z-50 text-xs backdrop-blur-md animate-in fade-in zoom-in-95 duration-100">
+            <div className="absolute right-0 top-full mt-1.5 w-48 bg-[#FAF6EF] dark:bg-[#1C2733] rounded-xl shadow-2xl border border-apple-border dark:border-apple-borderDark py-1.5 z-50 text-xs backdrop-blur-md animate-in fade-in zoom-in-95 duration-100">
               <div className="px-3 py-1 font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider text-[10px]">
                 Export Note As
               </div>
@@ -311,10 +311,10 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             className={`md:hidden flex items-center space-x-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all active:scale-95 ${
               hasUpdate
                 ? 'bg-amber-500/20 border border-amber-500/40 text-amber-600 dark:text-amber-400 animate-pulse'
-                : 'bg-neutral-200/60 dark:bg-neutral-800/80 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                : 'bg-[#E5DCCB]/70 dark:bg-[#1C2733] text-[#1C2B36] dark:text-[#E8EEF3] hover:bg-[#E5DCCB] dark:hover:bg-[#25394C] border border-[#DFD3C0]/60 dark:border-[#263747]'
             }`}
           >
-            <Sparkles size={14} className={hasUpdate ? 'text-amber-500 animate-spin' : 'text-apple-yellow'} />
+            <Sparkles size={14} className={hasUpdate ? 'text-amber-500 animate-spin' : 'text-[#395060] dark:text-[#7EAAD0]'} />
             <span>{hasUpdate ? 'Update' : 'Updates'}</span>
           </button>
         )}
@@ -334,8 +334,8 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           }
           className={`hidden md:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-md font-medium text-xs transition-all ${
             selectedFolderId === 'trash'
-              ? 'bg-neutral-200/80 dark:bg-neutral-800/80 text-neutral-400 dark:text-neutral-500 cursor-not-allowed border border-neutral-300/40 dark:border-neutral-700/40'
-              : 'bg-apple-yellow hover:bg-apple-yellowHover active:scale-95 text-white shadow-sm cursor-pointer'
+              ? 'bg-[#E5DCCB]/60 dark:bg-[#1C2733]/60 text-[#8A9BA8] dark:text-[#6E8092] cursor-not-allowed border border-[#DFD3C0]/40 dark:border-[#263747]'
+              : 'bg-apple-yellow dark:bg-[#2C4A68] hover:bg-apple-yellowHover dark:hover:bg-[#35587C] active:scale-95 text-white shadow-sm cursor-pointer'
           }`}
         >
           <SquarePen size={15} />
