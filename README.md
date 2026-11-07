@@ -14,11 +14,14 @@
   <sub>macOS · Apple Silicon DMG &nbsp; / &nbsp; Windows · EXE &nbsp; / &nbsp; Android · APK</sub>
 </p>
 
-> [!TIP]
-> **macOS Gatekeeper notice:** If macOS says *"Apple Notes is damaged and can't be opened"*, this is Apple's standard message for unnotarized open-source apps. Move the app to `/Applications` and run this in Terminal:
-> ```bash
-> xattr -cr "/Applications/Apple Notes.app"
-> ```
+> [!NOTE]
+> **First-Time Installation Notices (Open Source Releases):**
+> - **Windows:** If SmartScreen shows *"Windows protected your PC"*, click **"More info"** → **"Run anyway"**.
+> - **macOS:** If Gatekeeper says *"Apple Notes is damaged and can't be opened"*, move the app to `/Applications` and run:
+>   ```bash
+>   xattr -cr "/Applications/Apple Notes.app"
+>   ```
+> - **Android:** Enable *"Install from unknown sources"* if prompted by your browser, or tap *"More details"* → *"Install anyway"* if Play Protect warns about direct APK downloads.
 
 <br>
 

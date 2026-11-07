@@ -37,7 +37,9 @@
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "publisherName": "Ahmed Farook",
+      "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
       "oneClick": false,
