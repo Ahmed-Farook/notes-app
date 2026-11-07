@@ -11,6 +11,8 @@ import { RotateCcw, Trash2 } from 'lucide-react';
 import { useNotes } from '../../store/NotesContext';
 import { formatEditorDate } from '../../utils/dateUtils';
 import { triggerHaptic } from '../../utils/haptics';
+import { Capacitor } from '@capacitor/core';
+import { Keyboard } from '@capacitor/keyboard';
 import { EditorToolbar } from './EditorToolbar';
 
 /**
@@ -243,6 +245,88 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
       };
     }
   }, [activeNote?.id, activeNote?.isTrash, editor]);
+
+  // Dismiss cursor and blur editor when keyboard closes on mobile
+  useEffect(() => {
+    if (!editor) return;
+
+    const isMobile =
+      Capacitor.isNativePlatform() ||
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      ('ontouchstart' in window && window.innerWidth < 768);
+
+    if (!isMobile) return;
+
+    const dismissCursorAndBlur = () => {
+      // 1. Blur TipTap editor
+      editor.commands.blur();
+
+      // 2. Blur active DOM element
+      if (document.activeElement && document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+
+      // 3. Explicitly blur .ProseMirror element if present
+      const proseMirrorEl = document.querySelector('.ProseMirror') as HTMLElement | null;
+      if (proseMirrorEl) {
+        proseMirrorEl.blur();
+      }
+
+      // 4. Clear any active DOM text selection range
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        sel.removeAllRanges();
+      }
+    };
+
+    // Native Capacitor Keyboard listeners for Android
+    let willHideHandle: any = null;
+    let didHideHandle: any = null;
+
+    if (Capacitor.isNativePlatform()) {
+      Keyboard.addListener('keyboardWillHide', dismissCursorAndBlur)
+        .then((handle) => {
+          willHideHandle = handle;
+        })
+        .catch(() => {});
+
+      Keyboard.addListener('keyboardDidHide', dismissCursorAndBlur)
+        .then((handle) => {
+          didHideHandle = handle;
+        })
+        .catch(() => {});
+    }
+
+    // VisualViewport listener for mobile browsers & WebViews
+    const initialHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    let isKeyboardOpen = false;
+
+    const handleViewportResize = () => {
+      if (!window.visualViewport) return;
+      const currentHeight = window.visualViewport.height;
+
+      // If viewport shrank significantly, keyboard opened
+      if (currentHeight < initialHeight - 140) {
+        isKeyboardOpen = true;
+      } else if (isKeyboardOpen && currentHeight >= initialHeight - 60) {
+        // Keyboard just closed on mobile!
+        isKeyboardOpen = false;
+        dismissCursorAndBlur();
+      }
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportResize);
+    }
+
+    return () => {
+      if (willHideHandle?.remove) willHideHandle.remove();
+      if (didHideHandle?.remove) didHideHandle.remove();
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleViewportResize);
+      }
+    };
+  }, [editor]);
 
   if (!activeNote) {
     return (

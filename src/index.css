@@ -49,6 +49,10 @@
   caret-color: auto !important;
 }
 
+.ProseMirror:not(:focus):not(:focus-within) {
+  caret-color: transparent !important;
+}
+
 .ProseMirror *,
 [contenteditable="true"] * {
   user-select: text !important;

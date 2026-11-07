@@ -1,6 +1,6 @@
 {
   "name": "apple-notes-crossplatform",
-  "version": "0.2.18",
+  "version": "0.2.19",
   "description": "Apple Notes cross-platform note taking application",
   "author": "Ahmed Farook",
   "private": true,
@@ -52,6 +52,7 @@
     "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.6.0",
     "@capacitor/haptics": "^8.0.2",
+    "@capacitor/keyboard": "^8.0.6",
     "@capacitor/status-bar": "^8.0.4",
     "@supabase/supabase-js": "^2.118.0",
     "@tiptap/extension-highlight": "^2.11.5",
