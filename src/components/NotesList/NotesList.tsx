@@ -298,7 +298,7 @@ export const NotesList: React.FC<NotesListProps> = ({
             )}
           </div>
         ) : viewMode === 'gallery' ? (
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             {filteredNotes.map(note => (
               <NoteCard
                 key={note.id}
@@ -316,7 +316,7 @@ export const NotesList: React.FC<NotesListProps> = ({
                 <div className="px-2 text-[10px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
                   Pinned
                 </div>
-                <div className={isSelectionMode ? "space-y-2.5" : "space-y-1"}>
+                <div className={isSelectionMode ? "space-y-3" : "space-y-1.5"}>
                   {pinnedNotes.map(note => (
                     <NoteCard
                       key={note.id}
@@ -337,7 +337,7 @@ export const NotesList: React.FC<NotesListProps> = ({
                     Notes
                   </div>
                 )}
-                <div className={isSelectionMode ? "space-y-2.5" : "space-y-1"}>
+                <div className={isSelectionMode ? "space-y-3" : "space-y-1.5"}>
                   {unpinnedNotes.map(note => (
                     <NoteCard
                       key={note.id}

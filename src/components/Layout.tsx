@@ -17,6 +17,7 @@ export const Layout: React.FC = () => {
   const {
     isSidebarOpen,
     createNote,
+    setActiveNoteId,
     mobileView,
     setMobileView,
     isFolderPickerOpen,
@@ -87,9 +88,10 @@ export const Layout: React.FC = () => {
           return;
         }
 
-        // 4. If inside a note on mobile, navigate back to notes list
+        // 4. If inside a note on mobile, navigate back to notes list and clear active note
         if (mobileViewRef.current === 'editor') {
           setMobileView('list');
+          setActiveNoteId(null);
           return;
         }
 
@@ -119,7 +121,7 @@ export const Layout: React.FC = () => {
     };
   }, [updater, closeAuthModal, setIsFolderPickerOpen, setMobileView, setSearchQuery, setSelectedFolderId]);
 
-  // Global Keyboard Shortcuts (Cmd/Ctrl + N for new note)
+  // Global Keyboard Shortcuts (Cmd/Ctrl + N for new note, Esc to close/deselect note)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isCmdOrCtrl = e.metaKey || e.ctrlKey;
@@ -129,12 +131,36 @@ export const Layout: React.FC = () => {
           e.preventDefault();
           createNote();
         }
+        return;
+      }
+
+      // Escape key: close active note & deselect across Mac, Windows, and Web
+      if (e.key === 'Escape') {
+        if (isAuthModalOpenRef.current) return;
+        if (isFolderPickerOpenRef.current) {
+          setIsFolderPickerOpen(false);
+          return;
+        }
+        if (isSelectionMode) {
+          exitSelectionMode();
+          return;
+        }
+        if (searchQueryRef.current && searchQueryRef.current.trim().length > 0) {
+          setSearchQuery('');
+          return;
+        }
+
+        // Close the active note and bring to no notes selected
+        setActiveNoteId(null);
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [createNote]);
+  }, [createNote, setActiveNoteId, isSelectionMode, exitSelectionMode, setIsFolderPickerOpen, setSearchQuery]);
 
   const handleToggleChecklist = () => {
     if (checklistActionRef.current) {

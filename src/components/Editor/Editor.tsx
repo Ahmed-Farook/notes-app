@@ -159,53 +159,55 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
         </div>
       )}
 
-      {/* Note Meta Header: Date & Folder selector */}
-      <div className="pt-4 pb-2 px-8 flex items-center justify-between text-[11px] text-neutral-400 dark:text-neutral-500 select-none">
-        {/* Date Stamp */}
-        <span className="mx-auto font-medium">
-          {formatEditorDate(activeNote.updatedAt)}
-        </span>
-
-        {/* Folder Mover Dropdown */}
-        {!activeNote.isTrash && (
-          <div className="absolute right-6 top-3 flex items-center space-x-1 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded-full text-[11px] text-neutral-600 dark:text-neutral-400">
-            <FolderIcon size={11} className="text-apple-yellow" />
-            <select
-              value={activeNote.folderId}
-              onChange={(e) => moveNoteToFolder(activeNote.id, e.target.value)}
-              className="bg-transparent border-none outline-none cursor-pointer text-neutral-600 dark:text-neutral-300 pr-1"
-            >
-              <option value="default">Notes</option>
-              {folders.map(f => (
-                <option key={f.id} value={f.id}>{f.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
-      </div>
-
-      {/* Editor Content Body */}
+      {/* Editor Content Body (Scrollable container - date moves away on scroll) */}
       <div
-        className="flex-1 overflow-y-auto px-8 md:px-14 py-4 cursor-text select-text"
+        className="flex-1 overflow-y-auto px-5 md:px-14 py-3 cursor-text select-text"
         onClick={(e) => {
           if (editor && !activeNote.isTrash) {
             const target = e.target as HTMLElement;
             // If clicked on empty space around or below the text, focus the editor at the end
-            if (!target.closest('.ProseMirror') || target.classList.contains('ProseMirror')) {
+            if (!target.closest('.ProseMirror') && !target.closest('select') && !target.closest('button')) {
               editor.commands.focus('end');
             }
           }
         }}
       >
-        <EditorContent
-          editor={editor}
-          className="prose prose-neutral dark:prose-invert max-w-3xl mx-auto focus:outline-none min-h-[60vh] select-text cursor-text"
-          onClick={() => {
-            if (editor && !editor.isFocused && !activeNote.isTrash) {
-              editor.commands.focus();
-            }
-          }}
-        />
+        <div className="max-w-3xl mx-auto">
+          {/* Note Meta Header: Date & Folder selector scrolls away with note content */}
+          <div className="pt-2 pb-3 flex items-center justify-between text-[11px] text-neutral-400 dark:text-neutral-500 select-none relative">
+            {/* Date Stamp */}
+            <span className="mx-auto font-medium text-center">
+              {formatEditorDate(activeNote.updatedAt)}
+            </span>
+
+            {/* Folder Mover Dropdown */}
+            {!activeNote.isTrash && (
+              <div className="absolute right-0 top-1.5 flex items-center space-x-1 bg-neutral-100 dark:bg-neutral-800/80 px-2 py-0.5 rounded-full text-[11px] text-neutral-600 dark:text-neutral-400 shadow-xs border border-neutral-200/50 dark:border-neutral-700/50">
+                <FolderIcon size={11} className="text-apple-yellow shrink-0" />
+                <select
+                  value={activeNote.folderId}
+                  onChange={(e) => moveNoteToFolder(activeNote.id, e.target.value)}
+                  className="bg-transparent border-none outline-none cursor-pointer text-neutral-600 dark:text-neutral-300 pr-1 text-[11px]"
+                >
+                  <option value="default">Notes</option>
+                  {folders.map(f => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          <EditorContent
+            editor={editor}
+            className="prose prose-neutral dark:prose-invert focus:outline-none min-h-[60vh] select-text cursor-text"
+            onClick={() => {
+              if (editor && !editor.isFocused && !activeNote.isTrash) {
+                editor.commands.focus();
+              }
+            }}
+          />
+        </div>
       </div>
     </div>
   );

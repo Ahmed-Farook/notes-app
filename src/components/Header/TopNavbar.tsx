@@ -42,6 +42,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     exportCurrentNote,
     mobileView,
     setMobileView,
+    setActiveNoteId,
     currentFolder,
     selectedFolderId,
     setIsFolderPickerOpen,
@@ -101,6 +102,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             onClick={() => {
               triggerHaptic();
               setMobileView('list');
+              setActiveNoteId(null);
             }}
             className="md:hidden flex items-center space-x-1 text-apple-yellow hover:text-apple-yellowHover text-xs font-semibold py-1 px-1 rounded active:opacity-70"
           >

@@ -94,10 +94,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [notes, setNotes] = useState<Note[]>(() => loadStoredNotes());
   const [folders, setFolders] = useState<Folder[]>(() => loadStoredFolders());
   const [selectedFolderId, setSelectedFolderId] = useState<string>('default');
-  const [activeNoteId, setActiveNoteId] = useState<string | null>(() => {
-    const initial = loadStoredNotes();
-    return initial.length > 0 ? initial[0].id : null;
-  });
+  const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
@@ -365,15 +362,13 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return notes.find(n => n.id === activeNoteId) || null;
   }, [notes, activeNoteId]);
 
-  // Keep active note synced to the first note of the current folder if current activeNote is not in folder
+  // Only update active note if an active note is no longer in the list (e.g. moved or deleted)
   useEffect(() => {
-    if (filteredNotes.length > 0) {
+    if (activeNoteId) {
       const activeStillInList = filteredNotes.some(n => n.id === activeNoteId);
       if (!activeStillInList) {
-        setActiveNoteId(filteredNotes[0].id);
+        setActiveNoteId(null);
       }
-    } else {
-      setActiveNoteId(null);
     }
   }, [filteredNotes, activeNoteId]);
 
