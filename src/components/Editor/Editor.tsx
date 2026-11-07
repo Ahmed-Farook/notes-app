@@ -141,7 +141,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
               onClick={() => restoreNote(activeNote.id)}
               className="flex items-center space-x-1 px-2 py-1 rounded bg-amber-200/60 dark:bg-amber-800/60 hover:bg-amber-300 dark:hover:bg-amber-700 font-medium transition-colors"
             >
-              <RotateCcw size={12} />
+              <RotateCcw size={14} />
               <span>Restore</span>
             </button>
             <button
@@ -152,7 +152,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
               }}
               className="flex items-center space-x-1 px-2 py-1 rounded bg-red-100 dark:bg-red-900/60 hover:bg-red-200 dark:hover:bg-red-800 text-red-700 dark:text-red-200 font-medium transition-colors"
             >
-              <Trash2 size={12} />
+              <Trash2 size={14} />
               <span>Delete Permanently</span>
             </button>
           </div>

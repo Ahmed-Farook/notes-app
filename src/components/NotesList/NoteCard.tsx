@@ -113,8 +113,22 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
                 {note.title || 'New Note'}
               </h4>
             </div>
-            {note.isPinned && (
-              <Pin size={12} className="text-apple-yellow fill-apple-yellow shrink-0" />
+            {/* Gallery Pin Button: Single button for both pinning and unpinning */}
+            {!note.isTrash && (
+              <button
+                onClick={handlePin}
+                title={note.isPinned ? 'Unpin note' : 'Pin note'}
+                className={`p-1 rounded hover:scale-110 active:scale-95 transition-all shrink-0 ${
+                  note.isPinned
+                    ? 'text-apple-yellow'
+                    : 'hidden md:inline-flex opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-apple-yellow'
+                }`}
+              >
+                <Pin
+                  size={15}
+                  className={note.isPinned ? 'fill-apple-yellow text-apple-yellow' : ''}
+                />
+              </button>
             )}
           </div>
           <p className="text-[11px] text-neutral-500 dark:text-neutral-400 line-clamp-3 leading-relaxed">
@@ -126,30 +140,21 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
           <span>{formatListDate(note.updatedAt)}</span>
           {/* Desktop-only hover actions */}
           <div className="hidden md:flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            {!note.isTrash && (
-              <button
-                onClick={handlePin}
-                title={note.isPinned ? 'Unpin note' : 'Pin note'}
-                className="p-1 hover:text-apple-yellow text-neutral-400"
-              >
-                <Pin size={11} className={note.isPinned ? 'fill-apple-yellow text-apple-yellow' : ''} />
-              </button>
-            )}
             {note.isTrash ? (
               <button
                 onClick={handleRestore}
                 title="Restore note"
-                className="p-1 hover:text-green-500 text-neutral-400"
+                className="p-1 rounded hover:scale-110 active:scale-95 hover:text-green-500 text-neutral-400 transition-all"
               >
-                <RotateCcw size={11} />
+                <RotateCcw size={15} />
               </button>
             ) : (
               <button
                 onClick={handleDelete}
                 title="Delete note"
-                className="p-1 hover:text-red-500 text-neutral-400"
+                className="p-1 rounded hover:scale-110 active:scale-95 hover:text-red-500 text-neutral-400 transition-all"
               >
-                <Trash2 size={11} />
+                <Trash2 size={15} />
               </button>
             )}
           </div>
@@ -204,46 +209,57 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
             {note.title || 'New Note'}
           </h4>
           <div className="flex items-center space-x-1 shrink-0">
-            {note.isPinned && (
-              <Pin
-                size={11}
-                className={`shrink-0 ${
-                  !isSelectionMode && isSelected
-                    ? 'fill-white text-white'
-                    : 'fill-apple-yellow text-apple-yellow'
+            {/* Pin Button: Single button for both pinning and unpinning */}
+            {!note.isTrash && (
+              <button
+                onClick={handlePin}
+                title={note.isPinned ? 'Unpin note' : 'Pin note'}
+                className={`p-1 rounded hover:scale-110 active:scale-95 transition-all ${
+                  note.isPinned
+                    ? !isSelectionMode && isSelected
+                      ? 'text-white'
+                      : 'text-apple-yellow'
+                    : `hidden md:inline-flex opacity-0 group-hover:opacity-100 ${
+                        !isSelectionMode && isSelected
+                          ? 'text-white/80 hover:text-white'
+                          : 'text-neutral-400 hover:text-apple-yellow'
+                      }`
                 }`}
-              />
+              >
+                <Pin
+                  size={15}
+                  className={
+                    note.isPinned
+                      ? !isSelectionMode && isSelected
+                        ? 'fill-white text-white'
+                        : 'fill-apple-yellow text-apple-yellow'
+                      : ''
+                  }
+                />
+              </button>
             )}
+
             {/* Desktop-only hover actions (hidden on mobile to prevent misclicks) */}
             <div
-              className={`hidden md:flex items-center space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity ${
+              className={`hidden md:flex items-center opacity-0 group-hover:opacity-100 transition-opacity ${
                 !isSelectionMode && isSelected ? 'text-white' : 'text-neutral-400'
               }`}
             >
-              {!note.isTrash && (
-                <button
-                  onClick={handlePin}
-                  title={note.isPinned ? 'Unpin' : 'Pin'}
-                  className="p-0.5 hover:scale-110 transition-transform"
-                >
-                  <Pin size={11} />
-                </button>
-              )}
               {note.isTrash ? (
                 <button
                   onClick={handleRestore}
                   title="Restore note"
-                  className="p-0.5 hover:scale-110 transition-transform"
+                  className="p-1 hover:scale-110 active:scale-95 hover:text-green-500 transition-all"
                 >
-                  <RotateCcw size={11} />
+                  <RotateCcw size={15} />
                 </button>
               ) : (
                 <button
                   onClick={handleDelete}
                   title="Delete note"
-                  className="p-0.5 hover:scale-110 transition-transform"
+                  className="p-1 hover:scale-110 active:scale-95 hover:text-red-500 transition-all"
                 >
-                  <Trash2 size={11} />
+                  <Trash2 size={15} />
                 </button>
               )}
             </div>
