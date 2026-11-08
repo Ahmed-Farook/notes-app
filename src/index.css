@@ -4,7 +4,8 @@
 
 @layer base {
   body {
-    @apply antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
@@ -35,10 +36,17 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-neutral-300 dark:bg-neutral-700 rounded-full;
+    background-color: #d4d4d4;
+    border-radius: 9999px;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background-color: #404040;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-neutral-400 dark:bg-neutral-600;
+    background-color: #a3a3a3;
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background-color: #525252;
   }
 
   /* Utility to hide scrollbar while allowing scrolling */
