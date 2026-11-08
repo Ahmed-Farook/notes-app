@@ -19,6 +19,7 @@ import {
   Heading3,
 } from 'lucide-react';
 import { triggerHaptic } from '../../utils/haptics';
+import { toggleUnifiedCodeBlock } from '../../utils/editorCommands';
 
 interface EditorToolbarProps {
   editor: Editor | null;
@@ -149,7 +150,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible 
       </button>
 
       <button
-        onClick={() => runCommand(() => editor.chain().focus().toggleCodeBlock().run())}
+        onClick={() => runCommand(() => toggleUnifiedCodeBlock(editor))}
         title="Code Block"
         className={getBtnClass(editor.isActive('codeBlock'))}
       >

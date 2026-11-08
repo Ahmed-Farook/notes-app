@@ -134,6 +134,17 @@ export const Layout: React.FC = () => {
         return;
       }
 
+      // Cmd/Ctrl + F: Focus Search Bar
+      if (isCmdOrCtrl && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        const searchInput = document.querySelector<HTMLInputElement>('input[placeholder*="Search"]');
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.select();
+        }
+        return;
+      }
+
       // Escape key: close active note & deselect across Mac, Windows, and Web
       if (e.key === 'Escape') {
         if (isAuthModalOpenRef.current) return;

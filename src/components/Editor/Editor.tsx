@@ -1,12 +1,15 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
+import { Extension } from '@tiptap/core';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import StarterKit from '@tiptap/starter-kit';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import Underline from '@tiptap/extension-underline';
 import Highlight from '@tiptap/extension-highlight';
 import Placeholder from '@tiptap/extension-placeholder';
-import { RotateCcw, Trash2 } from 'lucide-react';
+import { RotateCcw, Trash2, Search, ChevronUp, ChevronDown, X } from 'lucide-react';
 
 import { useNotes } from '../../store/NotesContext';
 import { formatEditorDate } from '../../utils/dateUtils';
@@ -193,6 +196,83 @@ const CustomTaskItem = TaskItem.extend({
   },
 });
 
+const searchHighlightPluginKey = new PluginKey('searchHighlight');
+
+const SearchHighlightExtension = Extension.create({
+  name: 'searchHighlight',
+
+  addStorage() {
+    return {
+      searchTerm: '',
+      currentIndex: 0,
+      matches: [] as { from: number; to: number }[],
+    };
+  },
+
+  addProseMirrorPlugins() {
+    const extension = this;
+
+    return [
+      new Plugin({
+        key: searchHighlightPluginKey,
+        state: {
+          init() {
+            return DecorationSet.empty;
+          },
+          apply(tr, oldSet, oldState, newState) {
+            const meta = tr.getMeta(searchHighlightPluginKey);
+            if (meta) {
+              if (typeof meta.searchTerm === 'string') {
+                extension.storage.searchTerm = meta.searchTerm;
+              }
+              if (typeof meta.currentIndex === 'number') {
+                extension.storage.currentIndex = meta.currentIndex;
+              }
+            }
+
+            const term = (extension.storage.searchTerm || '').trim().toLowerCase();
+            if (!term) {
+              extension.storage.matches = [];
+              return DecorationSet.empty;
+            }
+
+            const matches: { from: number; to: number }[] = [];
+            newState.doc.descendants((node, pos) => {
+              if (node.isText && node.text) {
+                const text = node.text.toLowerCase();
+                let index = 0;
+                while ((index = text.indexOf(term, index)) !== -1) {
+                  matches.push({ from: pos + index, to: pos + index + term.length });
+                  index += term.length;
+                }
+              }
+            });
+
+            extension.storage.matches = matches;
+            const currentIndex = extension.storage.currentIndex || 0;
+
+            const decorations = matches.map((m, i) => {
+              const isActive = i === currentIndex;
+              return Decoration.inline(m.from, m.to, {
+                class: isActive
+                  ? 'search-match-active bg-[#FFB800] text-black font-semibold rounded-xs ring-2 ring-[#FF9500] shadow-xs'
+                  : 'search-match bg-[#FFE277]/80 dark:bg-[#7EAAD0]/35 text-neutral-900 dark:text-neutral-100 rounded-xs',
+              });
+            });
+
+            return DecorationSet.create(newState.doc, decorations);
+          },
+        },
+        props: {
+          decorations(state) {
+            return this.getState(state);
+          },
+        },
+      }),
+    ];
+  },
+});
+
 interface EditorProps {
   showToolbar: boolean;
   onRegisterToggleChecklist: (fn: () => void) => void;
@@ -205,7 +285,12 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     updateNote,
     restoreNote,
     permanentlyDeleteNote,
+    searchQuery,
+    setSearchQuery,
   } = useNotes();
+
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+  const [totalMatches, setTotalMatches] = useState(0);
 
   const isUpdatingRef = useRef(false);
   const activeNoteRef = useRef(activeNote);
@@ -228,6 +313,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
         placeholder: 'Type something...',
         emptyEditorClass: 'is-editor-empty',
       }),
+      SearchHighlightExtension,
     ],
     content: activeNote ? activeNote.content : '',
     editable: Boolean(activeNote && !activeNote.isTrash),
@@ -372,6 +458,78 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     };
   }, [editor]);
 
+  // Synchronize in-note search highlight with active note and search query
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    const term = searchQuery.trim();
+
+    const { tr } = editor.state;
+    tr.setMeta(searchHighlightPluginKey, { searchTerm: term, currentIndex: 0 });
+    editor.view.dispatch(tr);
+
+    const matches = (editor.storage as any).searchHighlight?.matches || [];
+    setTotalMatches(matches.length);
+    setCurrentMatchIndex(0);
+
+    if (matches.length > 0) {
+      requestAnimationFrame(() => {
+        const el = document.querySelector('.search-match-active');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+    }
+  }, [searchQuery, editor, activeNote?.id, activeNote?.content]);
+
+  const goToMatch = (newIndex: number) => {
+    if (!editor || totalMatches === 0) return;
+    const boundedIndex = (newIndex + totalMatches) % totalMatches;
+    setCurrentMatchIndex(boundedIndex);
+
+    const { tr } = editor.state;
+    tr.setMeta(searchHighlightPluginKey, { currentIndex: boundedIndex });
+    editor.view.dispatch(tr);
+
+    requestAnimationFrame(() => {
+      const el = document.querySelector('.search-match-active');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+  };
+
+  const handleNextMatch = () => {
+    triggerHaptic();
+    goToMatch(currentMatchIndex + 1);
+  };
+
+  const handlePrevMatch = () => {
+    triggerHaptic();
+    goToMatch(currentMatchIndex - 1);
+  };
+
+  // Keyboard navigation for search (Enter for next, Shift+Enter for previous, Esc to close)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!searchQuery) return;
+
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handlePrevMatch();
+        } else {
+          handleNextMatch();
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setSearchQuery('');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [searchQuery, totalMatches, currentMatchIndex]);
+
   if (!activeNote) {
     return (
       <div className="flex-1 bg-[#FAF6EF] dark:bg-[#131B24] flex flex-col items-center justify-center text-[#6E7E8E] dark:text-[#8AA0B4] select-none p-6 text-center">
@@ -390,6 +548,51 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     <div className="flex-1 bg-[#FAF6EF] dark:bg-[#131B24] flex flex-col h-full overflow-hidden relative select-text">
       {/* Optional Toolbar */}
       <EditorToolbar editor={editor} isVisible={showToolbar} />
+
+      {/* In-Note Search & Highlight Bar */}
+      {searchQuery && (
+        <div className="flex items-center justify-between px-4 py-2 border-b border-apple-border dark:border-apple-borderDark bg-[#EFE7D8]/95 dark:bg-[#151E28]/95 backdrop-blur-md z-30 text-xs shrink-0 select-none shadow-xs">
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <Search size={14} className="text-[#395060] dark:text-[#7EAAD0] shrink-0" />
+            <span className="font-semibold text-[#1C2B36] dark:text-[#E8EEF3] truncate max-w-[130px] sm:max-w-[200px]">
+              "{searchQuery}"
+            </span>
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[#E5DCCB] dark:bg-[#203244] text-[#5A6D7E] dark:text-[#8AA0B4] shrink-0">
+              {totalMatches > 0 ? `${currentMatchIndex + 1} of ${totalMatches}` : '0 results'}
+            </span>
+          </div>
+
+          <div className="flex items-center space-x-1 shrink-0">
+            <button
+              onClick={handlePrevMatch}
+              disabled={totalMatches === 0}
+              title="Previous match (Shift+Enter)"
+              className="p-1 rounded hover:bg-[#E5DCCB] dark:hover:bg-[#203244] text-[#1C2B36] dark:text-[#E8EEF3] disabled:opacity-30 disabled:hover:bg-transparent transition-colors active:scale-95"
+            >
+              <ChevronUp size={16} />
+            </button>
+            <button
+              onClick={handleNextMatch}
+              disabled={totalMatches === 0}
+              title="Next match (Enter)"
+              className="p-1 rounded hover:bg-[#E5DCCB] dark:hover:bg-[#203244] text-[#1C2B36] dark:text-[#E8EEF3] disabled:opacity-30 disabled:hover:bg-transparent transition-colors active:scale-95"
+            >
+              <ChevronDown size={16} />
+            </button>
+            <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#243547] mx-1" />
+            <button
+              onClick={() => {
+                triggerHaptic();
+                setSearchQuery('');
+              }}
+              title="Close search (Esc)"
+              className="p-1 rounded hover:bg-[#E5DCCB] dark:hover:bg-[#203244] text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors active:scale-95"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Trash Warning Banner */}
       {activeNote.isTrash && (

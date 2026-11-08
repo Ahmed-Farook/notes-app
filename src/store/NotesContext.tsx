@@ -320,7 +320,25 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const query = searchQuery.trim().toLowerCase();
 
     return notes.filter(note => {
-      // 1. Folder filter
+      // 1. If searching, search across all active notes (or trash if in trash folder)
+      if (query) {
+        if (selectedFolderId === 'trash') {
+          if (!note.isTrash) return false;
+        } else {
+          if (note.isTrash) return false;
+        }
+
+        // Comprehensive full-text search: title, preview snippet, and full note body
+        const matchesTitle = note.title.toLowerCase().includes(query);
+        const matchesSnippet = note.plainTextPreview.toLowerCase().includes(query);
+        // Strip HTML tags so entire note body text is searched
+        const cleanBody = note.content.replace(/<[^>]*>/g, ' ').toLowerCase();
+        const matchesBody = cleanBody.includes(query);
+
+        return matchesTitle || matchesSnippet || matchesBody;
+      }
+
+      // 2. Folder filter when not searching
       if (selectedFolderId === 'trash') {
         if (!note.isTrash) return false;
       } else {
@@ -334,13 +352,6 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         } else {
           if (noteFolder !== selectedFolderId) return false;
         }
-      }
-
-      // 2. Search query filter
-      if (query) {
-        const matchesTitle = note.title.toLowerCase().includes(query);
-        const matchesContent = note.plainTextPreview.toLowerCase().includes(query);
-        if (!matchesTitle && !matchesContent) return false;
       }
 
       return true;
