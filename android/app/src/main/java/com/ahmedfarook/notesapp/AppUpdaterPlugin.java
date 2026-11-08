@@ -37,9 +37,16 @@ public class AppUpdaterPlugin extends Plugin {
             return;
         }
 
-        File targetFile = new File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "texo-update.apk");
+        File downloadsDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        File targetFile = new File(downloadsDir, "texo-update.apk");
         if (targetFile.exists()) {
             targetFile.delete();
+        }
+
+        // Clean up legacy Apple-Notes-update.apk to avoid installing stale version
+        File legacyFile = new File(downloadsDir, "Apple-Notes-update.apk");
+        if (legacyFile.exists()) {
+            legacyFile.delete();
         }
 
         Uri uri = Uri.parse(downloadUrl);
@@ -65,7 +72,10 @@ public class AppUpdaterPlugin extends Plugin {
                     long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
                     if (id == downloadId) {
                         try {
-                            File apkFile = new File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "Apple-Notes-update.apk");
+                            File apkFile = targetFile;
+                            if (!apkFile.exists()) {
+                                apkFile = new File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "texo-update.apk");
+                            }
                             if (apkFile.exists()) {
                                 Uri apkUri = FileProvider.getUriForFile(
                                     context,

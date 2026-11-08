@@ -62,3 +62,4 @@ export const toggleUnifiedCodeBlock = (editor: Editor) => {
   dispatch(tr);
   editor.view.focus();
 };
+

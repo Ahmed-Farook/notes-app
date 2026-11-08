@@ -525,7 +525,7 @@ export const NotesList: React.FC<NotesListProps> = ({
             placeholder="Search all notes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8 pr-7 py-1 text-xs rounded-md bg-[#EFE7D8]/80 dark:bg-[#1C2733] border border-[#DFD3C0]/70 dark:border-[#223344] text-[#1C2B36] dark:text-[#E8EEF3] placeholder-[#8A9BA8] focus:outline-none focus:ring-1 focus:ring-apple-yellow transition-all"
+            className="w-full pl-8 pr-7 py-1 text-xs rounded-md bg-[#EFE7D8]/80 dark:bg-[#1C2733] border border-[#DFD3C0]/70 dark:border-[#223344] focus:border-[#213A50] dark:focus:border-[#4B708B] text-[#1C2B36] dark:text-[#E8EEF3] placeholder-[#8A9BA8] outline-none focus:outline-none focus:ring-0 transition-colors duration-150"
           />
           {searchQuery && (
             <button

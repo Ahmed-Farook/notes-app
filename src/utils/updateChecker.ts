@@ -191,19 +191,22 @@ export async function checkForUpdates(overrideToken?: string): Promise<UpdateInf
 
     if (Array.isArray(data.assets)) {
       if (platform === 'android') {
-        const apkAsset = data.assets.find((a: any) => a.name.endsWith('.apk'));
+        const apkAsset = data.assets.find((a: any) => a.name.startsWith('texo') && a.name.endsWith('.apk'))
+          || data.assets.find((a: any) => a.name.endsWith('.apk'));
         if (apkAsset) {
           downloadUrl = apkAsset.browser_download_url;
           assetName = apkAsset.name;
         }
       } else if (platform === 'mac') {
-        const dmgAsset = data.assets.find((a: any) => a.name.endsWith('.dmg'));
+        const dmgAsset = data.assets.find((a: any) => a.name.startsWith('texo') && a.name.endsWith('.dmg'))
+          || data.assets.find((a: any) => a.name.endsWith('.dmg'));
         if (dmgAsset) {
           downloadUrl = dmgAsset.browser_download_url;
           assetName = dmgAsset.name;
         }
       } else if (platform === 'windows') {
-        const exeAsset = data.assets.find((a: any) => a.name.endsWith('.exe'));
+        const exeAsset = data.assets.find((a: any) => a.name.startsWith('texo') && a.name.endsWith('.exe'))
+          || data.assets.find((a: any) => a.name.endsWith('.exe'));
         if (exeAsset) {
           downloadUrl = exeAsset.browser_download_url;
           assetName = exeAsset.name;

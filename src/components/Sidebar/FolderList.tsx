@@ -117,9 +117,6 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
                     <span className="truncate">{folder.name}</span>
                   </button>
                   <div className="flex items-center space-x-1.5">
-                    <span className={`text-[11px] ${isSelected ? 'text-white/80' : 'text-[#8A9BA8] dark:text-[#6E8092]'}`}>
-                      {getFolderCount(folder.id)}
-                    </span>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -132,6 +129,9 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
                     >
                       <Trash2 size={14} />
                     </button>
+                    <span className={`text-[11px] min-w-[14px] text-right ${isSelected ? 'text-white/80' : 'text-[#8A9BA8] dark:text-[#6E8092]'}`}>
+                      {getFolderCount(folder.id)}
+                    </span>
                   </div>
                 </div>
               );

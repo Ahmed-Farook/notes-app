@@ -12,6 +12,19 @@
     touch-action: manipulation;
   }
 
+  /* Prevent native browser focus ring flashing (blue on light, white on dark) */
+  input, textarea, select {
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  input:focus,
+  input:focus-visible,
+  textarea:focus,
+  textarea:focus-visible {
+    outline: none !important;
+    -webkit-focus-ring-color: transparent !important;
+  }
+
   /* Custom scrollbar matching macOS */
   ::-webkit-scrollbar {
     width: 6px;
@@ -241,5 +254,37 @@ mark {
 .dark mark {
   background-color: #203446;
   color: #d1e5f5;
+}
+
+/* Kyoto Search Match Highlights - Subtle, Paper-Aesthetic & Professional */
+.search-match {
+  background-color: rgba(229, 184, 105, 0.28);
+  color: inherit;
+  border-bottom: 1px solid rgba(212, 163, 89, 0.45);
+  border-radius: 2px;
+  padding: 0 1.5px;
+}
+
+.dark .search-match {
+  background-color: rgba(52, 81, 109, 0.5);
+  color: #E8EEF3;
+  border-bottom: 1px solid rgba(82, 120, 156, 0.5);
+}
+
+.search-match-active {
+  background-color: #D4A359;
+  color: #131B24 !important;
+  font-weight: 600;
+  border-radius: 2px;
+  padding: 0 2.5px;
+  box-shadow: 0 0 0 1.5px rgba(184, 135, 62, 0.85);
+  border-bottom: none;
+}
+
+.dark .search-match-active {
+  background-color: #46729A;
+  color: #FFFFFF !important;
+  box-shadow: 0 0 0 1.5px #7EAAD0;
+  border-bottom: none;
 }
 

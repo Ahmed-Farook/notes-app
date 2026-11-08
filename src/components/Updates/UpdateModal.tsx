@@ -276,6 +276,18 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                       </span>
                     </button>
 
+                    {updateInfo.platform === 'android' && (
+                      <a
+                        href={updateInfo.downloadUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full flex items-center justify-center space-x-1.5 py-1 text-xs text-[#395060] dark:text-[#7EAAD0] hover:underline transition-all"
+                      >
+                        <Download size={13} />
+                        <span>Download APK directly ({updateInfo.assetName || 'texo.apk'})</span>
+                      </a>
+                    )}
+
                     {installError && (
                       <p className="text-[11px] text-red-500 text-center">{installError}</p>
                     )}

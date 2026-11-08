@@ -254,9 +254,7 @@ const SearchHighlightExtension = Extension.create({
             const decorations = matches.map((m, i) => {
               const isActive = i === currentIndex;
               return Decoration.inline(m.from, m.to, {
-                class: isActive
-                  ? 'search-match-active bg-[#FFB800] text-black font-semibold rounded-xs ring-2 ring-[#FF9500] shadow-xs'
-                  : 'search-match bg-[#FFE277]/80 dark:bg-[#7EAAD0]/35 text-neutral-900 dark:text-neutral-100 rounded-xs',
+                class: isActive ? 'search-match-active' : 'search-match',
               });
             });
 
