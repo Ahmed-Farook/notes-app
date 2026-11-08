@@ -133,6 +133,10 @@ jobs:
         run: npm run build
 
       - name: Package macOS DMG
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+          ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
         run: npx electron-builder --mac dmg --arm64 --publish never
 
       - name: Rename and Prepare DMG
@@ -190,6 +194,10 @@ jobs:
         run: npm run build
 
       - name: Package Windows Installer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+          ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
         run: npx electron-builder --win nsis --x64 --publish never
 
       - name: Rename and Prepare EXE

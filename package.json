@@ -1,6 +1,6 @@
 {
   "name": "apple-notes-crossplatform",
-  "version": "0.2.23",
+  "version": "0.2.24",
   "description": "texō cross-platform note taking application",
   "author": "Ahmed Farook",
   "private": true,
@@ -23,6 +23,9 @@
     "productName": "texo",
     "directories": {
       "output": "release"
+    },
+    "electronDownload": {
+      "mirror": "https://npmmirror.com/mirrors/electron/"
     },
     "files": [
       "dist/**/*",

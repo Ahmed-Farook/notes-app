@@ -21,8 +21,9 @@
   input:focus-visible,
   textarea:focus,
   textarea:focus-visible {
-    outline: none !important;
-    -webkit-focus-ring-color: transparent !important;
+    outline: 2px solid transparent !important;
+    outline-offset: 2px !important;
+    box-shadow: none !important;
   }
 
   /* Custom scrollbar matching macOS */
