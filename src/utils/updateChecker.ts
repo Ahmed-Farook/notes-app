@@ -104,7 +104,7 @@ async function checkViaRawFallback(platform: PlatformType): Promise<UpdateInfo> 
 
   if (platform === 'android') {
     assetName = `texo-${latestVersion}.apk`;
-    downloadUrl = `https://github.com/${GITHUB_REPO}/releases/download/v${latestVersion}/${assetName}`;
+    downloadUrl = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/releases/texo.apk`;
   } else if (platform === 'mac') {
     assetName = `texo-${latestVersion}-arm64.dmg`;
     downloadUrl = `https://github.com/${GITHUB_REPO}/releases/download/v${latestVersion}/${assetName}`;
@@ -194,8 +194,9 @@ export async function checkForUpdates(overrideToken?: string): Promise<UpdateInf
         const apkAsset = data.assets.find((a: any) => a.name.startsWith('texo') && a.name.endsWith('.apk'))
           || data.assets.find((a: any) => a.name.endsWith('.apk'));
         if (apkAsset) {
-          downloadUrl = apkAsset.browser_download_url;
           assetName = apkAsset.name;
+          // Use Fastly/raw CDN mirror URL to completely avoid regional GitHub Releases 504 timeouts
+          downloadUrl = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/releases/texo.apk`;
         }
       } else if (platform === 'mac') {
         const dmgAsset = data.assets.find((a: any) => a.name.startsWith('texo') && a.name.endsWith('.dmg'))
