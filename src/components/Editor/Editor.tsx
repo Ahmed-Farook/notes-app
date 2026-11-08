@@ -421,7 +421,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
 
       {/* Editor Content Body (Scrollable container - date moves away on scroll) */}
       <div
-        className="flex-1 overflow-y-auto px-5 md:px-14 py-3 cursor-text select-text"
+        className="flex-1 overflow-y-auto px-5 md:px-14 py-3 pb-24 md:pb-8 cursor-text select-text"
         onClick={(e) => {
           if (editor && !activeNote.isTrash) {
             const target = e.target as HTMLElement;

@@ -22,3 +22,13 @@ export const formatEditorDate = (timestamp: number): string => {
   return format(date, "MMMM d, yyyy 'at' h:mm a");
 };
 
+export type DateBucket = 'Today' | 'Yesterday' | 'Previous 7 Days' | 'Older';
+
+export const getDateBucket = (timestamp: number): DateBucket => {
+  const date = new Date(timestamp);
+  if (isToday(date)) return 'Today';
+  if (isYesterday(date)) return 'Yesterday';
+  if (isThisWeek(date)) return 'Previous 7 Days';
+  return 'Older';
+};
+

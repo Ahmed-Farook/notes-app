@@ -18,6 +18,7 @@ import {
   Heading2,
   Heading3,
 } from 'lucide-react';
+import { triggerHaptic } from '../../utils/haptics';
 
 interface EditorToolbarProps {
   editor: Editor | null;
@@ -27,6 +28,11 @@ interface EditorToolbarProps {
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible }) => {
   if (!editor || !isVisible) return null;
 
+  const runCommand = (cmd: () => void) => {
+    triggerHaptic();
+    cmd();
+  };
+
   const getBtnClass = (isActive: boolean) =>
     `p-1.5 rounded shrink-0 transition-colors ${
       isActive
@@ -35,10 +41,10 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible 
     }`;
 
   return (
-    <div className="h-10 flex flex-nowrap items-center gap-1 px-3 border-b border-apple-border dark:border-apple-borderDark bg-[#F2ECE0]/95 dark:bg-[#151E28]/95 backdrop-blur sticky top-0 z-20 select-none text-xs overflow-x-auto no-scrollbar shrink-0">
+    <div className="h-10 flex flex-nowrap items-center gap-1 px-3 border-t md:border-t-0 md:border-b border-apple-border dark:border-apple-borderDark bg-[#F2ECE0]/95 dark:bg-[#151E28]/95 backdrop-blur md:sticky md:top-0 z-20 select-none text-xs overflow-x-auto no-scrollbar shrink-0 order-last md:order-first">
       {/* Text Style Headings */}
       <button
-        onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+        onClick={() => runCommand(() => editor.chain().focus().toggleHeading({ level: 1 }).run())}
         title="Title (H1)"
         className={getBtnClass(editor.isActive('heading', { level: 1 }))}
       >
@@ -46,7 +52,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible 
       </button>
 
       <button
-        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+        onClick={() => runCommand(() => editor.chain().focus().toggleHeading({ level: 2 }).run())}
         title="Heading (H2)"
         className={getBtnClass(editor.isActive('heading', { level: 2 }))}
       >
@@ -54,7 +60,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible 
       </button>
 
       <button
-        onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+        onClick={() => runCommand(() => editor.chain().focus().toggleHeading({ level: 3 }).run())}
         title="Subheading (H3)"
         className={getBtnClass(editor.isActive('heading', { level: 3 }))}
       >
@@ -65,7 +71,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible 
 
       {/* Basic Formatting */}
       <button
-        onClick={() => editor.chain().focus().toggleBold().run()}
+        onClick={() => runCommand(() => editor.chain().focus().toggleBold().run())}
         title="Bold (Cmd+B)"
         className={getBtnClass(editor.isActive('bold'))}
       >
@@ -73,7 +79,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible 
       </button>
 
       <button
-        onClick={() => editor.chain().focus().toggleItalic().run()}
+        onClick={() => runCommand(() => editor.chain().focus().toggleItalic().run())}
         title="Italic (Cmd+I)"
         className={getBtnClass(editor.isActive('italic'))}
       >
@@ -81,7 +87,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible 
       </button>
 
       <button
-        onClick={() => editor.chain().focus().toggleUnderline().run()}
+        onClick={() => runCommand(() => editor.chain().focus().toggleUnderline().run())}
         title="Underline (Cmd+U)"
         className={getBtnClass(editor.isActive('underline'))}
       >
@@ -89,7 +95,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible 
       </button>
 
       <button
-        onClick={() => editor.chain().focus().toggleStrike().run()}
+        onClick={() => runCommand(() => editor.chain().focus().toggleStrike().run())}
         title="Strikethrough"
         className={getBtnClass(editor.isActive('strike'))}
       >
@@ -97,13 +103,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible 
       </button>
 
       <button
-        onClick={() => editor.chain().focus().toggleHighlight().run()}
+        onClick={() => runCommand(() => editor.chain().focus().toggleHighlight().run())}
         title="Highlight"
-        className={`p-1.5 rounded shrink-0 transition-colors ${
-          editor.isActive('highlight')
-            ? 'bg-[#E5DCCB] dark:bg-[#203448] text-[#213A50] dark:text-[#7EAAD0] font-bold shadow-xs'
-            : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3]'
-        }`}
+        className={getBtnClass(editor.isActive('highlight'))}
       >
         <Highlighter size={15} />
       </button>
@@ -112,7 +114,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible 
 
       {/* Lists */}
       <button
-        onClick={() => editor.chain().focus().toggleTaskList().run()}
+        onClick={() => runCommand(() => editor.chain().focus().toggleTaskList().run())}
         title="Checklist"
         className={getBtnClass(editor.isActive('taskList'))}
       >
@@ -120,7 +122,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible 
       </button>
 
       <button
-        onClick={() => editor.chain().focus().toggleBulletList().run()}
+        onClick={() => runCommand(() => editor.chain().focus().toggleBulletList().run())}
         title="Bullet List"
         className={getBtnClass(editor.isActive('bulletList'))}
       >
@@ -128,7 +130,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible 
       </button>
 
       <button
-        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+        onClick={() => runCommand(() => editor.chain().focus().toggleOrderedList().run())}
         title="Numbered List"
         className={getBtnClass(editor.isActive('orderedList'))}
       >
@@ -139,7 +141,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible 
 
       {/* Quotes & Code */}
       <button
-        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+        onClick={() => runCommand(() => editor.chain().focus().toggleBlockquote().run())}
         title="Blockquote"
         className={getBtnClass(editor.isActive('blockquote'))}
       >
@@ -147,7 +149,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible 
       </button>
 
       <button
-        onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+        onClick={() => runCommand(() => editor.chain().focus().toggleCodeBlock().run())}
         title="Code Block"
         className={getBtnClass(editor.isActive('codeBlock'))}
       >
@@ -155,7 +157,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible 
       </button>
 
       <button
-        onClick={() => editor.chain().focus().setHorizontalRule().run()}
+        onClick={() => runCommand(() => editor.chain().focus().setHorizontalRule().run())}
         title="Horizontal Divider"
         className="p-1.5 rounded shrink-0 text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3] transition-colors"
       >
@@ -166,7 +168,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible 
 
       {/* Undo / Redo */}
       <button
-        onClick={() => editor.chain().focus().undo().run()}
+        onClick={() => runCommand(() => editor.chain().focus().undo().run())}
         disabled={!editor.can().undo()}
         title="Undo (Cmd+Z)"
         className="p-1.5 rounded shrink-0 text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3] disabled:opacity-30 disabled:pointer-events-none transition-colors"
@@ -175,7 +177,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible 
       </button>
 
       <button
-        onClick={() => editor.chain().focus().redo().run()}
+        onClick={() => runCommand(() => editor.chain().focus().redo().run())}
         disabled={!editor.can().redo()}
         title="Redo (Cmd+Shift+Z)"
         className="p-1.5 rounded shrink-0 text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3] disabled:opacity-30 disabled:pointer-events-none transition-colors"

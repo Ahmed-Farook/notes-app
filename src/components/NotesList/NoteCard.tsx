@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { Pin, Trash2, RotateCcw, Check } from 'lucide-react';
 import { Note, ViewMode } from '../../types/note';
 import { formatListDate } from '../../utils/dateUtils';
@@ -27,6 +27,12 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isLongPressRef = useRef(false);
 
+  // Mobile Touch Swipe Gesture State
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
+  const isSwipingRef = useRef(false);
+
   const startLongPress = () => {
     isLongPressRef.current = false;
     longPressTimerRef.current = setTimeout(() => {
@@ -41,6 +47,64 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (isSelectionMode) return;
+    touchStartXRef.current = e.touches[0].clientX;
+    touchStartYRef.current = e.touches[0].clientY;
+    isSwipingRef.current = false;
+    startLongPress();
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (isSelectionMode || touchStartXRef.current === null || touchStartYRef.current === null) return;
+    const dx = e.touches[0].clientX - touchStartXRef.current;
+    const dy = e.touches[0].clientY - touchStartYRef.current;
+
+    // If scrolling vertically, let the parent scroll view handle it
+    if (!isSwipingRef.current && Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx)) {
+      cancelLongPress();
+      return;
+    }
+
+    // If dragging horizontally, initiate swipe gesture
+    if (Math.abs(dx) > 10) {
+      isSwipingRef.current = true;
+      cancelLongPress();
+      const clamped = Math.max(-110, Math.min(110, dx));
+      setSwipeOffset(clamped);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    cancelLongPress();
+    const currentOffset = swipeOffset;
+    const wasSwiping = isSwipingRef.current;
+
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+
+    if (wasSwiping) {
+      if (currentOffset < -65) {
+        // Swiped Left: Delete note
+        triggerHaptic();
+        deleteNote(note.id);
+      } else if (currentOffset > 65) {
+        // Swiped Right: Pin or restore
+        triggerHaptic();
+        if (note.isTrash) {
+          restoreNote(note.id);
+        } else {
+          togglePinNote(note.id);
+        }
+      }
+    }
+
+    setSwipeOffset(0);
+    setTimeout(() => {
+      isSwipingRef.current = false;
+    }, 120);
   };
 
   const handleClick = (e: React.MouseEvent) => {
@@ -163,29 +227,79 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
     );
   }
 
-  // Standard List View Card (Apple Notes style)
+  // Standard List View Card (Apple Notes style with mobile swipe actions)
   return (
-    <div
-      onClick={handleClick}
-      onTouchStart={startLongPress}
-      onTouchEnd={cancelLongPress}
-      onTouchMove={cancelLongPress}
-      onContextMenu={(e) => {
-        if (!isSelectionMode) {
-          e.preventDefault();
-          enterSelectionMode(note.id);
-        }
-      }}
-      className={`group relative px-3 py-3 md:py-2.5 rounded-xl transition-all cursor-pointer select-none active:scale-[0.99] flex items-center border ${
-        isSelectionMode
-          ? isChecked
-            ? 'border-2 border-apple-yellow dark:border-[#7EAAD0] bg-apple-yellowLight dark:bg-[#203448] shadow-xs text-neutral-900 dark:text-[#E8EEF3]'
-            : 'border-2 border-transparent hover:bg-[#EBE2D3] dark:hover:bg-[#202D3A] text-neutral-900 dark:text-neutral-100'
-          : isSelected
-          ? 'border-transparent bg-apple-yellow dark:bg-[#253D56] text-white shadow-sm'
-          : 'border-transparent hover:bg-[#EBE2D3] dark:hover:bg-[#202D3A] text-[#1C2B36] dark:text-[#E8EEF3]'
-      }`}
-    >
+    <div className="relative overflow-hidden rounded-xl">
+      {/* Swipe reveal background actions */}
+      {swipeOffset !== 0 && (
+        <div className="absolute inset-0 flex items-center justify-between rounded-xl overflow-hidden pointer-events-none select-none">
+          {/* Swiping Right: Pin / Unpin (or Restore if in trash) */}
+          <div
+            className={`h-full w-full flex items-center px-4 transition-colors ${
+              note.isTrash
+                ? 'bg-emerald-600 text-white justify-start'
+                : 'bg-apple-yellow dark:bg-[#254260] text-white justify-start'
+            }`}
+          >
+            <div
+              className={`flex items-center space-x-1.5 transition-transform ${
+                Math.abs(swipeOffset) > 65 ? 'scale-110 font-semibold' : 'scale-95 opacity-85'
+              }`}
+            >
+              {note.isTrash ? (
+                <>
+                  <RotateCcw size={15} />
+                  <span className="text-xs">Restore</span>
+                </>
+              ) : (
+                <>
+                  <Pin size={15} className={note.isPinned ? '' : 'fill-white'} />
+                  <span className="text-xs">{note.isPinned ? 'Unpin' : 'Pin'}</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Swiping Left: Delete */}
+          <div className="h-full w-full bg-red-600 text-white flex items-center justify-end px-4">
+            <div
+              className={`flex items-center space-x-1.5 transition-transform ${
+                Math.abs(swipeOffset) > 65 ? 'scale-110 font-semibold' : 'scale-95 opacity-85'
+              }`}
+            >
+              <span className="text-xs">Delete</span>
+              <Trash2 size={15} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Foreground Note Card */}
+      <div
+        onClick={handleClick}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{
+          transform: `translateX(${swipeOffset}px)`,
+          transition: isSwipingRef.current ? 'none' : 'transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1)',
+        }}
+        onContextMenu={(e) => {
+          if (!isSelectionMode) {
+            e.preventDefault();
+            enterSelectionMode(note.id);
+          }
+        }}
+        className={`group relative px-3 py-3 md:py-2.5 rounded-xl transition-colors cursor-pointer select-none active:scale-[0.99] flex items-center border ${
+          isSelectionMode
+            ? isChecked
+              ? 'border-2 border-apple-yellow dark:border-[#7EAAD0] bg-apple-yellowLight dark:bg-[#203448] shadow-xs text-neutral-900 dark:text-[#E8EEF3]'
+              : 'border-2 border-transparent hover:bg-[#EBE2D3] dark:hover:bg-[#202D3A] text-neutral-900 dark:text-neutral-100'
+            : isSelected
+            ? 'border-transparent bg-apple-yellow dark:bg-[#253D56] text-white shadow-sm'
+            : 'border-transparent hover:bg-[#EBE2D3] dark:hover:bg-[#202D3A] text-[#1C2B36] dark:text-[#E8EEF3]'
+        }`}
+      >
       {/* Checkbox circle when in multi-select mode */}
       {isSelectionMode && (
         <div className="mr-3 shrink-0 flex items-center justify-center">
@@ -288,6 +402,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 };
 

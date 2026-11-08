@@ -84,6 +84,7 @@ interface NotesContextType {
   moveNoteToFolder: (noteId: string, folderId: string) => void;
 
   createFolder: (name: string) => void;
+  renameFolder: (id: string, newName: string) => void;
   deleteFolder: (id: string) => void;
   exportCurrentNote: (formatType: 'markdown' | 'txt' | 'html', noteToExport?: Note) => void;
 }
@@ -548,6 +549,24 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   }, [user]);
 
+  const renameFolder = useCallback((id: string, newName: string) => {
+    triggerHaptic();
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    setFolders(prev =>
+      prev.map(f => {
+        if (f.id === id) {
+          const updated = { ...f, name: trimmed };
+          if (user) {
+            upsertFolderToCloud(updated, user.id, encryptionKeyRef.current);
+          }
+          return updated;
+        }
+        return f;
+      })
+    );
+  }, [user]);
+
   const deleteFolder = useCallback((id: string) => {
     triggerHaptic();
     setFolders(prev => prev.filter(f => f.id !== id));
@@ -780,6 +799,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         togglePinNote,
         moveNoteToFolder,
         createFolder,
+        renameFolder,
         deleteFolder,
         exportCurrentNote,
       }}
