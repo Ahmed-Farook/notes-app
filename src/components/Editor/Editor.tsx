@@ -644,8 +644,8 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
       >
         <div className="max-w-3xl mx-auto">
           {/* Note Date Header: scrolls away with note content */}
-          <div className="pt-2 pb-3 flex items-center justify-center text-[11px] text-neutral-400 dark:text-neutral-500 select-none">
-            <span className="font-medium text-center">
+          <div className="pt-2 pb-3 flex items-center justify-center text-[11px] text-[#6E8092] dark:text-[#8AA0B4] select-none">
+            <span className="font-semibold text-center">
               {formatEditorDate(activeNote.updatedAt)}
             </span>
           </div>

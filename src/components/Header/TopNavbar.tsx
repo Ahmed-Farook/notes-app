@@ -201,7 +201,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
 
           {showExportMenu && noteToExport && (
             <div className="absolute right-0 top-full mt-1.5 w-48 bg-[#FAF6EF] dark:bg-[#1C2733] rounded-xl shadow-2xl border border-apple-border dark:border-apple-borderDark py-1.5 z-50 text-xs backdrop-blur-md animate-in fade-in zoom-in-95 duration-100">
-              <div className="px-3 py-1 font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider text-[10px]">
+              <div className="px-3 py-1 font-semibold text-[#5A6E82] dark:text-[#8AA0B4] uppercase tracking-wider text-[10px]">
                 Export Note As
               </div>
               <button

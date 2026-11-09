@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Search,
   X,
@@ -87,6 +87,22 @@ export const NotesList: React.FC<NotesListProps> = ({
   const folderTouchTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isFolderLongPressRef = useRef(false);
   const folderTouchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const [isActionSheetInteractable, setIsActionSheetInteractable] = useState(false);
+  const actionSheetOpenedAtRef = useRef<number>(0);
+
+  // When actionSheetFolder mounts, enforce a 350ms touch cooldown to completely absorb finger-lift ghost clicks
+  useEffect(() => {
+    if (actionSheetFolder) {
+      setIsActionSheetInteractable(false);
+      actionSheetOpenedAtRef.current = Date.now() + 350;
+      const timer = setTimeout(() => {
+        setIsActionSheetInteractable(true);
+      }, 350);
+      return () => clearTimeout(timer);
+    } else {
+      setIsActionSheetInteractable(false);
+    }
+  }, [actionSheetFolder]);
 
   // Bottom sheet drag-to-dismiss gesture state
   const [sheetDragOffset, setSheetDragOffset] = useState(0);
@@ -266,7 +282,7 @@ export const NotesList: React.FC<NotesListProps> = ({
         </div>
       ) : (
         <div className="h-10 px-3.5 flex items-center justify-between border-b border-apple-border dark:border-apple-borderDark bg-[#EFE7D8]/90 dark:bg-[#131B24]/90 backdrop-blur-md shrink-0">
-          <span className="text-xs font-medium text-[#6E7E8E] dark:text-[#8AA0B4]">
+          <span className="text-xs font-semibold text-[#3B4D5E] dark:text-[#95ACC0]">
             {filteredNotes.length} {filteredNotes.length === 1 ? 'note' : 'notes'}
           </span>
           {filteredNotes.length > 0 && (
@@ -428,7 +444,7 @@ export const NotesList: React.FC<NotesListProps> = ({
 
               {/* Custom Folders Group */}
               <div className="space-y-1">
-                <span className="px-2 text-[10px] font-semibold uppercase tracking-wider text-[#6E7E8E] dark:text-[#8AA0B4]">
+                <span className="px-2 text-[11px] font-semibold uppercase tracking-wider text-[#5A6E82] dark:text-[#8AA0B4]">
                   Custom Folders
                 </span>
                 <div className="bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0]/60 dark:border-[#223344] rounded-xl overflow-hidden shadow-xs divide-y divide-[#DFD3C0]/40 dark:divide-[#223344]">
@@ -443,7 +459,7 @@ export const NotesList: React.FC<NotesListProps> = ({
                           placeholder="Folder name..."
                           value={newFolderName}
                           onChange={(e) => setNewFolderName(e.target.value)}
-                          className="w-full text-xs px-2.5 py-1 rounded bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0] dark:border-[#2B3F54] text-[#1C2B36] dark:text-[#E8EEF3] outline-none focus:border-[#213A50] dark:focus:border-[#7EAAD0]"
+                          className="w-full text-xs px-2.5 py-1 rounded bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0] dark:border-[#2B3F54] text-[#1C2B36] dark:text-[#E8EEF3] placeholder-[#5A6E82]/70 dark:placeholder-[#8AA0B4]/60 outline-none focus:border-[#213A50] dark:focus:border-[#7EAAD0]"
                         />
                         <button
                           type="submit"
@@ -451,8 +467,8 @@ export const NotesList: React.FC<NotesListProps> = ({
                           title="Create folder"
                           className={`p-1.5 rounded-md transition-colors ${
                             newFolderName.trim()
-                              ? 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/15'
-                              : 'text-neutral-400/50 dark:text-neutral-500/40 cursor-not-allowed'
+                              ? 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 active:scale-95'
+                              : 'text-neutral-400/60 dark:text-[#526D85] cursor-not-allowed'
                           }`}
                         >
                           <Check size={16} strokeWidth={2.5} />
@@ -464,7 +480,7 @@ export const NotesList: React.FC<NotesListProps> = ({
                             setNewFolderName('');
                           }}
                           title="Cancel"
-                          className="p-1.5 rounded-md text-neutral-400 hover:text-neutral-700 dark:text-[#8AA0B4] dark:hover:text-[#E8EEF3] hover:bg-neutral-200/50 dark:hover:bg-neutral-700/50 transition-colors"
+                          className="p-1.5 rounded-md text-neutral-500 hover:text-neutral-700 dark:text-[#95ACC0] dark:hover:text-[#E8EEF3] hover:bg-neutral-200/50 dark:hover:bg-neutral-700/50 transition-colors"
                         >
                           <X size={16} strokeWidth={2} />
                         </button>
@@ -592,10 +608,10 @@ export const NotesList: React.FC<NotesListProps> = ({
 
                         <div className="flex items-center space-x-2 shrink-0">
                           <span
-                            className={`text-[11px] font-mono ${
+                            className={`text-[11px] font-mono font-medium ${
                               !isFolderSelectionMode && isSelected
                                 ? 'text-white/90'
-                                : 'text-[#8A9BA8] dark:text-[#8AA0B4]'
+                                : 'text-[#485B6D] dark:text-[#95ACC0]'
                             }`}
                           >
                             {count}
@@ -633,7 +649,7 @@ export const NotesList: React.FC<NotesListProps> = ({
                     <span>Recently Deleted</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className="text-[11px] text-[#8A9BA8] dark:text-[#6E8092] font-mono">{trashCount}</span>
+                    <span className="text-[11px] text-[#485B6D] dark:text-[#95ACC0] font-medium font-mono">{trashCount}</span>
                     {selectedFolderId === 'trash' && (
                       <Check size={15} className="text-red-500 stroke-[2.5]" />
                     )}
@@ -672,7 +688,10 @@ export const NotesList: React.FC<NotesListProps> = ({
         <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150 select-none">
           <div
             className="absolute inset-0"
-            onClick={() => setActionSheetFolder(null)}
+            onClick={() => {
+              if (Date.now() < actionSheetOpenedAtRef.current || !isActionSheetInteractable) return;
+              setActionSheetFolder(null);
+            }}
           />
           <div className="relative w-full max-w-sm bg-[#EFE7D8] dark:bg-[#131B24] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-[#DFD3C0] dark:border-[#223344] overflow-hidden p-3 space-y-2.5 animate-in slide-in-from-bottom duration-200 z-10">
             {/* Header Info */}
@@ -684,16 +703,19 @@ export const NotesList: React.FC<NotesListProps> = ({
                 <h4 className="text-xs font-semibold text-[#1C2B36] dark:text-[#E8EEF3] truncate">
                   {actionSheetFolder.name}
                 </h4>
-                <p className="text-[10px] text-[#8A9BA8] dark:text-[#8AA0B4]">
+                <p className="text-[10px] text-[#485B6D] dark:text-[#95ACC0] font-medium">
                   {getFolderCount(actionSheetFolder.id)} {getFolderCount(actionSheetFolder.id) === 1 ? 'note' : 'notes'}
                 </p>
               </div>
             </div>
 
-            {/* Actions Group (No "Select Folders" button as requested) */}
-            <div className="bg-[#FAF6EF] dark:bg-[#1C2733] rounded-xl overflow-hidden divide-y divide-[#DFD3C0]/40 dark:divide-[#223344] border border-[#DFD3C0]/50 dark:border-[#223344]">
+            {/* Actions Group (No "Select Folders" button; guarded by cooldown to prevent finger-lift ghost clicks) */}
+            <div className={`bg-[#FAF6EF] dark:bg-[#1C2733] rounded-xl overflow-hidden divide-y divide-[#DFD3C0]/40 dark:divide-[#223344] border border-[#DFD3C0]/50 dark:border-[#223344] transition-opacity ${
+              !isActionSheetInteractable ? 'pointer-events-none opacity-85' : 'opacity-100'
+            }`}>
               <button
                 onClick={() => {
+                  if (Date.now() < actionSheetOpenedAtRef.current || !isActionSheetInteractable) return;
                   triggerHaptic();
                   setEditingFolderId(actionSheetFolder.id);
                   setEditingFolderName(actionSheetFolder.name);
@@ -707,6 +729,7 @@ export const NotesList: React.FC<NotesListProps> = ({
 
               <button
                 onClick={() => {
+                  if (Date.now() < actionSheetOpenedAtRef.current || !isActionSheetInteractable) return;
                   triggerHaptic();
                   const targetFolder = actionSheetFolder;
                   setActionSheetFolder(null);
@@ -725,8 +748,11 @@ export const NotesList: React.FC<NotesListProps> = ({
 
             {/* Cancel Button */}
             <button
-              onClick={() => setActionSheetFolder(null)}
-              className="w-full py-2.5 rounded-xl bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0]/60 dark:border-[#223344] text-xs font-semibold text-[#6E7E8E] dark:text-[#8AA0B4] hover:bg-[#E5DCCB] dark:hover:bg-[#202E3C] transition-colors"
+              onClick={() => {
+                if (Date.now() < actionSheetOpenedAtRef.current || !isActionSheetInteractable) return;
+                setActionSheetFolder(null);
+              }}
+              className="w-full py-2.5 rounded-xl bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0]/60 dark:border-[#223344] text-xs font-semibold text-[#3B4D5E] dark:text-[#95ACC0] hover:bg-[#E5DCCB] dark:hover:bg-[#202E3C] transition-colors"
             >
               Cancel
             </button>
@@ -745,13 +771,13 @@ export const NotesList: React.FC<NotesListProps> = ({
       {/* Search Bar */}
       <div className="p-2.5 border-b border-apple-border dark:border-apple-borderDark">
         <div className="relative flex items-center">
-          <Search size={14} className="absolute left-2.5 text-neutral-400 pointer-events-none" />
+          <Search size={14} className="absolute left-2.5 text-[#5A6E82] dark:text-[#8AA0B4] pointer-events-none" />
           <input
             type="text"
             placeholder="Search all notes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8 pr-7 py-1 text-xs rounded-md bg-[#EFE7D8]/80 dark:bg-[#1C2733] border border-[#DFD3C0]/70 dark:border-[#223344] focus:border-[#213A50] dark:focus:border-[#4B708B] text-[#1C2B36] dark:text-[#E8EEF3] placeholder-[#8A9BA8] outline-none focus:outline-none focus:ring-0 transition-colors duration-150"
+            className="w-full pl-8 pr-7 py-1 text-xs rounded-md bg-[#EFE7D8]/80 dark:bg-[#1C2733] border border-[#DFD3C0]/70 dark:border-[#223344] focus:border-[#213A50] dark:focus:border-[#4B708B] text-[#1C2B36] dark:text-[#E8EEF3] placeholder-[#5A6E82]/75 dark:placeholder-[#8AA0B4]/70 outline-none focus:outline-none focus:ring-0 transition-colors duration-150"
           />
           {searchQuery && (
             <button
@@ -798,7 +824,7 @@ export const NotesList: React.FC<NotesListProps> = ({
             {/* Pinned Section */}
             {pinnedNotes.length > 0 && (
               <div className="space-y-1">
-                <div className="px-2 text-[10px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
+                <div className="px-2 text-[11px] font-semibold text-[#5A6E82] dark:text-[#8AA0B4] uppercase tracking-wider">
                   Pinned
                 </div>
                 <div className={isSelectionMode ? "space-y-3" : "space-y-1.5"}>
@@ -833,7 +859,7 @@ export const NotesList: React.FC<NotesListProps> = ({
                 <div className="space-y-3">
                   {notesByBucket.map(group => (
                     <div key={group.bucket} className="space-y-1">
-                      <div className="px-2 text-[10px] font-semibold text-[#8A9BA8] dark:text-[#6E8092] uppercase tracking-wider">
+                      <div className="px-2 text-[11px] font-semibold text-[#5A6E82] dark:text-[#8AA0B4] uppercase tracking-wider">
                         {group.bucket}
                       </div>
                       <div className={isSelectionMode ? "space-y-3" : "space-y-1.5"}>

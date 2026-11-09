@@ -92,3 +92,4 @@ export const DeleteFolderModal: React.FC<DeleteFolderModalProps> = ({
     </div>
   );
 };
+

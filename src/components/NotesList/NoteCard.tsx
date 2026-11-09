@@ -81,18 +81,16 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
 
     if (isSwipingRef.current) {
       cancelLongPress();
-      // Apply rubber-band resistance curve after 75px for a natural, controlled feel
+      // Allow sliding across the entire note box (just like in Apple Notes)
       const sign = dx > 0 ? 1 : -1;
-      const base = Math.min(absX, 75);
-      const extra = Math.max(0, absX - 75) * 0.45;
-      const clamped = sign * Math.min(125, base + extra);
+      const clamped = sign * Math.min(340, absX);
 
-      // Trigger a subtle tactile haptic pulse exactly when crossing the execution threshold (88px)
-      const THRESHOLD = 88;
-      if (Math.abs(clamped) >= THRESHOLD && !hasTriggeredHapticRef.current) {
+      // Trigger a subtle tactile haptic pulse exactly when crossing the full-swipe threshold (180px)
+      const FULL_SWIPE_THRESHOLD = 180;
+      if (Math.abs(clamped) >= FULL_SWIPE_THRESHOLD && !hasTriggeredHapticRef.current) {
         hasTriggeredHapticRef.current = true;
         triggerHaptic();
-      } else if (Math.abs(clamped) < THRESHOLD) {
+      } else if (Math.abs(clamped) < FULL_SWIPE_THRESHOLD) {
         hasTriggeredHapticRef.current = false;
       }
 
@@ -111,15 +109,16 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
     swipeOffsetRef.current = 0;
     hasTriggeredHapticRef.current = false;
 
-    const SWIPE_ACTION_THRESHOLD = 88;
+    // Full swipe threshold: only delete or pin when swiped from one end to another (180px)
+    const FULL_SWIPE_THRESHOLD = 180;
 
     if (wasSwiping) {
-      if (currentOffset < -SWIPE_ACTION_THRESHOLD) {
-        // Swiped Left past threshold: Delete note
+      if (currentOffset < -FULL_SWIPE_THRESHOLD) {
+        // Swiped from right to left end: Delete note
         triggerHaptic();
         deleteNote(note.id);
-      } else if (currentOffset > SWIPE_ACTION_THRESHOLD) {
-        // Swiped Right past threshold: Pin or restore
+      } else if (currentOffset > FULL_SWIPE_THRESHOLD) {
+        // Swiped from left to right end: Pin or restore
         triggerHaptic();
         if (note.isTrash) {
           restoreNote(note.id);
@@ -223,12 +222,12 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
               </button>
             )}
           </div>
-          <p className="text-[11px] text-neutral-500 dark:text-[#8AA0B4] line-clamp-3 leading-relaxed">
+          <p className="text-[11px] text-[#485B6D] dark:text-[#A0B5C8] line-clamp-3 leading-relaxed">
             {note.plainTextPreview || 'No additional text'}
           </p>
         </div>
 
-        <div className="flex items-center justify-between pt-2 border-t border-[#DFD3C0]/50 dark:border-[#223344] text-[10px] text-[#8A9BA8] dark:text-[#6E8092]">
+        <div className="flex items-center justify-between pt-2 border-t border-[#DFD3C0]/50 dark:border-[#223344] text-[10px] text-[#3B4D5E] dark:text-[#95ACC0] font-semibold">
           <span>{formatListDate(note.updatedAt)}</span>
           {/* Desktop-only hover actions */}
           <div className="hidden md:flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -258,42 +257,44 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
   // Standard List View Card (Apple Notes style with mobile swipe actions)
   return (
     <div className="relative overflow-hidden rounded-xl">
-      {/* Swipe reveal background actions */}
+      {/* Swipe reveal background actions: Solid full-width background matching Apple Notes */}
       {swipeOffset !== 0 && (
-        <div className="absolute inset-0 flex items-center rounded-xl overflow-hidden pointer-events-none select-none bg-[#EBE2D3]/60 dark:bg-[#111822]">
+        <div
+          className={`absolute inset-0 flex items-center rounded-xl overflow-hidden pointer-events-none select-none transition-colors ${
+            swipeOffset > 0
+              ? note.isTrash
+                ? 'bg-emerald-600'
+                : 'bg-blue-600'
+              : 'bg-red-600'
+          }`}
+        >
           {/* Swiping Right: Pin / Unpin (or Restore if in trash) */}
           {swipeOffset > 0 && (
-            <div className="h-full w-full flex items-center px-3.5 justify-start">
+            <div className="h-full w-full flex items-center px-5 justify-start text-white">
               <div
-                className={`flex items-center space-x-2 px-3 py-1.5 rounded-full transition-all duration-150 ${
-                  Math.abs(swipeOffset) >= 88
-                    ? note.isTrash
-                      ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400/40 scale-105 font-medium'
-                      : 'bg-[#213A50] dark:bg-[#203D5C] text-white shadow-md ring-2 ring-[#3A5D80]/60 scale-105 font-medium'
-                    : note.isTrash
-                    ? 'bg-emerald-600/85 text-white/90 scale-95'
-                    : 'bg-[#213A50]/85 dark:bg-[#203D5C]/85 text-white/90 scale-95'
+                className={`flex items-center space-x-2 transition-transform duration-150 ${
+                  Math.abs(swipeOffset) >= 180 ? 'scale-110 font-bold' : 'scale-100 font-medium'
                 }`}
               >
                 {note.isTrash ? (
                   <>
-                    <RotateCcw size={14} className="stroke-[2.2]" />
-                    <span className="text-[11px] tracking-wide font-medium">
-                      {Math.abs(swipeOffset) >= 88 ? 'Release to Restore' : 'Restore'}
+                    <RotateCcw size={17} className="stroke-[2.5]" />
+                    <span className="text-xs tracking-wide">
+                      {Math.abs(swipeOffset) >= 180 ? 'Release to Restore' : 'Restore'}
                     </span>
                   </>
                 ) : (
                   <>
                     <Pin
-                      size={14}
+                      size={17}
                       className={
                         note.isPinned
-                          ? 'text-amber-400 dark:text-amber-300 stroke-[2.2]'
-                          : 'fill-amber-400 text-amber-400 dark:fill-amber-300 dark:text-amber-300 stroke-[2.2]'
+                          ? 'stroke-[2.5]'
+                          : 'fill-white stroke-[2.5]'
                       }
                     />
-                    <span className="text-[11px] tracking-wide font-medium">
-                      {Math.abs(swipeOffset) >= 88
+                    <span className="text-xs tracking-wide">
+                      {Math.abs(swipeOffset) >= 180
                         ? note.isPinned
                           ? 'Release to Unpin'
                           : 'Release to Pin'
@@ -309,18 +310,16 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
 
           {/* Swiping Left: Delete */}
           {swipeOffset < 0 && (
-            <div className="h-full w-full flex items-center px-3.5 justify-end">
+            <div className="h-full w-full flex items-center px-5 justify-end text-white">
               <div
-                className={`flex items-center space-x-2 px-3 py-1.5 rounded-full transition-all duration-150 ${
-                  Math.abs(swipeOffset) >= 88
-                    ? 'bg-rose-600 dark:bg-red-600 text-white shadow-md ring-2 ring-red-400/40 scale-105 font-medium'
-                    : 'bg-rose-600/85 dark:bg-red-600/85 text-white/90 scale-95'
+                className={`flex items-center space-x-2 transition-transform duration-150 ${
+                  Math.abs(swipeOffset) >= 180 ? 'scale-110 font-bold' : 'scale-100 font-medium'
                 }`}
               >
-                <span className="text-[11px] tracking-wide font-medium">
-                  {Math.abs(swipeOffset) >= 88 ? 'Release to Delete' : 'Delete'}
+                <span className="text-xs tracking-wide">
+                  {Math.abs(swipeOffset) >= 180 ? 'Release to Delete' : 'Delete'}
                 </span>
-                <Trash2 size={14} className="stroke-[2.2]" />
+                <Trash2 size={17} className="stroke-[2.5]" />
               </div>
             </div>
           )}
@@ -436,10 +435,10 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
 
         <div className="flex items-baseline space-x-1.5 text-[11px] overflow-hidden">
           <span
-            className={`shrink-0 font-medium ${
+            className={`shrink-0 font-semibold ${
               !isSelectionMode && isSelected
-                ? 'text-white/80'
-                : 'text-[#6E7E8E] dark:text-[#8AA0B4]'
+                ? 'text-white/85'
+                : 'text-[#3B4D5E] dark:text-[#95ACC0]'
             }`}
           >
             {formatListDate(note.updatedAt)}
@@ -447,8 +446,8 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
           <span
             className={`truncate ${
               !isSelectionMode && isSelected
-                ? 'text-white/70'
-                : 'text-[#8A9BA8] dark:text-[#6E8092]'
+                ? 'text-white/75'
+                : 'text-[#485B6D] dark:text-[#A0B5C8]'
             }`}
           >
             {note.plainTextPreview || 'No additional text'}

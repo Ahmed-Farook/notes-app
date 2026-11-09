@@ -155,7 +155,7 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
       <div className="overflow-y-auto px-2 py-3 space-y-4 flex-1">
         {/* Main Notes Section */}
         <div>
-          <div className="px-2 pb-1 text-[11px] font-semibold tracking-wider text-neutral-400 dark:text-neutral-500 uppercase">
+          <div className="px-2 pb-1 text-[11px] font-semibold tracking-wider text-[#5A6E82] dark:text-[#8AA0B4] uppercase">
             Notes
           </div>
           <div className="space-y-0.5">
@@ -174,7 +174,7 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
                 <FolderIcon size={15} className={selectedFolderId === 'default' ? 'text-white' : 'text-[#395060] dark:text-[#7EAAD0]'} />
                 <span className="truncate">Notes</span>
               </div>
-              <span className={`text-[11px] ${selectedFolderId === 'default' ? 'text-white/80' : 'text-[#8A9BA8] dark:text-[#6E8092]'}`}>
+              <span className={`text-[11px] ${selectedFolderId === 'default' ? 'text-white/80' : 'text-[#485B6D] dark:text-[#95ACC0] font-medium'}`}>
                 {defaultNotesCount}
               </span>
             </button>
@@ -184,7 +184,7 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
         {/* Custom Folders Group */}
         <div>
           <div className="flex items-center justify-between px-2 pb-1">
-            <span className="text-[11px] font-semibold tracking-wider text-neutral-400 dark:text-neutral-500 uppercase">
+            <span className="text-[11px] font-semibold tracking-wider text-[#5A6E82] dark:text-[#8AA0B4] uppercase">
               Folders
             </span>
             <div className="flex items-center space-x-1">
@@ -207,7 +207,7 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
                     setIsAddingFolder(true);
                   }}
                   title="Add New Folder"
-                  className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-0.5 rounded"
+                  className="text-[#5A6E82] hover:text-[#213A50] dark:text-[#8AA0B4] dark:hover:text-[#E8EEF3] p-0.5 rounded"
                 >
                   <FolderPlus size={14} />
                 </button>
@@ -373,10 +373,10 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
                       </div>
                     )}
                     <span
-                      className={`text-[11px] min-w-[14px] text-right font-mono ${
+                      className={`text-[11px] min-w-[14px] text-right font-mono font-medium ${
                         isSelected && !isFolderSelectionMode
                           ? 'text-white/80'
-                          : 'text-[#8A9BA8] dark:text-[#6E8092]'
+                          : 'text-[#485B6D] dark:text-[#95ACC0]'
                       }`}
                     >
                       {getFolderCount(folder.id)}
@@ -401,7 +401,7 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
                       setNewFolderName('');
                     }
                   }}
-                  className="w-full text-xs px-1.5 py-0.5 rounded bg-transparent outline-none text-[#1C2B36] dark:text-[#E8EEF3] placeholder-neutral-400 dark:placeholder-neutral-500"
+                  className="w-full text-xs px-1.5 py-0.5 rounded bg-transparent outline-none text-[#1C2B36] dark:text-[#E8EEF3] placeholder-[#5A6E82]/70 dark:placeholder-[#8AA0B4]/60"
                 />
                 <button
                   type="submit"
@@ -409,8 +409,8 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
                   title="Create folder"
                   className={`p-1 rounded-md transition-colors ${
                     newFolderName.trim()
-                      ? 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/15'
-                      : 'text-neutral-400/50 dark:text-neutral-500/40 cursor-not-allowed'
+                      ? 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 active:scale-95'
+                      : 'text-neutral-400/60 dark:text-[#526D85] cursor-not-allowed'
                   }`}
                 >
                   <Check size={14} strokeWidth={2.5} />
@@ -422,7 +422,7 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
                     setNewFolderName('');
                   }}
                   title="Cancel"
-                  className="p-1 rounded-md text-neutral-400 hover:text-neutral-700 dark:text-[#8AA0B4] dark:hover:text-[#E8EEF3] hover:bg-neutral-200/50 dark:hover:bg-neutral-700/50 transition-colors"
+                  className="p-1 rounded-md text-neutral-500 hover:text-neutral-800 dark:text-[#95ACC0] dark:hover:text-[#E8EEF3] hover:bg-neutral-200/50 dark:hover:bg-neutral-700/50 transition-colors"
                 >
                   <X size={14} strokeWidth={2} />
                 </button>
@@ -445,10 +445,10 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
             }`}
           >
             <div className="flex items-center space-x-2 truncate">
-              <Trash size={15} className={selectedFolderId === 'trash' ? 'text-white' : 'text-[#8A9BA8] dark:text-[#6E8092]'} />
+              <Trash size={15} className={selectedFolderId === 'trash' ? 'text-white' : 'text-[#5A6E82] dark:text-[#8AA0B4]'} />
               <span className="truncate">Recently Deleted</span>
             </div>
-            <span className={`text-[11px] ${selectedFolderId === 'trash' ? 'text-white/80' : 'text-[#8A9BA8] dark:text-[#6E8092]'}`}>
+            <span className={`text-[11px] font-medium ${selectedFolderId === 'trash' ? 'text-white/80' : 'text-[#485B6D] dark:text-[#95ACC0]'}`}>
               {trashCount}
             </span>
           </button>

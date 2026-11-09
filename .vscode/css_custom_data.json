@@ -1,0 +1,33 @@
+{
+  "version": 1.1,
+  "atDirectives": [
+    {
+      "name": "@tailwind",
+      "description": "Tailwind CSS directive to inject base, components, and utilities styles."
+    },
+    {
+      "name": "@apply",
+      "description": "Tailwind CSS directive to inline existing utility classes into your own custom CSS."
+    },
+    {
+      "name": "@layer",
+      "description": "Tailwind CSS directive to tell Tailwind which bucket a set of custom styles belongs to."
+    },
+    {
+      "name": "@config",
+      "description": "Tailwind CSS directive to specify which config file Tailwind should use."
+    },
+    {
+      "name": "@responsive",
+      "description": "Tailwind CSS directive to generate responsive variants of your styles."
+    },
+    {
+      "name": "@screen",
+      "description": "Tailwind CSS directive to create media queries that reference breakpoints by name."
+    },
+    {
+      "name": "@variants",
+      "description": "Tailwind CSS directive to generate hover, focus, and other variants of your styles."
+    }
+  ]
+}
