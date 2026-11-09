@@ -29,6 +29,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
 
   // Mobile Touch Swipe Gesture State
   const [swipeOffset, setSwipeOffset] = useState(0);
+  const swipeOffsetRef = useRef(0);
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
   const isSwipingRef = useRef(false);
@@ -73,17 +74,19 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
       isSwipingRef.current = true;
       cancelLongPress();
       const clamped = Math.max(-110, Math.min(110, dx));
+      swipeOffsetRef.current = clamped;
       setSwipeOffset(clamped);
     }
   };
 
   const handleTouchEnd = () => {
     cancelLongPress();
-    const currentOffset = swipeOffset;
+    const currentOffset = swipeOffsetRef.current;
     const wasSwiping = isSwipingRef.current;
 
     touchStartXRef.current = null;
     touchStartYRef.current = null;
+    swipeOffsetRef.current = 0;
 
     if (wasSwiping) {
       if (currentOffset < -65) {
@@ -234,43 +237,47 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
       {swipeOffset !== 0 && (
         <div className="absolute inset-0 flex items-center justify-between rounded-xl overflow-hidden pointer-events-none select-none">
           {/* Swiping Right: Pin / Unpin (or Restore if in trash) */}
-          <div
-            className={`h-full w-full flex items-center px-4 transition-colors ${
-              note.isTrash
-                ? 'bg-emerald-600 text-white justify-start'
-                : 'bg-apple-yellow dark:bg-[#254260] text-white justify-start'
-            }`}
-          >
+          {swipeOffset > 0 && (
             <div
-              className={`flex items-center space-x-1.5 transition-transform ${
-                Math.abs(swipeOffset) > 65 ? 'scale-110 font-semibold' : 'scale-95 opacity-85'
+              className={`h-full w-full flex items-center px-4 transition-colors ${
+                note.isTrash
+                  ? 'bg-emerald-600 text-white justify-start'
+                  : 'bg-apple-yellow dark:bg-[#254260] text-white justify-start'
               }`}
             >
-              {note.isTrash ? (
-                <>
-                  <RotateCcw size={15} />
-                  <span className="text-xs">Restore</span>
-                </>
-              ) : (
-                <>
-                  <Pin size={15} className={note.isPinned ? '' : 'fill-white'} />
-                  <span className="text-xs">{note.isPinned ? 'Unpin' : 'Pin'}</span>
-                </>
-              )}
+              <div
+                className={`flex items-center space-x-1.5 transition-transform ${
+                  Math.abs(swipeOffset) > 65 ? 'scale-110 font-semibold' : 'scale-95 opacity-85'
+                }`}
+              >
+                {note.isTrash ? (
+                  <>
+                    <RotateCcw size={15} />
+                    <span className="text-xs">Restore</span>
+                  </>
+                ) : (
+                  <>
+                    <Pin size={15} className={note.isPinned ? '' : 'fill-white'} />
+                    <span className="text-xs">{note.isPinned ? 'Unpin' : 'Pin'}</span>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Swiping Left: Delete */}
-          <div className="h-full w-full bg-red-600 text-white flex items-center justify-end px-4">
-            <div
-              className={`flex items-center space-x-1.5 transition-transform ${
-                Math.abs(swipeOffset) > 65 ? 'scale-110 font-semibold' : 'scale-95 opacity-85'
-              }`}
-            >
-              <span className="text-xs">Delete</span>
-              <Trash2 size={15} />
+          {swipeOffset < 0 && (
+            <div className="h-full w-full bg-red-600 text-white flex items-center justify-end px-4">
+              <div
+                className={`flex items-center space-x-1.5 transition-transform ${
+                  Math.abs(swipeOffset) > 65 ? 'scale-110 font-semibold' : 'scale-95 opacity-85'
+                }`}
+              >
+                <span className="text-xs">Delete</span>
+                <Trash2 size={15} />
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -280,6 +287,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         style={{
           transform: `translateX(${swipeOffset}px)`,
           transition: isSwipingRef.current ? 'none' : 'transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1)',
@@ -294,10 +302,10 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
           isSelectionMode
             ? isChecked
               ? 'border-2 border-apple-yellow dark:border-[#7EAAD0] bg-apple-yellowLight dark:bg-[#203448] shadow-xs text-neutral-900 dark:text-[#E8EEF3]'
-              : 'border-2 border-transparent hover:bg-[#EBE2D3] dark:hover:bg-[#202D3A] text-neutral-900 dark:text-neutral-100'
+              : 'border-2 border-transparent bg-[#F6EFE4] dark:bg-[#16202A] hover:bg-[#EBE2D3] dark:hover:bg-[#202D3A] text-neutral-900 dark:text-neutral-100'
             : isSelected
             ? 'border-transparent bg-apple-yellow dark:bg-[#253D56] text-white shadow-sm'
-            : 'border-transparent hover:bg-[#EBE2D3] dark:hover:bg-[#202D3A] text-[#1C2B36] dark:text-[#E8EEF3]'
+            : 'border-transparent bg-[#F6EFE4] dark:bg-[#16202A] hover:bg-[#EBE2D3] dark:hover:bg-[#202D3A] text-[#1C2B36] dark:text-[#E8EEF3]'
         }`}
       >
       {/* Checkbox circle when in multi-select mode */}

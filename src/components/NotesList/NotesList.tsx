@@ -21,6 +21,7 @@ import { NoteCard } from './NoteCard';
 import { triggerHaptic } from '../../utils/haptics';
 import { getDateBucket, DateBucket } from '../../utils/dateUtils';
 import type { UpdateInfo } from '../../utils/updateChecker';
+import type { Folder as FolderType } from '../../types/note';
 
 interface NotesListProps {
   onCheckUpdates?: () => void;
@@ -48,6 +49,7 @@ export const NotesList: React.FC<NotesListProps> = ({
     createFolder,
     renameFolder,
     deleteFolder,
+    deleteFolders,
     selectedFolderId,
     setSelectedFolderId,
     isFolderPickerOpen,
@@ -69,11 +71,91 @@ export const NotesList: React.FC<NotesListProps> = ({
   const [newFolderName, setNewFolderName] = useState('');
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editingFolderName, setEditingFolderName] = useState('');
-  const [folderMenuId, setFolderMenuId] = useState<string | null>(null);
+
+  // Mobile Folder Selection Mode & Long Press Action Sheet
+  const [isFolderSelectionMode, setIsFolderSelectionMode] = useState(false);
+  const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>([]);
+  const [actionSheetFolder, setActionSheetFolder] = useState<FolderType | null>(null);
+  const folderTouchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isFolderLongPressRef = useRef(false);
+  const folderTouchStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
   // Bottom sheet drag-to-dismiss gesture state
   const [sheetDragOffset, setSheetDragOffset] = useState(0);
   const sheetTouchStartY = useRef<number | null>(null);
+
+  const handleFolderTouchStart = (folder: FolderType, e: React.TouchEvent) => {
+    if (isFolderSelectionMode) return;
+    folderTouchStartPosRef.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+    };
+    isFolderLongPressRef.current = false;
+    folderTouchTimerRef.current = setTimeout(() => {
+      isFolderLongPressRef.current = true;
+      triggerHaptic();
+      setActionSheetFolder(folder);
+    }, 450);
+  };
+
+  const handleFolderTouchMove = (e: React.TouchEvent) => {
+    if (!folderTouchStartPosRef.current) return;
+    const dx = e.touches[0].clientX - folderTouchStartPosRef.current.x;
+    const dy = e.touches[0].clientY - folderTouchStartPosRef.current.y;
+    if (Math.hypot(dx, dy) > 10) {
+      if (folderTouchTimerRef.current) {
+        clearTimeout(folderTouchTimerRef.current);
+        folderTouchTimerRef.current = null;
+      }
+    }
+  };
+
+  const handleFolderTouchEnd = () => {
+    if (folderTouchTimerRef.current) {
+      clearTimeout(folderTouchTimerRef.current);
+      folderTouchTimerRef.current = null;
+    }
+    folderTouchStartPosRef.current = null;
+  };
+
+  const toggleSelectFolder = (folderId: string) => {
+    triggerHaptic();
+    setSelectedFolderIds(prev =>
+      prev.includes(folderId) ? prev.filter(id => id !== folderId) : [...prev, folderId]
+    );
+  };
+
+  const toggleSelectAllFolders = () => {
+    triggerHaptic();
+    if (selectedFolderIds.length === folders.length) {
+      setSelectedFolderIds([]);
+    } else {
+      setSelectedFolderIds(folders.map(f => f.id));
+    }
+  };
+
+  const handleDeleteSelectedFolders = () => {
+    if (selectedFolderIds.length === 0) return;
+    triggerHaptic();
+    const count = selectedFolderIds.length;
+    if (confirm(`Delete ${count} folder${count > 1 ? 's' : ''}? Notes inside will move to Notes.`)) {
+      deleteFolders(selectedFolderIds);
+      setSelectedFolderIds([]);
+      setIsFolderSelectionMode(false);
+    }
+  };
+
+  const handleRenameSelectedFolder = () => {
+    if (selectedFolderIds.length !== 1) return;
+    const target = folders.find(f => f.id === selectedFolderIds[0]);
+    if (target) {
+      triggerHaptic();
+      setEditingFolderId(target.id);
+      setEditingFolderName(target.name);
+      setIsFolderSelectionMode(false);
+      setSelectedFolderIds([]);
+    }
+  };
 
   const handleCreateFolder = (e: React.FormEvent) => {
     e.preventDefault();
@@ -190,7 +272,8 @@ export const NotesList: React.FC<NotesListProps> = ({
             className="absolute inset-0"
             onClick={() => {
               setIsFolderPickerOpen(false);
-              setFolderMenuId(null);
+              setIsFolderSelectionMode(false);
+              setSelectedFolderIds([]);
             }}
           />
 
@@ -220,39 +303,76 @@ export const NotesList: React.FC<NotesListProps> = ({
               onTouchEnd={handleSheetTouchEnd}
               className="flex items-center justify-between px-5 py-3 border-b border-[#DFD3C0]/70 dark:border-[#223344] bg-[#EFE7D8] dark:bg-[#131B24] select-none"
             >
-              <div className="flex items-center space-x-2">
-                <Folder size={17} className="text-[#213A50] dark:text-[#7EAAD0]" />
-                <h3 className="text-sm font-semibold text-[#1C2B36] dark:text-[#E8EEF3]">
-                  Folders
-                </h3>
-              </div>
-              <button
-                onClick={() => {
-                  setIsFolderPickerOpen(false);
-                  setFolderMenuId(null);
-                }}
-                className="text-xs font-semibold text-[#213A50] hover:text-[#172A3C] dark:text-[#7EAAD0] dark:hover:text-[#9DC3E6] py-1 px-2.5 rounded-lg transition-colors"
-              >
-                Done
-              </button>
+              {isFolderSelectionMode ? (
+                <>
+                  <button
+                    onClick={toggleSelectAllFolders}
+                    className="text-xs font-semibold text-apple-yellow dark:text-[#7EAAD0] hover:underline"
+                  >
+                    {selectedFolderIds.length === folders.length ? 'Deselect All' : 'Select All'}
+                  </button>
+                  <span className="text-xs font-semibold text-[#1C2B36] dark:text-[#E8EEF3]">
+                    {selectedFolderIds.length} Selected
+                  </span>
+                  <button
+                    onClick={() => {
+                      triggerHaptic();
+                      setIsFolderSelectionMode(false);
+                      setSelectedFolderIds([]);
+                    }}
+                    className="text-xs font-semibold text-apple-yellow dark:text-[#7EAAD0] hover:underline"
+                  >
+                    Done
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center space-x-2">
+                    <Folder size={17} className="text-[#213A50] dark:text-[#7EAAD0]" />
+                    <h3 className="text-sm font-semibold text-[#1C2B36] dark:text-[#E8EEF3]">
+                      Folders
+                    </h3>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {folders.length > 0 && (
+                      <button
+                        onClick={() => {
+                          triggerHaptic();
+                          setIsFolderSelectionMode(true);
+                          setSelectedFolderIds([]);
+                        }}
+                        className="text-xs font-semibold text-[#213A50] hover:text-[#172A3C] dark:text-[#7EAAD0] dark:hover:text-[#9DC3E6] py-1 px-2.5 rounded-lg transition-colors active:scale-95"
+                      >
+                        Select
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setIsFolderPickerOpen(false);
+                        setIsFolderSelectionMode(false);
+                        setSelectedFolderIds([]);
+                      }}
+                      className="text-xs font-semibold text-[#213A50] hover:text-[#172A3C] dark:text-[#7EAAD0] dark:hover:text-[#9DC3E6] py-1 px-2.5 rounded-lg transition-colors active:scale-95"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Folder List Group */}
-            <div
-              className="p-3 space-y-3 overflow-y-auto"
-              onClick={() => {
-                if (folderMenuId) setFolderMenuId(null);
-              }}
-            >
+            <div className="p-3 space-y-3 overflow-y-auto flex-1">
               {/* Main Notes Group */}
-              <div className="bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0]/60 dark:border-[#223344] rounded-xl overflow-hidden shadow-xs divide-y divide-[#DFD3C0]/40 dark:divide-[#223344]">
+              <div className={`bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0]/60 dark:border-[#223344] rounded-xl overflow-hidden shadow-xs divide-y divide-[#DFD3C0]/40 dark:divide-[#223344] ${
+                isFolderSelectionMode ? 'opacity-40 pointer-events-none' : ''
+              }`}>
                 {/* Notes (Default) */}
                 <button
                   onClick={() => {
                     triggerHaptic();
                     setSelectedFolderId('default');
                     setIsFolderPickerOpen(false);
-                    setFolderMenuId(null);
                   }}
                   className={`w-full px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors text-left ${
                     selectedFolderId === 'default'
@@ -294,49 +414,51 @@ export const NotesList: React.FC<NotesListProps> = ({
                 </span>
                 <div className="bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0]/60 dark:border-[#223344] rounded-xl overflow-hidden shadow-xs divide-y divide-[#DFD3C0]/40 dark:divide-[#223344]">
                   {/* Inline Add Folder Row */}
-                  {isAddingFolder ? (
-                    <form onSubmit={handleCreateFolder} className="px-3.5 py-2 flex items-center space-x-2 bg-[#F2EAE0] dark:bg-[#16202B]">
-                      <FolderPlus size={16} className="text-[#213A50] dark:text-[#7EAAD0] shrink-0" />
-                      <input
-                        type="text"
-                        autoFocus
-                        placeholder="Folder name..."
-                        value={newFolderName}
-                        onChange={(e) => setNewFolderName(e.target.value)}
-                        className="w-full text-xs px-2.5 py-1 rounded bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0] dark:border-[#2B3F54] text-[#1C2B36] dark:text-[#E8EEF3] outline-none focus:border-[#213A50] dark:focus:border-[#7EAAD0]"
-                      />
-                      <button
-                        type="submit"
-                        disabled={!newFolderName.trim()}
-                        className="p-1 rounded text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 disabled:opacity-30"
-                      >
-                        <Check size={16} strokeWidth={2.5} />
-                      </button>
+                  {!isFolderSelectionMode && (
+                    isAddingFolder ? (
+                      <form onSubmit={handleCreateFolder} className="px-3.5 py-2 flex items-center space-x-2 bg-[#F2EAE0] dark:bg-[#16202B]">
+                        <FolderPlus size={16} className="text-[#213A50] dark:text-[#7EAAD0] shrink-0" />
+                        <input
+                          type="text"
+                          autoFocus
+                          placeholder="Folder name..."
+                          value={newFolderName}
+                          onChange={(e) => setNewFolderName(e.target.value)}
+                          className="w-full text-xs px-2.5 py-1 rounded bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0] dark:border-[#2B3F54] text-[#1C2B36] dark:text-[#E8EEF3] outline-none focus:border-[#213A50] dark:focus:border-[#7EAAD0]"
+                        />
+                        <button
+                          type="submit"
+                          disabled={!newFolderName.trim()}
+                          className="p-1 rounded text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 disabled:opacity-30"
+                        >
+                          <Check size={16} strokeWidth={2.5} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAddingFolder(false);
+                            setNewFolderName('');
+                          }}
+                          className="p-1 rounded text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
+                        >
+                          <X size={16} />
+                        </button>
+                      </form>
+                    ) : (
                       <button
                         type="button"
                         onClick={() => {
-                          setIsAddingFolder(false);
-                          setNewFolderName('');
+                          triggerHaptic();
+                          setIsAddingFolder(true);
                         }}
-                        className="p-1 rounded text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
+                        className="w-full px-3.5 py-2.5 flex items-center space-x-2.5 text-xs font-medium text-[#213A50] dark:text-[#7EAAD0] hover:bg-[#E5DCCB] dark:hover:bg-[#202E3C] transition-colors text-left"
                       >
-                        <X size={16} />
+                        <div className="w-6 h-6 rounded-md bg-[#213A50]/10 dark:bg-[#7EAAD0]/15 flex items-center justify-center shrink-0">
+                          <FolderPlus size={14} className="text-[#213A50] dark:text-[#7EAAD0]" />
+                        </div>
+                        <span className="font-semibold">New Folder...</span>
                       </button>
-                    </form>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        triggerHaptic();
-                        setIsAddingFolder(true);
-                      }}
-                      className="w-full px-3.5 py-2.5 flex items-center space-x-2.5 text-xs font-medium text-[#213A50] dark:text-[#7EAAD0] hover:bg-[#E5DCCB] dark:hover:bg-[#202E3C] transition-colors text-left"
-                    >
-                      <div className="w-6 h-6 rounded-md bg-[#213A50]/10 dark:bg-[#7EAAD0]/15 flex items-center justify-center shrink-0">
-                        <FolderPlus size={14} className="text-[#213A50] dark:text-[#7EAAD0]" />
-                      </div>
-                      <span className="font-semibold">New Folder...</span>
-                    </button>
+                    )
                   )}
 
                   {/* Existing Custom Folders */}
@@ -344,7 +466,7 @@ export const NotesList: React.FC<NotesListProps> = ({
                     const count = getFolderCount(f.id);
                     const isSelected = selectedFolderId === f.id;
                     const isEditing = editingFolderId === f.id;
-                    const isMenuOpen = folderMenuId === f.id;
+                    const isChecked = selectedFolderIds.includes(f.id);
 
                     if (isEditing) {
                       return (
@@ -385,97 +507,71 @@ export const NotesList: React.FC<NotesListProps> = ({
                     return (
                       <div
                         key={f.id}
-                        className={`w-full flex items-center justify-between text-xs transition-colors ${
-                          isSelected
+                        onTouchStart={(e) => handleFolderTouchStart(f, e)}
+                        onTouchMove={handleFolderTouchMove}
+                        onTouchEnd={handleFolderTouchEnd}
+                        onTouchCancel={handleFolderTouchEnd}
+                        onClick={() => {
+                          if (isFolderLongPressRef.current) {
+                            isFolderLongPressRef.current = false;
+                            return;
+                          }
+                          if (isFolderSelectionMode) {
+                            toggleSelectFolder(f.id);
+                          } else {
+                            triggerHaptic();
+                            setSelectedFolderId(f.id);
+                            setIsFolderPickerOpen(false);
+                          }
+                        }}
+                        className={`w-full px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors cursor-pointer select-none ${
+                          isFolderSelectionMode
+                            ? isChecked
+                              ? 'bg-[#E5DCCB] dark:bg-[#203448] font-medium'
+                              : 'text-[#1C2B36] dark:text-[#E8EEF3] hover:bg-[#E5DCCB] dark:hover:bg-[#202E3C]'
+                            : isSelected
                             ? 'bg-[#213A50] dark:bg-[#254260] text-white font-medium shadow-xs'
                             : 'text-[#1C2B36] dark:text-[#E8EEF3] hover:bg-[#E5DCCB] dark:hover:bg-[#202E3C]'
                         }`}
                       >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            triggerHaptic();
-                            setSelectedFolderId(f.id);
-                            setIsFolderPickerOpen(false);
-                            setFolderMenuId(null);
-                          }}
-                          className="flex-1 px-3.5 py-2.5 flex items-center space-x-2.5 truncate text-left"
-                        >
-                          <div
-                            className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
-                              isSelected
-                                ? 'bg-white/20 text-white'
-                                : 'bg-[#E8F1F7] dark:bg-[#203448] text-[#213A50] dark:text-[#7EAAD0]'
-                            }`}
-                          >
-                            <Folder size={14} />
-                          </div>
+                        <div className="flex items-center space-x-2.5 truncate flex-1">
+                          {isFolderSelectionMode ? (
+                            <div
+                              className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 border transition-all ${
+                                isChecked
+                                  ? 'bg-apple-yellow dark:bg-[#345A7D] border-apple-yellow dark:border-[#7EAAD0] text-white shadow-xs'
+                                  : 'border-neutral-300 dark:border-neutral-600 bg-white/60 dark:bg-neutral-800/60'
+                              }`}
+                            >
+                              {isChecked && <Check size={10} strokeWidth={3} />}
+                            </div>
+                          ) : (
+                            <div
+                              className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
+                                isSelected
+                                  ? 'bg-white/20 text-white'
+                                  : 'bg-[#E8F1F7] dark:bg-[#203448] text-[#213A50] dark:text-[#7EAAD0]'
+                              }`}
+                            >
+                              <Folder size={14} />
+                            </div>
+                          )}
                           <span className="truncate">{f.name}</span>
-                        </button>
+                        </div>
 
-                        <div className="flex items-center space-x-1.5 pr-2 shrink-0">
+                        <div className="flex items-center space-x-2 shrink-0">
                           <span
                             className={`text-[11px] font-mono ${
-                              isSelected ? 'text-white/90' : 'text-[#8A9BA8] dark:text-[#8AA0B4]'
+                              !isFolderSelectionMode && isSelected
+                                ? 'text-white/90'
+                                : 'text-[#8A9BA8] dark:text-[#8AA0B4]'
                             }`}
                           >
                             {count}
                           </span>
-
-                          {/* 3-dots Menu for Rename / Delete on Mobile */}
-                          <div className="relative">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                triggerHaptic();
-                                setFolderMenuId(isMenuOpen ? null : f.id);
-                              }}
-                              className={`p-1 rounded-md transition-colors ${
-                                isSelected
-                                  ? 'text-white/80 hover:text-white hover:bg-white/10'
-                                  : 'text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-[#E5DCCB] dark:hover:bg-[#2B3F54]'
-                              }`}
-                              title="Folder options"
-                            >
-                              <MoreVertical size={14} />
-                            </button>
-
-                            {/* Dropdown popup */}
-                            {isMenuOpen && (
-                              <div className="absolute right-0 top-full mt-1 w-32 bg-[#FAF6EF] dark:bg-[#1A2532] border border-[#DFD3C0] dark:border-[#2D435A] rounded-lg shadow-xl z-30 py-1 text-xs divide-y divide-[#DFD3C0]/40 dark:divide-[#2D435A]">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    triggerHaptic();
-                                    setEditingFolderId(f.id);
-                                    setEditingFolderName(f.name);
-                                    setFolderMenuId(null);
-                                  }}
-                                  className="w-full px-3 py-1.5 flex items-center space-x-2 text-left text-[#1C2B36] dark:text-[#E8EEF3] hover:bg-[#EBE2D3] dark:hover:bg-[#233547]"
-                                >
-                                  <Pencil size={12} className="text-[#395060] dark:text-[#7EAAD0]" />
-                                  <span>Rename</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    triggerHaptic();
-                                    setFolderMenuId(null);
-                                    if (confirm(`Delete folder "${f.name}"? Notes inside will move to Notes.`)) {
-                                      deleteFolder(f.id);
-                                    }
-                                  }}
-                                  className="w-full px-3 py-1.5 flex items-center space-x-2 text-left text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
-                                >
-                                  <Trash2 size={12} />
-                                  <span>Delete</span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                          {!isFolderSelectionMode && isSelected && (
+                            <Check size={15} className="text-white stroke-[2.5]" />
+                          )}
                         </div>
                       </div>
                     );
@@ -484,13 +580,14 @@ export const NotesList: React.FC<NotesListProps> = ({
               </div>
 
               {/* Trash Folder Group */}
-              <div className="bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0]/60 dark:border-[#223344] rounded-xl overflow-hidden shadow-xs">
+              <div className={`bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0]/60 dark:border-[#223344] rounded-xl overflow-hidden shadow-xs ${
+                isFolderSelectionMode ? 'opacity-40 pointer-events-none' : ''
+              }`}>
                 <button
                   onClick={() => {
                     triggerHaptic();
                     setSelectedFolderId('trash');
                     setIsFolderPickerOpen(false);
-                    setFolderMenuId(null);
                   }}
                   className={`w-full px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors text-left ${
                     selectedFolderId === 'trash'
@@ -513,7 +610,107 @@ export const NotesList: React.FC<NotesListProps> = ({
                 </button>
               </div>
             </div>
+
+            {/* Folder Selection Mode Sticky Action Bar */}
+            {isFolderSelectionMode && (
+              <div className="p-3 border-t border-[#DFD3C0]/70 dark:border-[#223344] bg-[#EFE7D8] dark:bg-[#131B24] flex items-center justify-between shrink-0">
+                <button
+                  disabled={selectedFolderIds.length !== 1}
+                  onClick={handleRenameSelectedFolder}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-[#213A50] dark:text-[#7EAAD0] hover:bg-[#E5DCCB] dark:hover:bg-[#1F2C3A] disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                >
+                  <Pencil size={14} />
+                  <span>Rename</span>
+                </button>
+                <button
+                  disabled={selectedFolderIds.length === 0}
+                  onClick={handleDeleteSelectedFolders}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                >
+                  <Trash2 size={14} />
+                  <span>Delete{selectedFolderIds.length > 0 ? ` (${selectedFolderIds.length})` : ''}</span>
+                </button>
+              </div>
+            )}
           </div>
+
+          {/* Dedicated Long-Press Folder Action Sheet Modal */}
+          {actionSheetFolder && (
+            <div className="fixed inset-0 z-60 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+              <div
+                className="absolute inset-0"
+                onClick={() => setActionSheetFolder(null)}
+              />
+              <div className="relative w-full max-w-sm bg-[#EFE7D8] dark:bg-[#131B24] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-[#DFD3C0] dark:border-[#223344] overflow-hidden p-3 space-y-2.5 animate-in slide-in-from-bottom duration-200 z-10">
+                {/* Header Info */}
+                <div className="px-3 py-2 flex items-center space-x-3 border-b border-[#DFD3C0]/60 dark:border-[#223344]">
+                  <div className="w-8 h-8 rounded-lg bg-[#213A50]/10 dark:bg-[#7EAAD0]/15 flex items-center justify-center text-[#213A50] dark:text-[#7EAAD0] shrink-0">
+                    <Folder size={16} />
+                  </div>
+                  <div className="truncate">
+                    <h4 className="text-xs font-semibold text-[#1C2B36] dark:text-[#E8EEF3] truncate">
+                      {actionSheetFolder.name}
+                    </h4>
+                    <p className="text-[10px] text-[#8A9BA8] dark:text-[#8AA0B4]">
+                      {getFolderCount(actionSheetFolder.id)} {getFolderCount(actionSheetFolder.id) === 1 ? 'note' : 'notes'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Actions Group */}
+                <div className="bg-[#FAF6EF] dark:bg-[#1C2733] rounded-xl overflow-hidden divide-y divide-[#DFD3C0]/40 dark:divide-[#223344] border border-[#DFD3C0]/50 dark:border-[#223344]">
+                  <button
+                    onClick={() => {
+                      triggerHaptic();
+                      setEditingFolderId(actionSheetFolder.id);
+                      setEditingFolderName(actionSheetFolder.name);
+                      setActionSheetFolder(null);
+                    }}
+                    className="w-full px-4 py-3 flex items-center space-x-3 text-xs font-medium text-[#1C2B36] dark:text-[#E8EEF3] hover:bg-[#E5DCCB] dark:hover:bg-[#202E3C] transition-colors text-left"
+                  >
+                    <Pencil size={15} className="text-[#395060] dark:text-[#7EAAD0]" />
+                    <span>Rename Folder</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      triggerHaptic();
+                      setIsFolderSelectionMode(true);
+                      setSelectedFolderIds([actionSheetFolder.id]);
+                      setActionSheetFolder(null);
+                    }}
+                    className="w-full px-4 py-3 flex items-center space-x-3 text-xs font-medium text-[#1C2B36] dark:text-[#E8EEF3] hover:bg-[#E5DCCB] dark:hover:bg-[#202E3C] transition-colors text-left"
+                  >
+                    <Check size={15} className="text-[#395060] dark:text-[#7EAAD0]" />
+                    <span>Select Folders</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      triggerHaptic();
+                      const targetFolder = actionSheetFolder;
+                      setActionSheetFolder(null);
+                      if (confirm(`Delete folder "${targetFolder.name}"? Notes inside will move to Notes.`)) {
+                        deleteFolder(targetFolder.id);
+                      }
+                    }}
+                    className="w-full px-4 py-3 flex items-center space-x-3 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors text-left"
+                  >
+                    <Trash2 size={15} />
+                    <span>Delete Folder</span>
+                  </button>
+                </div>
+
+                {/* Cancel Button */}
+                <button
+                  onClick={() => setActionSheetFolder(null)}
+                  className="w-full py-2.5 rounded-xl bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0]/60 dark:border-[#223344] text-xs font-semibold text-[#6E7E8E] dark:text-[#8AA0B4] hover:bg-[#E5DCCB] dark:hover:bg-[#202E3C] transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
       {/* Search Bar */}

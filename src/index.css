@@ -14,10 +14,15 @@
   }
 
   /* Prevent native browser focus ring flashing (blue on light, white on dark) */
-  input, textarea, select {
-    outline: none;
-    -webkit-tap-highlight-color: transparent;
+  button, a, input, textarea, select {
+    outline: none !important;
+    -webkit-tap-highlight-color: transparent !important;
   }
+  button:focus,
+  button:focus-visible,
+  button:active,
+  a:focus,
+  a:focus-visible,
   input:focus,
   input:focus-visible,
   textarea:focus,

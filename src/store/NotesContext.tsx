@@ -86,6 +86,7 @@ interface NotesContextType {
   createFolder: (name: string) => void;
   renameFolder: (id: string, newName: string) => void;
   deleteFolder: (id: string) => void;
+  deleteFolders: (ids: string[]) => void;
   exportCurrentNote: (formatType: 'markdown' | 'txt' | 'html', noteToExport?: Note) => void;
 }
 
@@ -592,6 +593,22 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   }, [selectedFolderId, user]);
 
+  const deleteFolders = useCallback((ids: string[]) => {
+    if (ids.length === 0) return;
+    triggerHaptic();
+    const idSet = new Set(ids);
+    setFolders(prev => prev.filter(f => !idSet.has(f.id)));
+    setNotes(prev =>
+      prev.map(n => (n.folderId && idSet.has(n.folderId) ? { ...n, folderId: 'default' } : n))
+    );
+    if (selectedFolderId && idSet.has(selectedFolderId)) {
+      setSelectedFolderId('default');
+    }
+    if (user) {
+      ids.forEach(id => deleteFolderFromCloud(id));
+    }
+  }, [selectedFolderId, user]);
+
   // Export current note
   const exportCurrentNote = useCallback((formatType: 'markdown' | 'txt' | 'html', specificNote?: Note) => {
     const targetNote = specificNote || activeNote;
@@ -812,6 +829,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         createFolder,
         renameFolder,
         deleteFolder,
+        deleteFolders,
         exportCurrentNote,
       }}
     >

@@ -299,25 +299,27 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         {mobileView === 'editor' ? (
           activeNote && (
             <button
+              key="mobile-nav-delete-btn"
               onClick={() => {
                 triggerHaptic();
                 deleteNote(activeNote.id);
                 setMobileView('list');
               }}
               title="Delete Note"
-              className="md:hidden flex items-center justify-center p-2 rounded-md text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 active:scale-95 transition-all"
+              className="md:hidden flex items-center justify-center p-2 rounded-md text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 active:scale-95 transition-colors duration-150 outline-none focus:outline-none focus:ring-0"
             >
               <Trash2 size={17} />
             </button>
           )
         ) : (
           <button
+            key="mobile-nav-update-btn"
             onClick={() => {
               triggerHaptic();
               onCheckUpdates?.();
             }}
             title="Check for Software Updates"
-            className={`md:hidden flex items-center space-x-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all active:scale-95 ${
+            className={`md:hidden flex items-center space-x-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors duration-150 active:scale-95 outline-none focus:outline-none focus:ring-0 ${
               hasUpdate
                 ? 'bg-amber-500/20 border border-amber-500/40 text-amber-600 dark:text-amber-400 animate-pulse'
                 : 'bg-[#E5DCCB]/70 dark:bg-[#1C2733] text-[#1C2B36] dark:text-[#E8EEF3] hover:bg-[#E5DCCB] dark:hover:bg-[#25394C] border border-[#DFD3C0]/60 dark:border-[#263747]'
