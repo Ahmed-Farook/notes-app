@@ -2,6 +2,7 @@ const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
+const http = require('http');
 const https = require('https');
 const { spawn, execSync } = require('child_process');
 
@@ -152,41 +153,125 @@ function buildMenu() {
   Menu.setApplicationMenu(menu);
 }
 
-// Helper to download files with redirect support and progress reporting
-function downloadFileWithProgress(url, destPath, onProgress) {
+// Helper to execute a single download attempt with redirect support and stream error handling
+function singleDownloadAttempt(url, destPath, onProgress, redirectCount = 0) {
+  if (redirectCount > 5) {
+    return Promise.reject(new Error('Too many redirects'));
+  }
   return new Promise((resolve, reject) => {
-    const file = fs.createWriteStream(destPath);
-    const req = https.get(url, (res) => {
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        file.close();
-        try { fs.unlinkSync(destPath); } catch (_) {}
-        return downloadFileWithProgress(res.headers.location, destPath, onProgress).then(resolve).catch(reject);
-      }
-      if (res.statusCode !== 200) {
-        file.close();
-        try { fs.unlinkSync(destPath); } catch (_) {}
-        return reject(new Error(`Download failed with HTTP ${res.statusCode}`));
-      }
-      const total = parseInt(res.headers['content-length'] || '0', 10);
-      let received = 0;
-      res.on('data', (chunk) => {
-        received += chunk.length;
-        if (total > 0 && onProgress) {
-          const percent = Math.min(100, Math.round((received / total) * 100));
-          onProgress(percent);
+    let file = fs.createWriteStream(destPath);
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch (e) {
+      file.close();
+      return reject(new Error(`Invalid URL: ${url}`));
+    }
+    const client = parsed.protocol === 'http:' ? http : https;
+
+    const req = client.get(
+      url,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': '*/*',
+        },
+      },
+      (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          file.close();
+          try { fs.unlinkSync(destPath); } catch (_) {}
+          let nextUrl = res.headers.location;
+          if (nextUrl.startsWith('/')) {
+            nextUrl = `${parsed.protocol}//${parsed.host}${nextUrl}`;
+          }
+          return singleDownloadAttempt(nextUrl, destPath, onProgress, redirectCount + 1)
+            .then(resolve)
+            .catch(reject);
         }
-      });
-      res.pipe(file);
-      file.on('finish', () => {
-        file.close(() => resolve());
-      });
-    });
+
+        if (res.statusCode !== 200) {
+          file.close();
+          try { fs.unlinkSync(destPath); } catch (_) {}
+          return reject(new Error(`Download failed with HTTP ${res.statusCode}`));
+        }
+
+        const total = parseInt(res.headers['content-length'] || '0', 10);
+        let received = 0;
+
+        res.on('data', (chunk) => {
+          received += chunk.length;
+          if (total > 0 && onProgress) {
+            const percent = Math.min(100, Math.round((received / total) * 100));
+            onProgress(percent);
+          }
+        });
+
+        res.on('error', (err) => {
+          file.close();
+          try { fs.unlinkSync(destPath); } catch (_) {}
+          reject(err);
+        });
+
+        file.on('error', (err) => {
+          file.close();
+          try { fs.unlinkSync(destPath); } catch (_) {}
+          reject(err);
+        });
+
+        res.pipe(file);
+
+        file.on('finish', () => {
+          file.close(() => {
+            try {
+              const stats = fs.statSync(destPath);
+              if (stats.size < 500000) {
+                try { fs.unlinkSync(destPath); } catch (_) {}
+                return reject(new Error(`Downloaded file is unexpectedly small (${stats.size} bytes)`));
+              }
+              resolve();
+            } catch (err) {
+              reject(err);
+            }
+          });
+        });
+      }
+    );
+
     req.on('error', (err) => {
       file.close();
       try { fs.unlinkSync(destPath); } catch (_) {}
       reject(err);
     });
+
+    req.setTimeout(45000, () => {
+      req.destroy(new Error('Connection timed out'));
+    });
   });
+}
+
+// Multi-mirror resilient file downloader (tries primary URL, then ghfast.top, then ghproxy.net)
+async function downloadFileWithProgress(originalUrl, destPath, onProgress) {
+  const candidateUrls = [
+    originalUrl,
+    `https://ghfast.top/${originalUrl}`,
+    `https://ghproxy.net/${originalUrl}`,
+  ];
+
+  let lastError = null;
+  for (let i = 0; i < candidateUrls.length; i++) {
+    const candidate = candidateUrls[i];
+    try {
+      await singleDownloadAttempt(candidate, destPath, onProgress);
+      return;
+    } catch (err) {
+      console.warn(`[Updater] Attempt ${i + 1} failed for ${candidate}:`, err.message);
+      lastError = err;
+      try { fs.unlinkSync(destPath); } catch (_) {}
+    }
+  }
+
+  throw lastError || new Error('Failed to download update from all available mirrors');
 }
 
 // Helper to fetch JSON from API or CDN with redirect support and custom User-Agent

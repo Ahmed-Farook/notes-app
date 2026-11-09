@@ -33,6 +33,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
   const isSwipingRef = useRef(false);
+  const hasTriggeredHapticRef = useRef(false);
 
   const startLongPress = () => {
     isLongPressRef.current = false;
@@ -55,6 +56,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
     touchStartXRef.current = e.touches[0].clientX;
     touchStartYRef.current = e.touches[0].clientY;
     isSwipingRef.current = false;
+    hasTriggeredHapticRef.current = false;
     startLongPress();
   };
 
@@ -62,18 +64,38 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
     if (isSelectionMode || touchStartXRef.current === null || touchStartYRef.current === null) return;
     const dx = e.touches[0].clientX - touchStartXRef.current;
     const dy = e.touches[0].clientY - touchStartYRef.current;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
 
-    // If scrolling vertically, let the parent scroll view handle it
-    if (!isSwipingRef.current && Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx)) {
+    // If scrolling vertically, let the parent scroll view handle it without triggering horizontal swipe
+    if (!isSwipingRef.current && absY > 8 && absY * 1.3 > absX) {
       cancelLongPress();
       return;
     }
 
-    // If dragging horizontally, initiate swipe gesture
-    if (Math.abs(dx) > 10) {
+    // Require deliberate horizontal movement (at least 18px and dominant over vertical) to start swipe
+    if (!isSwipingRef.current && absX > 18 && absX > absY * 1.5) {
       isSwipingRef.current = true;
       cancelLongPress();
-      const clamped = Math.max(-110, Math.min(110, dx));
+    }
+
+    if (isSwipingRef.current) {
+      cancelLongPress();
+      // Apply rubber-band resistance curve after 75px for a natural, controlled feel
+      const sign = dx > 0 ? 1 : -1;
+      const base = Math.min(absX, 75);
+      const extra = Math.max(0, absX - 75) * 0.45;
+      const clamped = sign * Math.min(125, base + extra);
+
+      // Trigger a subtle tactile haptic pulse exactly when crossing the execution threshold (88px)
+      const THRESHOLD = 88;
+      if (Math.abs(clamped) >= THRESHOLD && !hasTriggeredHapticRef.current) {
+        hasTriggeredHapticRef.current = true;
+        triggerHaptic();
+      } else if (Math.abs(clamped) < THRESHOLD) {
+        hasTriggeredHapticRef.current = false;
+      }
+
       swipeOffsetRef.current = clamped;
       setSwipeOffset(clamped);
     }
@@ -87,14 +109,17 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
     touchStartXRef.current = null;
     touchStartYRef.current = null;
     swipeOffsetRef.current = 0;
+    hasTriggeredHapticRef.current = false;
+
+    const SWIPE_ACTION_THRESHOLD = 88;
 
     if (wasSwiping) {
-      if (currentOffset < -65) {
-        // Swiped Left: Delete note
+      if (currentOffset < -SWIPE_ACTION_THRESHOLD) {
+        // Swiped Left past threshold: Delete note
         triggerHaptic();
         deleteNote(note.id);
-      } else if (currentOffset > 65) {
-        // Swiped Right: Pin or restore
+      } else if (currentOffset > SWIPE_ACTION_THRESHOLD) {
+        // Swiped Right past threshold: Pin or restore
         triggerHaptic();
         if (note.isTrash) {
           restoreNote(note.id);
@@ -235,30 +260,47 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
     <div className="relative overflow-hidden rounded-xl">
       {/* Swipe reveal background actions */}
       {swipeOffset !== 0 && (
-        <div className="absolute inset-0 flex items-center justify-between rounded-xl overflow-hidden pointer-events-none select-none">
+        <div className="absolute inset-0 flex items-center rounded-xl overflow-hidden pointer-events-none select-none bg-[#EBE2D3]/60 dark:bg-[#111822]">
           {/* Swiping Right: Pin / Unpin (or Restore if in trash) */}
           {swipeOffset > 0 && (
-            <div
-              className={`h-full w-full flex items-center px-4 transition-colors ${
-                note.isTrash
-                  ? 'bg-emerald-600 text-white justify-start'
-                  : 'bg-apple-yellow dark:bg-[#254260] text-white justify-start'
-              }`}
-            >
+            <div className="h-full w-full flex items-center px-3.5 justify-start">
               <div
-                className={`flex items-center space-x-1.5 transition-transform ${
-                  Math.abs(swipeOffset) > 65 ? 'scale-110 font-semibold' : 'scale-95 opacity-85'
+                className={`flex items-center space-x-2 px-3 py-1.5 rounded-full transition-all duration-150 ${
+                  Math.abs(swipeOffset) >= 88
+                    ? note.isTrash
+                      ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400/40 scale-105 font-medium'
+                      : 'bg-[#213A50] dark:bg-[#203D5C] text-white shadow-md ring-2 ring-[#3A5D80]/60 scale-105 font-medium'
+                    : note.isTrash
+                    ? 'bg-emerald-600/85 text-white/90 scale-95'
+                    : 'bg-[#213A50]/85 dark:bg-[#203D5C]/85 text-white/90 scale-95'
                 }`}
               >
                 {note.isTrash ? (
                   <>
-                    <RotateCcw size={15} />
-                    <span className="text-xs">Restore</span>
+                    <RotateCcw size={14} className="stroke-[2.2]" />
+                    <span className="text-[11px] tracking-wide font-medium">
+                      {Math.abs(swipeOffset) >= 88 ? 'Release to Restore' : 'Restore'}
+                    </span>
                   </>
                 ) : (
                   <>
-                    <Pin size={15} className={note.isPinned ? '' : 'fill-white'} />
-                    <span className="text-xs">{note.isPinned ? 'Unpin' : 'Pin'}</span>
+                    <Pin
+                      size={14}
+                      className={
+                        note.isPinned
+                          ? 'text-amber-400 dark:text-amber-300 stroke-[2.2]'
+                          : 'fill-amber-400 text-amber-400 dark:fill-amber-300 dark:text-amber-300 stroke-[2.2]'
+                      }
+                    />
+                    <span className="text-[11px] tracking-wide font-medium">
+                      {Math.abs(swipeOffset) >= 88
+                        ? note.isPinned
+                          ? 'Release to Unpin'
+                          : 'Release to Pin'
+                        : note.isPinned
+                        ? 'Unpin'
+                        : 'Pin'}
+                    </span>
                   </>
                 )}
               </div>
@@ -267,14 +309,18 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
 
           {/* Swiping Left: Delete */}
           {swipeOffset < 0 && (
-            <div className="h-full w-full bg-red-600 text-white flex items-center justify-end px-4">
+            <div className="h-full w-full flex items-center px-3.5 justify-end">
               <div
-                className={`flex items-center space-x-1.5 transition-transform ${
-                  Math.abs(swipeOffset) > 65 ? 'scale-110 font-semibold' : 'scale-95 opacity-85'
+                className={`flex items-center space-x-2 px-3 py-1.5 rounded-full transition-all duration-150 ${
+                  Math.abs(swipeOffset) >= 88
+                    ? 'bg-rose-600 dark:bg-red-600 text-white shadow-md ring-2 ring-red-400/40 scale-105 font-medium'
+                    : 'bg-rose-600/85 dark:bg-red-600/85 text-white/90 scale-95'
                 }`}
               >
-                <span className="text-xs">Delete</span>
-                <Trash2 size={15} />
+                <span className="text-[11px] tracking-wide font-medium">
+                  {Math.abs(swipeOffset) >= 88 ? 'Release to Delete' : 'Delete'}
+                </span>
+                <Trash2 size={14} className="stroke-[2.2]" />
               </div>
             </div>
           )}

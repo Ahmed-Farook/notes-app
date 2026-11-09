@@ -289,7 +289,18 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                     )}
 
                     {installError && (
-                      <p className="text-[11px] text-red-500 text-center">{installError}</p>
+                      <div className="space-y-1.5 text-center pt-1">
+                        <p className="text-[11px] text-red-500">{installError}</p>
+                        <a
+                          href={updateInfo.downloadUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center space-x-1 text-xs text-[#395060] dark:text-[#7EAAD0] hover:underline"
+                        >
+                          <Download size={13} />
+                          <span>Download {updateInfo.assetName || 'update'} manually in browser</span>
+                        </a>
+                      </div>
                     )}
                   </div>
                 )}

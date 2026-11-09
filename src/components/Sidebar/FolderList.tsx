@@ -15,6 +15,7 @@ import { useNotes } from '../../store/NotesContext';
 import { CURRENT_VERSION } from '../../utils/updateChecker';
 import { triggerHaptic } from '../../utils/haptics';
 import type { Folder as FolderType } from '../../types/note';
+import { DeleteFolderModal } from '../common/DeleteFolderModal';
 
 interface FolderListProps {
   onCheckUpdates?: () => void;
@@ -41,6 +42,15 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
   // Selection Mode State
   const [isFolderSelectionMode, setIsFolderSelectionMode] = useState(false);
   const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>([]);
+
+  // Themed Delete Confirmation Modal State
+  const [deleteModalState, setDeleteModalState] = useState<{
+    isOpen: boolean;
+    folderId?: string;
+    folderName?: string;
+    isBulk?: boolean;
+    bulkIds?: string[];
+  } | null>(null);
 
   // Context Menu State
   const [contextMenu, setContextMenu] = useState<{
@@ -109,12 +119,23 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
   const handleDeleteSelected = () => {
     if (selectedFolderIds.length === 0) return;
     triggerHaptic();
-    const count = selectedFolderIds.length;
-    if (confirm(`Delete ${count} folder${count > 1 ? 's' : ''}? Notes inside will move to Notes.`)) {
-      deleteFolders(selectedFolderIds);
+    setDeleteModalState({
+      isOpen: true,
+      isBulk: true,
+      bulkIds: selectedFolderIds,
+    });
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteModalState) return;
+    if (deleteModalState.isBulk && deleteModalState.bulkIds) {
+      deleteFolders(deleteModalState.bulkIds);
       setSelectedFolderIds([]);
       setIsFolderSelectionMode(false);
+    } else if (deleteModalState.folderId) {
+      deleteFolder(deleteModalState.folderId);
     }
+    setDeleteModalState(null);
   };
 
   const handleRenameSelected = () => {
@@ -238,7 +259,12 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
                     <button
                       type="submit"
                       disabled={!editingFolderName.trim()}
-                      className="p-0.5 text-emerald-600 dark:text-emerald-400 disabled:opacity-30"
+                      title="Save folder name"
+                      className={`p-1 rounded-md transition-colors ${
+                        editingFolderName.trim()
+                          ? 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/15'
+                          : 'text-neutral-400/50 dark:text-neutral-500/40 cursor-not-allowed'
+                      }`}
                     >
                       <Check size={13} strokeWidth={2.5} />
                     </button>
@@ -248,9 +274,10 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
                         setEditingFolderId(null);
                         setEditingFolderName('');
                       }}
-                      className="p-0.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
+                      title="Cancel"
+                      className="p-1 rounded-md text-neutral-400 hover:text-neutral-700 dark:text-[#8AA0B4] dark:hover:text-[#E8EEF3] hover:bg-neutral-200/50 dark:hover:bg-neutral-700/50 transition-colors"
                     >
-                      <X size={13} />
+                      <X size={13} strokeWidth={2} />
                     </button>
                   </form>
                 );
@@ -332,9 +359,11 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
                           onClick={(e) => {
                             e.stopPropagation();
                             triggerHaptic();
-                            if (confirm(`Delete folder "${folder.name}"? Notes inside will move to Notes.`)) {
-                              deleteFolder(folder.id);
-                            }
+                            setDeleteModalState({
+                              isOpen: true,
+                              folderId: folder.id,
+                              folderName: folder.name,
+                            });
                           }}
                           title="Delete Folder"
                           className="p-1 rounded hover:text-red-500 hover:scale-110 active:scale-95 transition-all text-neutral-400"
@@ -359,7 +388,7 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
 
             {/* Inline add folder form */}
             {isAddingFolder && (
-              <form onSubmit={handleCreateFolder} className="px-2 py-1 flex items-center space-x-1">
+              <form onSubmit={handleCreateFolder} className="px-2 py-1.5 flex items-center space-x-1.5 bg-[#FAF6EF] dark:bg-[#1C2733] rounded-lg border border-[#DFD3C0] dark:border-[#2D435A]">
                 <input
                   type="text"
                   autoFocus
@@ -372,14 +401,19 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
                       setNewFolderName('');
                     }
                   }}
-                  className="w-full text-xs px-2 py-1 rounded bg-[#FAF6EF] dark:bg-[#1C2733] border border-apple-border dark:border-apple-borderDark outline-none focus:border-apple-yellow text-[#1C2B36] dark:text-[#E8EEF3]"
+                  className="w-full text-xs px-1.5 py-0.5 rounded bg-transparent outline-none text-[#1C2B36] dark:text-[#E8EEF3] placeholder-neutral-400 dark:placeholder-neutral-500"
                 />
                 <button
                   type="submit"
                   disabled={!newFolderName.trim()}
-                  className="p-1 text-apple-yellow hover:text-apple-yellowHover disabled:opacity-40"
+                  title="Create folder"
+                  className={`p-1 rounded-md transition-colors ${
+                    newFolderName.trim()
+                      ? 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/15'
+                      : 'text-neutral-400/50 dark:text-neutral-500/40 cursor-not-allowed'
+                  }`}
                 >
-                  <Check size={14} />
+                  <Check size={14} strokeWidth={2.5} />
                 </button>
                 <button
                   type="button"
@@ -387,9 +421,10 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
                     setIsAddingFolder(false);
                     setNewFolderName('');
                   }}
-                  className="p-1 text-neutral-400 hover:text-neutral-600"
+                  title="Cancel"
+                  className="p-1 rounded-md text-neutral-400 hover:text-neutral-700 dark:text-[#8AA0B4] dark:hover:text-[#E8EEF3] hover:bg-neutral-200/50 dark:hover:bg-neutral-700/50 transition-colors"
                 >
-                  <X size={14} />
+                  <X size={14} strokeWidth={2} />
                 </button>
               </form>
             )}
@@ -504,9 +539,11 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
               triggerHaptic();
               const target = contextMenu.folder;
               setContextMenu(null);
-              if (confirm(`Delete folder "${target.name}"? Notes inside will move to Notes.`)) {
-                deleteFolder(target.id);
-              }
+              setDeleteModalState({
+                isOpen: true,
+                folderId: target.id,
+                folderName: target.name,
+              });
             }}
             className="w-full px-3 py-1.5 flex items-center space-x-2 text-left text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
           >
@@ -515,6 +552,15 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
           </button>
         </div>
       )}
+
+      {/* Themed Delete Confirmation Dialog */}
+      <DeleteFolderModal
+        isOpen={Boolean(deleteModalState?.isOpen)}
+        onClose={() => setDeleteModalState(null)}
+        onConfirm={handleConfirmDelete}
+        folderName={deleteModalState?.folderName}
+        folderCount={deleteModalState?.isBulk ? deleteModalState.bulkIds?.length : 1}
+      />
     </aside>
   );
 };
