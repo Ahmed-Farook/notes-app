@@ -227,7 +227,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
           </p>
         </div>
 
-        <div className="flex items-center justify-between pt-2 border-t border-[#DFD3C0]/50 dark:border-[#223344] text-[10px] text-[#3B4D5E] dark:text-[#95ACC0] font-semibold">
+        <div className="flex items-center justify-between pt-2 border-t border-[#DFD3C0]/50 dark:border-[#223344] text-[10px] text-[#6E7E8E] dark:text-[#8299AD] font-normal">
           <span>{formatListDate(note.updatedAt)}</span>
           {/* Desktop-only hover actions */}
           <div className="hidden md:flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -263,9 +263,9 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
           className={`absolute inset-0 flex items-center rounded-xl overflow-hidden pointer-events-none select-none transition-colors ${
             swipeOffset > 0
               ? note.isTrash
-                ? 'bg-emerald-600'
-                : 'bg-blue-600'
-              : 'bg-red-600'
+                ? 'bg-emerald-700 dark:bg-emerald-800'
+                : 'bg-[#213A50] dark:bg-[#2A4763]'
+              : 'bg-red-600 dark:bg-red-700'
           }`}
         >
           {/* Swiping Right: Pin / Unpin (or Restore if in trash) */}
@@ -435,10 +435,10 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
 
         <div className="flex items-baseline space-x-1.5 text-[11px] overflow-hidden">
           <span
-            className={`shrink-0 font-semibold ${
+            className={`shrink-0 font-normal ${
               !isSelectionMode && isSelected
-                ? 'text-white/85'
-                : 'text-[#3B4D5E] dark:text-[#95ACC0]'
+                ? 'text-white/70'
+                : 'text-[#6E7E8E] dark:text-[#8299AD]'
             }`}
           >
             {formatListDate(note.updatedAt)}

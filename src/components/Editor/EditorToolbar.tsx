@@ -90,7 +90,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   };
 
   const getBtnClass = (isActive: boolean) =>
-    `p-1.5 rounded shrink-0 transition-colors ${
+    `p-1.5 rounded shrink-0 transition-colors outline-none focus:outline-none focus-visible:outline-none ${
       isActive
         ? 'bg-[#E5DCCB] dark:bg-[#203448] text-[#213A50] dark:text-[#7EAAD0] font-bold shadow-xs'
         : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3]'
@@ -101,12 +101,14 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       {/* Samsung Notes Mode Switcher: [Type] vs [Draw] */}
       <div className="flex items-center bg-[#E5DCCB]/90 dark:bg-[#1A2530] border border-[#DFD3C0] dark:border-[#263747] rounded-lg p-0.5 shrink-0 shadow-xs">
         <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
             triggerHaptic();
             onTogglePenMode(false);
           }}
           title="Type (Keyboard Text Mode)"
-          className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-semibold transition-all ${
+          className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-semibold transition-all outline-none focus:outline-none ${
             !isPenMode
               ? 'bg-[#FAF6EF] dark:bg-[#25394C] text-[#213A50] dark:text-[#E8EEF3] shadow-xs'
               : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:text-[#213A50] dark:hover:text-white'
@@ -117,12 +119,14 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         </button>
 
         <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
             triggerHaptic();
             onTogglePenMode(true);
           }}
           title="Draw (Samsung Notes Stylus & Pen Mode)"
-          className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-semibold transition-all ${
+          className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-semibold transition-all outline-none focus:outline-none ${
             isPenMode
               ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs'
               : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:text-[#213A50] dark:hover:text-white'
@@ -149,7 +153,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 onChangeDrawingTool('pen');
               }}
               title="Pen (Natural Ink with Stylus Pressure)"
-              className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-all ${
+              className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-all outline-none focus:outline-none ${
                 activeDrawingTool === 'pen'
                   ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs'
                   : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733]'
@@ -168,7 +172,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 onChangeDrawingTool('highlighter');
               }}
               title="Highlighter (Translucent Chisel)"
-              className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-all ${
+              className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-all outline-none focus:outline-none ${
                 activeDrawingTool === 'highlighter'
                   ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs'
                   : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733]'
@@ -187,7 +191,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 onChangeDrawingTool('eraser');
               }}
               title="Eraser (Tap or Drag across strokes to erase)"
-              className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-all ${
+              className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-all outline-none focus:outline-none ${
                 activeDrawingTool === 'eraser'
                   ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs'
                   : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733]'
@@ -205,15 +209,17 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             {STROKE_SIZES.map((sz) => (
               <button
                 key={sz.label}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   triggerHaptic();
                   onChangeSize(sz.value);
                 }}
                 title={`${sz.label} (${sz.value}px)`}
-                className={`w-6 h-6 rounded-md flex items-center justify-center transition-all ${
+                className={`w-6 h-6 rounded-md flex items-center justify-center transition-all outline-none focus:outline-none ${
                   activeSize === sz.value
-                    ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white ring-1 ring-apple-yellow'
-                    : 'bg-[#E5DCCB]/60 dark:bg-[#1A2530] text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#E5DCCB]'
+                    ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs'
+                    : 'bg-[#E5DCCB]/60 dark:bg-[#1A2530] text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#E5DCCB] dark:hover:bg-[#223344]'
                 }`}
               >
                 <div
@@ -231,19 +237,21 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           {activeDrawingTool !== 'eraser' && (
             <>
               <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#223344] mx-1 shrink-0" />
-              <div className="flex items-center space-x-1 shrink-0">
+              <div className="flex items-center space-x-1.5 shrink-0">
                 {PRESET_COLORS.map((col) => (
                   <button
                     key={col.value}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
                       triggerHaptic();
                       onChangeColor(col.value);
                     }}
                     title={col.name}
-                    className={`w-5 h-5 rounded-full transition-transform shrink-0 ${
+                    className={`w-5 h-5 rounded-full transition-transform shrink-0 outline-none focus:outline-none border border-black/10 dark:border-white/15 ${
                       activeColor === col.value
-                        ? 'scale-125 ring-2 ring-offset-1 ring-apple-yellow dark:ring-[#7EAAD0] dark:ring-offset-[#151E28]'
-                        : 'hover:scale-110 border border-black/10 dark:border-white/10'
+                        ? 'scale-115 ring-2 ring-apple-yellow dark:ring-[#7EAAD0] shadow-xs'
+                        : 'hover:scale-105 opacity-85 hover:opacity-100'
                     }`}
                     style={{ backgroundColor: col.value }}
                   />
@@ -252,7 +260,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 {/* Custom Color Input */}
                 <label
                   title="Custom Color"
-                  className="w-5 h-5 rounded-full border border-[#DFD3C0] dark:border-[#2D435A] flex items-center justify-center cursor-pointer overflow-hidden shrink-0 hover:scale-110 transition-transform"
+                  className="w-5 h-5 rounded-full border border-black/10 dark:border-white/15 flex items-center justify-center cursor-pointer overflow-hidden shrink-0 hover:scale-105 transition-transform outline-none focus:outline-none"
                   style={{
                     background:
                       'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)',
@@ -273,37 +281,43 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
           {/* Drawing Undo / Redo / Clear */}
           <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
               triggerHaptic();
               onDrawingUndo();
             }}
             disabled={!canDrawingUndo}
             title="Undo stroke"
-            className="p-1.5 rounded shrink-0 text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3] disabled:opacity-30 disabled:pointer-events-none transition-colors"
+            className="p-1.5 rounded shrink-0 text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3] disabled:opacity-30 disabled:pointer-events-none transition-colors outline-none focus:outline-none"
           >
             <Undo2 size={15} />
           </button>
 
           <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
               triggerHaptic();
               onDrawingRedo();
             }}
             disabled={!canDrawingRedo}
             title="Redo stroke"
-            className="p-1.5 rounded shrink-0 text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3] disabled:opacity-30 disabled:pointer-events-none transition-colors"
+            className="p-1.5 rounded shrink-0 text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3] disabled:opacity-30 disabled:pointer-events-none transition-colors outline-none focus:outline-none"
           >
             <Redo2 size={15} />
           </button>
 
           <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
               triggerHaptic();
               onDrawingClear();
             }}
             disabled={!canDrawingUndo}
             title="Clear all annotations on this note"
-            className="p-1.5 rounded shrink-0 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+            className="p-1.5 rounded shrink-0 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-30 disabled:pointer-events-none transition-colors outline-none focus:outline-none"
           >
             <Trash2 size={15} />
           </button>
@@ -313,6 +327,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         <>
           {/* Headings */}
           <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => runCommand(() => editor.chain().focus().toggleHeading({ level: 1 }).run())}
             title="Title (H1)"
             className={getBtnClass(editor.isActive('heading', { level: 1 }))}
@@ -321,6 +337,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           </button>
 
           <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => runCommand(() => editor.chain().focus().toggleHeading({ level: 2 }).run())}
             title="Heading (H2)"
             className={getBtnClass(editor.isActive('heading', { level: 2 }))}
@@ -329,6 +347,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           </button>
 
           <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => runCommand(() => editor.chain().focus().toggleHeading({ level: 3 }).run())}
             title="Subheading (H3)"
             className={getBtnClass(editor.isActive('heading', { level: 3 }))}
@@ -340,6 +360,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
           {/* Basic Formatting */}
           <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => runCommand(() => editor.chain().focus().toggleBold().run())}
             title="Bold (Cmd+B)"
             className={getBtnClass(editor.isActive('bold'))}
@@ -348,6 +370,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           </button>
 
           <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => runCommand(() => editor.chain().focus().toggleItalic().run())}
             title="Italic (Cmd+I)"
             className={getBtnClass(editor.isActive('italic'))}
@@ -356,6 +380,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           </button>
 
           <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => runCommand(() => editor.chain().focus().toggleUnderline().run())}
             title="Underline (Cmd+U)"
             className={getBtnClass(editor.isActive('underline'))}
@@ -364,6 +390,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           </button>
 
           <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => runCommand(() => editor.chain().focus().toggleStrike().run())}
             title="Strikethrough"
             className={getBtnClass(editor.isActive('strike'))}
@@ -372,6 +400,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           </button>
 
           <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => runCommand(() => editor.chain().focus().toggleHighlight().run())}
             title="Highlight Text"
             className={getBtnClass(editor.isActive('highlight'))}
@@ -383,6 +413,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
           {/* Lists */}
           <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => runCommand(() => editor.chain().focus().toggleTaskList().run())}
             title="Checklist"
             className={getBtnClass(editor.isActive('taskList'))}
@@ -391,6 +423,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           </button>
 
           <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => runCommand(() => editor.chain().focus().toggleBulletList().run())}
             title="Bullet List"
             className={getBtnClass(editor.isActive('bulletList'))}
@@ -399,6 +433,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           </button>
 
           <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => runCommand(() => editor.chain().focus().toggleOrderedList().run())}
             title="Numbered List"
             className={getBtnClass(editor.isActive('orderedList'))}
@@ -410,6 +446,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
           {/* Quotes & Code */}
           <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => runCommand(() => editor.chain().focus().toggleBlockquote().run())}
             title="Blockquote"
             className={getBtnClass(editor.isActive('blockquote'))}
@@ -418,6 +456,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           </button>
 
           <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => runCommand(() => toggleUnifiedCodeBlock(editor))}
             title="Code Block"
             className={getBtnClass(editor.isActive('codeBlock'))}
@@ -426,9 +466,11 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           </button>
 
           <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => runCommand(() => editor.chain().focus().setHorizontalRule().run())}
             title="Horizontal Divider"
-            className="p-1.5 rounded shrink-0 text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3] transition-colors"
+            className="p-1.5 rounded shrink-0 text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3] transition-colors outline-none focus:outline-none"
           >
             <Minus size={15} />
           </button>
@@ -437,19 +479,23 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
           {/* Text Undo / Redo */}
           <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => runCommand(() => editor.chain().focus().undo().run())}
             disabled={!editor.can().undo()}
             title="Undo (Cmd+Z)"
-            className="p-1.5 rounded shrink-0 text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3] disabled:opacity-30 disabled:pointer-events-none transition-colors"
+            className="p-1.5 rounded shrink-0 text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3] disabled:opacity-30 disabled:pointer-events-none transition-colors outline-none focus:outline-none"
           >
             <Undo2 size={15} />
           </button>
 
           <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => runCommand(() => editor.chain().focus().redo().run())}
             disabled={!editor.can().redo()}
             title="Redo (Cmd+Shift+Z)"
-            className="p-1.5 rounded shrink-0 text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3] disabled:opacity-30 disabled:pointer-events-none transition-colors"
+            className="p-1.5 rounded shrink-0 text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3] disabled:opacity-30 disabled:pointer-events-none transition-colors outline-none focus:outline-none"
           >
             <Redo2 size={15} />
           </button>

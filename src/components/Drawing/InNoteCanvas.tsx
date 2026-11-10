@@ -29,12 +29,12 @@ interface InNoteCanvasProps {
   clearTrigger?: number;
 }
 
-// Aesthetic Custom SVG Cursors for Desktop
-const PEN_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M7 17L18 6l2 2L9 19l-7 3 2-7L7 17z' fill='%23213A50' stroke='%23FAF6EF' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M2 22l5-2-3-3-2 5z' fill='%23E5A93C' stroke='%23FAF6EF' stroke-width='1'/%3E%3Ccircle cx='2' cy='22' r='1.2' fill='%23DC2626'/%3E%3C/svg%3E") 2 22, crosshair`;
+// Standard, Professional Minimalist Cursors for Desktop
+const PEN_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22' fill='none'%3E%3Cpath d='M1 1L3 8L6 11L14 3L11 0L1 1Z' fill='%230F172A' stroke='%23FFFFFF' stroke-width='1.25' stroke-linejoin='round'/%3E%3Cpath d='M6 11L13 18C13.8 18.8 15.2 18.8 16 18L18 16C18.8 15.2 18.8 13.8 18 13L11 6' stroke='%230F172A' stroke-width='1.75' stroke-linecap='round'/%3E%3Ccircle cx='1' cy='1' r='0.8' fill='%230F172A'/%3E%3C/svg%3E") 1 1, crosshair`;
 
-const HIGHLIGHTER_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M8 16L18 6l3 3L11 19l-7 2 1-5 3 0z' fill='%23D97706' stroke='%23FAF6EF' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpolygon points='2,22 7,20 5,17 1,19' fill='%23FACC15' stroke='%23FAF6EF' stroke-width='1'/%3E%3Cline x1='2' y1='22' x2='4' y2='19' stroke='%23B45309' stroke-width='1.5'/%3E%3C/svg%3E") 2 22, crosshair`;
+const HIGHLIGHTER_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22' fill='none'%3E%3Cpath d='M2 18L5 12L10 17L4 20L2 18Z' fill='%23E2E8F0' stroke='%230F172A' stroke-width='1.2' stroke-linejoin='round'/%3E%3Cpath d='M5 12L14 3C14.8 2.2 16.2 2.2 17 3L19 5C19.8 5.8 19.8 7.2 19 8L10 17' fill='%230F172A' stroke='%23FFFFFF' stroke-width='1.2' stroke-linejoin='round'/%3E%3Cline x1='1' y1='19' x2='4' y2='16' stroke='%23F59E0B' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 2 18, crosshair`;
 
-const ERASER_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Ccircle cx='12' cy='12' r='9' fill='rgba(239,68,68,0.2)' stroke='%23DC2626' stroke-width='1.5' stroke-dasharray='3 2'/%3E%3Ccircle cx='12' cy='12' r='1.5' fill='%23DC2626'/%3E%3C/svg%3E") 12 12, crosshair`;
+const ERASER_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Ccircle cx='12' cy='12' r='8' stroke='%230F172A' stroke-width='1.25'/%3E%3Ccircle cx='12' cy='12' r='8' stroke='%23FFFFFF' stroke-width='0.5'/%3E%3Ccircle cx='12' cy='12' r='1' fill='%230F172A'/%3E%3C/svg%3E") 12 12, crosshair`;
 
 export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
   noteId,

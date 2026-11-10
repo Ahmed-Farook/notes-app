@@ -428,7 +428,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     }
   }, [editor, onRegisterToggleChecklist]);
 
-  // Update editor content and editable state when active note changes
+  // Update editor content and editable state when active note changes or remote sync arrives
   useEffect(() => {
     if (!editor || !activeNote) return;
 
@@ -437,7 +437,23 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     const currentHTML = editor.getHTML();
     if (currentHTML !== activeNote.content) {
       isUpdatingRef.current = true;
+
+      // Preserve cursor selection if editor is focused on this device
+      const isFocused = editor.isFocused;
+      const { from, to } = editor.state.selection;
+
       editor.commands.setContent(activeNote.content, false);
+
+      if (isFocused) {
+        try {
+          const maxPos = editor.state.doc.content.size;
+          editor.commands.setTextSelection({
+            from: Math.min(from, maxPos),
+            to: Math.min(to, maxPos),
+          });
+        } catch (_) {}
+      }
+
       const timer = setTimeout(() => {
         isUpdatingRef.current = false;
       }, 50);
@@ -446,7 +462,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
         isUpdatingRef.current = false;
       };
     }
-  }, [activeNote?.id, activeNote?.isTrash, editor]);
+  }, [activeNote?.id, activeNote?.content, activeNote?.isTrash, editor]);
 
   // Dismiss cursor and blur editor when keyboard closes on mobile
   useEffect(() => {
