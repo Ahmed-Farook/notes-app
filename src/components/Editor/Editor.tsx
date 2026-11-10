@@ -623,7 +623,15 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
         editor={editor}
         isVisible={showToolbar}
         isPenMode={isPenMode}
-        onTogglePenMode={(mode) => setIsPenMode(mode)}
+        onTogglePenMode={(mode) => {
+          setIsPenMode(mode);
+          if (mode && editor) {
+            editor.commands.blur();
+            if (document.activeElement instanceof HTMLElement) {
+              document.activeElement.blur();
+            }
+          }
+        }}
         activeDrawingTool={activeDrawingTool}
         onChangeDrawingTool={setActiveDrawingTool}
         activeColor={activeDrawingColor}

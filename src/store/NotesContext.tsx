@@ -424,7 +424,8 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           const hasContentChanged =
             (updates.content !== undefined && updates.content !== note.content) ||
             (updates.title !== undefined && updates.title !== note.title) ||
-            (updates.plainTextPreview !== undefined && updates.plainTextPreview !== note.plainTextPreview);
+            (updates.plainTextPreview !== undefined && updates.plainTextPreview !== note.plainTextPreview) ||
+            (updates.drawingStrokes !== undefined && updates.drawingStrokes !== note.drawingStrokes);
 
           const newUpdatedAt = hasContentChanged ? Date.now() : (updates.updatedAt ?? note.updatedAt);
 

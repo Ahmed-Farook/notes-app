@@ -141,7 +141,10 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           {/* Tool selector: Pen, Highlighter, Eraser */}
           <div className="flex items-center space-x-1 shrink-0">
             <button
-              onClick={() => {
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.preventDefault();
                 triggerHaptic();
                 onChangeDrawingTool('pen');
               }}
@@ -157,7 +160,10 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             </button>
 
             <button
-              onClick={() => {
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.preventDefault();
                 triggerHaptic();
                 onChangeDrawingTool('highlighter');
               }}
@@ -173,7 +179,10 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             </button>
 
             <button
-              onClick={() => {
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.preventDefault();
                 triggerHaptic();
                 onChangeDrawingTool('eraser');
               }}

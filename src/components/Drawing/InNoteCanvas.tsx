@@ -29,6 +29,13 @@ interface InNoteCanvasProps {
   clearTrigger?: number;
 }
 
+// Aesthetic Custom SVG Cursors for Desktop
+const PEN_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M7 17L18 6l2 2L9 19l-7 3 2-7L7 17z' fill='%23213A50' stroke='%23FAF6EF' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M2 22l5-2-3-3-2 5z' fill='%23E5A93C' stroke='%23FAF6EF' stroke-width='1'/%3E%3Ccircle cx='2' cy='22' r='1.2' fill='%23DC2626'/%3E%3C/svg%3E") 2 22, crosshair`;
+
+const HIGHLIGHTER_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M8 16L18 6l3 3L11 19l-7 2 1-5 3 0z' fill='%23D97706' stroke='%23FAF6EF' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpolygon points='2,22 7,20 5,17 1,19' fill='%23FACC15' stroke='%23FAF6EF' stroke-width='1'/%3E%3Cline x1='2' y1='22' x2='4' y2='19' stroke='%23B45309' stroke-width='1.5'/%3E%3C/svg%3E") 2 22, crosshair`;
+
+const ERASER_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Ccircle cx='12' cy='12' r='9' fill='rgba(239,68,68,0.2)' stroke='%23DC2626' stroke-width='1.5' stroke-dasharray='3 2'/%3E%3Ccircle cx='12' cy='12' r='1.5' fill='%23DC2626'/%3E%3C/svg%3E") 12 12, crosshair`;
+
 export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
   noteId,
   initialStrokesJson,
@@ -52,9 +59,9 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
   const strokesRef = useRef<InNoteStroke[]>([]);
   strokesRef.current = strokes;
 
-  // Track active pointer IDs to handle 2-finger scrolling and palm rejection
-  const activePointersRef = useRef<Map<number, { clientX: number; clientY: number }>>(new Map());
-  const twoFingerLastPosRef = useRef<{ x: number; y: number } | null>(null);
+  // Track if active drawing is using a hardware stylus
+  const isStylusActiveRef = useRef(false);
+  const lastTouchMidYRef = useRef<number | null>(null);
 
   // Track the noteId that current strokes belong to
   const prevNoteIdRef = useRef<string>(noteId);
@@ -64,7 +71,7 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     onHistoryChange?.(strokes.length > 0, undoneStrokes.length > 0);
   }, [strokes.length, undoneStrokes.length, onHistoryChange]);
 
-  // Load strokes when switching notes
+  // Load strokes when switching notes or remote sync arrives
   useEffect(() => {
     const isDifferentNote = prevNoteIdRef.current !== noteId;
     prevNoteIdRef.current = noteId;
@@ -222,6 +229,69 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     redrawCanvas();
   }, [strokes, redrawCanvas]);
 
+  // Native non-passive touch listeners on canvas to guarantee zero scrolling during single-finger drawing/highlighting/erasing
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (!isPenMode) return;
+      if (e.touches.length === 1) {
+        // Prevent default browser touch scrolling on single finger/pen
+        e.preventDefault();
+      } else if (e.touches.length >= 2) {
+        // Multi-touch: user wants to scroll the page with two fingers
+        if (isDrawingRef.current) {
+          isDrawingRef.current = false;
+          currentStrokeRef.current = null;
+          redrawCanvas();
+        }
+        lastTouchMidYRef.current = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!isPenMode) return;
+      if (e.touches.length === 1) {
+        // Single finger/pen drawing: prevent browser scroll gesture
+        e.preventDefault();
+      } else if (e.touches.length >= 2) {
+        // Two fingers: smooth natural document scroll
+        const currentMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        if (lastTouchMidYRef.current !== null) {
+          const deltaY = currentMidY - lastTouchMidYRef.current;
+          const scrollContainer = canvas.closest('.overflow-y-auto') as HTMLElement | null;
+          if (scrollContainer) {
+            scrollContainer.scrollTop -= deltaY;
+          }
+        }
+        lastTouchMidYRef.current = currentMidY;
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) {
+        lastTouchMidYRef.current = null;
+      }
+    };
+
+    const onTouchCancel = () => {
+      lastTouchMidYRef.current = null;
+    };
+
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    canvas.addEventListener('touchend', onTouchEnd, { passive: false });
+    canvas.addEventListener('touchcancel', onTouchCancel, { passive: false });
+
+    return () => {
+      canvas.removeEventListener('touchstart', onTouchStart);
+      canvas.removeEventListener('touchmove', onTouchMove);
+      canvas.removeEventListener('touchend', onTouchEnd);
+      canvas.removeEventListener('touchcancel', onTouchCancel);
+    };
+  }, [isPenMode, redrawCanvas]);
+
   // Handle external Undo trigger
   const prevUndoTrigger = useRef(undoTrigger);
   useEffect(() => {
@@ -285,7 +355,7 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
   };
 
   // Erase any stroke intersecting with eraser coordinate
-  const handleEraserAt = (x: number, y: number, radius = 18) => {
+  const handleEraserAt = (x: number, y: number, radius = 26) => {
     const remaining = strokesRef.current.filter((stroke) => {
       for (let i = 0; i < stroke.points.length; i++) {
         const pt = stroke.points[i];
@@ -313,25 +383,18 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isPenMode) return;
 
-    activePointersRef.current.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
-
-    // Multi-touch gesture (e.g. 2 fingers to scroll the note)
-    if (activePointersRef.current.size >= 2) {
-      // Cancel in-progress drawing immediately and remove any dot that finger 1 just started
-      isDrawingRef.current = false;
-      currentStrokeRef.current = null;
-      redrawCanvas();
-
-      const pts = Array.from(activePointersRef.current.values());
-      twoFingerLastPosRef.current = {
-        x: (pts[0].clientX + pts[1].clientX) / 2,
-        y: (pts[0].clientY + pts[1].clientY) / 2,
-      };
-      return;
-    }
-
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    const isPen = e.pointerType === 'pen';
+
+    // Palm rejection: If stylus is currently active, ignore secondary touch pointers
+    if (!isPen && isStylusActiveRef.current) return;
+    if (isPen) {
+      isStylusActiveRef.current = true;
+    }
+
+    if (!isPen && e.isPrimary === false) return;
 
     try {
       canvas.setPointerCapture(e.pointerId);
@@ -340,13 +403,12 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    const isPen = e.pointerType === 'pen';
     const pressure = isPen && e.pressure > 0 ? e.pressure : 0.5;
 
     isDrawingRef.current = true;
 
     if (activeTool === 'eraser') {
-      handleEraserAt(x, y, activeSize * 2.8);
+      handleEraserAt(x, y, Math.max(26, activeSize * 3.5));
       return;
     }
 
@@ -365,39 +427,21 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isPenMode) return;
-
-    activePointersRef.current.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
-
-    // Handle 2-finger scroll navigation
-    if (activePointersRef.current.size >= 2) {
-      const pts = Array.from(activePointersRef.current.values());
-      const currentMidX = (pts[0].clientX + pts[1].clientX) / 2;
-      const currentMidY = (pts[0].clientY + pts[1].clientY) / 2;
-
-      if (twoFingerLastPosRef.current) {
-        const deltaY = currentMidY - twoFingerLastPosRef.current.y;
-        const scrollContainer = canvasRef.current?.closest('.overflow-y-auto') as HTMLElement | null;
-        if (scrollContainer) {
-          scrollContainer.scrollTop -= deltaY;
-        }
-      }
-
-      twoFingerLastPosRef.current = { x: currentMidX, y: currentMidY };
-      return;
-    }
-
     if (!isDrawingRef.current) return;
+
+    const isPen = e.pointerType === 'pen';
+    if (!isPen && isStylusActiveRef.current) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    const isPen = e.pointerType === 'pen';
     const pressure = isPen && e.pressure > 0 ? e.pressure : 0.5;
 
     if (activeTool === 'eraser') {
-      handleEraserAt(x, y, activeSize * 2.8);
+      handleEraserAt(x, y, Math.max(26, activeSize * 3.5));
       return;
     }
 
@@ -411,7 +455,7 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     if (!isDrawingRef.current) return;
     isDrawingRef.current = false;
 
-    if (currentStrokeRef.current && currentStrokeRef.current.points.length > 0) {
+    if (activeTool !== 'eraser' && currentStrokeRef.current && currentStrokeRef.current.points.length > 0) {
       const nextStrokes = [...strokesRef.current, currentStrokeRef.current];
       setStrokes(nextStrokes);
       setUndoneStrokes([]);
@@ -422,23 +466,23 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    activePointersRef.current.delete(e.pointerId);
-    if (activePointersRef.current.size < 2) {
-      twoFingerLastPosRef.current = null;
+    if (e.pointerType === 'pen') {
+      setTimeout(() => {
+        isStylusActiveRef.current = false;
+      }, 150);
     }
-    if (activePointersRef.current.size === 0) {
-      finishDrawing();
-    }
+    finishDrawing();
   };
 
-  const handlePointerCancel = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    activePointersRef.current.delete(e.pointerId);
-    if (activePointersRef.current.size < 2) {
-      twoFingerLastPosRef.current = null;
-    }
-    if (activePointersRef.current.size === 0) {
-      finishDrawing();
-    }
+  const handlePointerCancel = () => {
+    finishDrawing();
+  };
+
+  const getCursorStyle = () => {
+    if (!isPenMode) return 'default';
+    if (activeTool === 'eraser') return ERASER_CURSOR;
+    if (activeTool === 'highlighter') return HIGHLIGHTER_CURSOR;
+    return PEN_CURSOR;
   };
 
   return (
@@ -450,11 +494,12 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
       onPointerCancel={handlePointerCancel}
       className={`absolute top-0 left-0 w-full ${
         isPenMode
-          ? 'z-20 pointer-events-auto touch-none cursor-crosshair'
+          ? 'z-20 pointer-events-auto'
           : 'z-10 pointer-events-none'
       }`}
       style={{
         touchAction: 'none',
+        cursor: getCursorStyle(),
       }}
     />
   );
