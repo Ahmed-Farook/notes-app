@@ -315,7 +315,9 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
 
   // Samsung Notes Seamless In-Note Stylus Drawing State
   const [isPenMode, setIsPenMode] = useState(false);
-  const [activeDrawingTool, setActiveDrawingTool] = useState<'pen' | 'highlighter' | 'eraser'>('pen');
+  const [activeDrawingTool, setActiveDrawingTool] = useState<
+    'pen' | 'highlighter' | 'partial_eraser' | 'stroke_eraser' | 'eraser'
+  >('pen');
   const [activeDrawingColor, setActiveDrawingColor] = useState(theme === 'dark' ? '#E8EEF3' : '#213A50');
   const [activeDrawingSize, setActiveDrawingSize] = useState(5);
   const [canDrawingUndo, setCanDrawingUndo] = useState(false);
@@ -788,6 +790,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
             {/* Seamless In-Note Drawing Canvas Overlay */}
             <InNoteCanvas
               noteId={activeNote.id}
+              theme={theme}
               initialStrokesJson={activeNote.drawingStrokes}
               isPenMode={isPenMode}
               activeTool={activeDrawingTool}

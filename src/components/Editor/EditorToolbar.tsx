@@ -46,14 +46,16 @@ const STROKE_SIZES = [
   { label: 'Broad', value: 16 },
 ];
 
+export type DrawingTool = 'pen' | 'highlighter' | 'partial_eraser' | 'stroke_eraser' | 'eraser';
+
 interface EditorToolbarProps {
   editor: Editor | null;
   isVisible: boolean;
   // Samsung Notes Seamless In-Note Drawing State
   isPenMode: boolean;
   onTogglePenMode: (penMode: boolean) => void;
-  activeDrawingTool: 'pen' | 'highlighter' | 'eraser';
-  onChangeDrawingTool: (tool: 'pen' | 'highlighter' | 'eraser') => void;
+  activeDrawingTool: DrawingTool;
+  onChangeDrawingTool: (tool: DrawingTool) => void;
   activeColor: string;
   onChangeColor: (color: string) => void;
   activeSize: number;
@@ -142,7 +144,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       {/* When in Pen Mode: Show Samsung Notes drawing tools */}
       {isPenMode ? (
         <>
-          {/* Tool selector: Pen, Highlighter, Eraser */}
+          {/* Tool selector: Pen, Highlighter, Part Eraser, Stroke Eraser */}
           <div className="flex items-center space-x-1 shrink-0">
             <button
               type="button"
@@ -188,17 +190,36 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               onClick={(e) => {
                 e.preventDefault();
                 triggerHaptic();
-                onChangeDrawingTool('eraser');
+                onChangeDrawingTool('partial_eraser');
               }}
-              title="Eraser (Tap or Drag across strokes to erase)"
+              title="Part Eraser (Erases part of stroke)"
               className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-all outline-none focus:outline-none ${
-                activeDrawingTool === 'eraser'
+                activeDrawingTool === 'partial_eraser' || activeDrawingTool === 'eraser'
                   ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs'
                   : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733]'
               }`}
             >
               <Eraser size={14} />
-              <span className="hidden sm:inline">Eraser</span>
+              <span className="hidden sm:inline">Part Eraser</span>
+            </button>
+
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.preventDefault();
+                triggerHaptic();
+                onChangeDrawingTool('stroke_eraser');
+              }}
+              title="Stroke Eraser (Erases entire stroke)"
+              className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-all outline-none focus:outline-none ${
+                activeDrawingTool === 'stroke_eraser'
+                  ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs'
+                  : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733]'
+              }`}
+            >
+              <Trash2 size={13} />
+              <span className="hidden sm:inline">Stroke Eraser</span>
             </button>
           </div>
 
@@ -234,7 +255,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           </div>
 
           {/* Color Palette (hidden in eraser mode) */}
-          {activeDrawingTool !== 'eraser' && (
+          {activeDrawingTool !== 'partial_eraser' &&
+            activeDrawingTool !== 'stroke_eraser' &&
+            activeDrawingTool !== 'eraser' && (
             <>
               <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#223344] mx-1 shrink-0" />
               <div className="flex items-center space-x-1.5 shrink-0">

@@ -15,11 +15,14 @@ export interface InNoteStroke {
   points: InNotePoint[];
 }
 
+export type DrawingToolType = 'pen' | 'highlighter' | 'partial_eraser' | 'stroke_eraser' | 'eraser';
+
 interface InNoteCanvasProps {
   noteId: string;
+  theme?: 'light' | 'dark';
   initialStrokesJson?: string | null;
   isPenMode: boolean;
-  activeTool: 'pen' | 'highlighter' | 'eraser';
+  activeTool: DrawingToolType;
   activeColor: string;
   activeSize: number;
   onStrokesUpdate: (strokesJson: string) => void;
@@ -29,15 +32,109 @@ interface InNoteCanvasProps {
   clearTrigger?: number;
 }
 
-// Standard, Professional Minimalist Cursors for Desktop
-const PEN_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22' fill='none'%3E%3Cpath d='M1 1L3 8L6 11L14 3L11 0L1 1Z' fill='%230F172A' stroke='%23FFFFFF' stroke-width='1.25' stroke-linejoin='round'/%3E%3Cpath d='M6 11L13 18C13.8 18.8 15.2 18.8 16 18L18 16C18.8 15.2 18.8 13.8 18 13L11 6' stroke='%230F172A' stroke-width='1.75' stroke-linecap='round'/%3E%3Ccircle cx='1' cy='1' r='0.8' fill='%230F172A'/%3E%3C/svg%3E") 1 1, crosshair`;
+/**
+ * Clean, High-Contrast Cursors matching user reference drawings
+ * Theme-aware: bold white outline on dark theme, bold dark outline on light theme
+ */
+function getPenCursor(theme?: 'light' | 'dark') {
+  const isDark = theme === 'dark';
+  const stroke = isDark ? '%23FFFFFF' : '%231C2B36';
+  const fill = isDark ? '%231E293B' : '%23FFFFFF';
+  const tipFill = isDark ? '%237EAAD0' : '%23D97706';
+  return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26' fill='none'%3E%3Cpath d='M2 24 L2 17 L15 4 C17 2 20 2 22 4 C24 6 24 9 22 11 L9 24 Z' fill='${fill}' stroke='${stroke}' stroke-width='2.2' stroke-linejoin='round' stroke-linecap='round'/%3E%3Cpolygon points='2,24 2,17 9,24' fill='${tipFill}' stroke='${stroke}' stroke-width='1.8' stroke-linejoin='round'/%3E%3Cline x1='12' y1='7' x2='19' y2='14' stroke='${stroke}' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 2 24, crosshair`;
+}
 
-const HIGHLIGHTER_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22' fill='none'%3E%3Cpath d='M2 18L5 12L10 17L4 20L2 18Z' fill='%23E2E8F0' stroke='%230F172A' stroke-width='1.2' stroke-linejoin='round'/%3E%3Cpath d='M5 12L14 3C14.8 2.2 16.2 2.2 17 3L19 5C19.8 5.8 19.8 7.2 19 8L10 17' fill='%230F172A' stroke='%23FFFFFF' stroke-width='1.2' stroke-linejoin='round'/%3E%3Cline x1='1' y1='19' x2='4' y2='16' stroke='%23F59E0B' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 2 18, crosshair`;
+function getHighlighterCursor(theme?: 'light' | 'dark') {
+  const isDark = theme === 'dark';
+  const stroke = isDark ? '%23FFFFFF' : '%231C2B36';
+  const fill = isDark ? '%231E293B' : '%23FFFFFF';
+  const chiselColor = '%23FACC15';
+  return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26' fill='none'%3E%3Cpath d='M4 17 L16 5 L22 11 L10 23 Z' fill='${fill}' stroke='${stroke}' stroke-width='2.2' stroke-linejoin='round'/%3E%3Cpath d='M4 17 L2 24 L7 22 L10 23 Z' fill='${chiselColor}' stroke='${stroke}' stroke-width='2' stroke-linejoin='round'/%3E%3Cline x1='4' y1='17' x2='10' y2='23' stroke='${stroke}' stroke-width='2'/%3E%3C/svg%3E") 2 24, crosshair`;
+}
 
-const ERASER_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Ccircle cx='12' cy='12' r='8' stroke='%230F172A' stroke-width='1.25'/%3E%3Ccircle cx='12' cy='12' r='8' stroke='%23FFFFFF' stroke-width='0.5'/%3E%3Ccircle cx='12' cy='12' r='1' fill='%230F172A'/%3E%3C/svg%3E") 12 12, crosshair`;
+function getEraserCursor(theme?: 'light' | 'dark') {
+  const isDark = theme === 'dark';
+  const stroke = isDark ? '%23FFFFFF' : '%231C2B36';
+  const fill = isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.08)';
+  return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26' fill='none'%3E%3Ccircle cx='13' cy='13' r='10' stroke='${stroke}' stroke-width='2' stroke-dasharray='3 2' fill='${fill}'/%3E%3Ccircle cx='13' cy='13' r='1.5' fill='${stroke}'/%3E%3C/svg%3E") 13 13, crosshair`;
+}
+
+/**
+ * Erases points inside the eraser circle, splitting the stroke into surviving sub-strokes
+ */
+function erasePartOfStroke(
+  stroke: InNoteStroke,
+  ex: number,
+  ey: number,
+  radius: number
+): InNoteStroke[] {
+  if (stroke.points.length === 0) return [];
+  const r2 = (radius + stroke.size / 2) * (radius + stroke.size / 2);
+
+  // Subdivide any long line segments so fast gestures don't skip lines
+  const densePoints: InNotePoint[] = [];
+  for (let i = 0; i < stroke.points.length; i++) {
+    const curr = stroke.points[i];
+    if (i === 0) {
+      densePoints.push(curr);
+      continue;
+    }
+    const prev = stroke.points[i - 1];
+    const dist = Math.hypot(curr.x - prev.x, curr.y - prev.y);
+    const step = Math.max(3, radius / 3);
+    if (dist > step) {
+      const numSteps = Math.floor(dist / step);
+      for (let s = 1; s <= numSteps; s++) {
+        const t = s / (numSteps + 1);
+        densePoints.push({
+          x: prev.x + (curr.x - prev.x) * t,
+          y: prev.y + (curr.y - prev.y) * t,
+          pressure:
+            prev.pressure && curr.pressure
+              ? prev.pressure + (curr.pressure - prev.pressure) * t
+              : prev.pressure,
+        });
+      }
+    }
+    densePoints.push(curr);
+  }
+
+  const resultingStrokes: InNoteStroke[] = [];
+  let currentSegment: InNotePoint[] = [];
+
+  for (const pt of densePoints) {
+    const dx = pt.x - ex;
+    const dy = pt.y - ey;
+    const isInside = dx * dx + dy * dy <= r2;
+
+    if (!isInside) {
+      currentSegment.push(pt);
+    } else {
+      if (currentSegment.length > 0) {
+        resultingStrokes.push({
+          ...stroke,
+          id: `${stroke.id}-${resultingStrokes.length}-${Date.now().toString(36)}`,
+          points: currentSegment,
+        });
+        currentSegment = [];
+      }
+    }
+  }
+
+  if (currentSegment.length > 0) {
+    resultingStrokes.push({
+      ...stroke,
+      id: `${stroke.id}-${resultingStrokes.length}-${Date.now().toString(36)}`,
+      points: currentSegment,
+    });
+  }
+
+  return resultingStrokes;
+}
 
 export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
   noteId,
+  theme = 'light',
   initialStrokesJson,
   isPenMode,
   activeTool,
@@ -143,7 +240,8 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
 
       if (stroke.points.length === 1) {
         const p = stroke.points[0];
-        const dotRadius = (stroke.size * (p.pressure && p.pressure > 0 ? p.pressure * 1.2 : 1)) / 2;
+        const dotRadius =
+          (stroke.size * (p.pressure && p.pressure > 0 ? p.pressure * 1.2 : 1)) / 2;
         ctx.fillStyle = stroke.color;
         ctx.beginPath();
         ctx.arc(p.x, p.y, Math.max(1.5, dotRadius), 0, Math.PI * 2);
@@ -338,7 +436,7 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     }
   }, [clearTrigger, onStrokesUpdate]);
 
-  // Point-to-segment distance for eraser collision
+  // Point-to-segment distance for whole-stroke eraser collision
   const distanceToSegment = (
     px: number,
     py: number,
@@ -354,8 +452,42 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
   };
 
-  // Erase any stroke intersecting with eraser coordinate
-  const handleEraserAt = (x: number, y: number, radius = 26) => {
+  // 1. Partial Eraser: Erases points inside the eraser circle, splitting strokes cleanly
+  const handlePartialEraserAt = (x: number, y: number, radius = 20) => {
+    let changed = false;
+    const r2 = (radius + 2) * (radius + 2);
+
+    const nextStrokes: InNoteStroke[] = [];
+
+    for (const stroke of strokesRef.current) {
+      let strokeHit = false;
+
+      for (const pt of stroke.points) {
+        const dx = pt.x - x;
+        const dy = pt.y - y;
+        if (dx * dx + dy * dy <= r2) {
+          strokeHit = true;
+          break;
+        }
+      }
+
+      if (!strokeHit) {
+        nextStrokes.push(stroke);
+      } else {
+        changed = true;
+        const parts = erasePartOfStroke(stroke, x, y, radius);
+        nextStrokes.push(...parts);
+      }
+    }
+
+    if (changed) {
+      setStrokes(nextStrokes);
+      onStrokesUpdate(JSON.stringify(nextStrokes));
+    }
+  };
+
+  // 2. Stroke Eraser: Deletes the entire stroke object on contact
+  const handleStrokeEraserAt = (x: number, y: number, radius = 24) => {
     const remaining = strokesRef.current.filter((stroke) => {
       for (let i = 0; i < stroke.points.length; i++) {
         const pt = stroke.points[i];
@@ -373,13 +505,24 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     });
 
     if (remaining.length !== strokesRef.current.length) {
-      triggerHaptic();
       setStrokes(remaining);
       onStrokesUpdate(JSON.stringify(remaining));
     }
   };
 
-  // Stylus & Touch Pointer Event Handlers
+  // Route erasing to partial or whole-stroke eraser
+  const handleEraserAt = (x: number, y: number, radius: number) => {
+    if (activeTool === 'stroke_eraser') {
+      handleStrokeEraserAt(x, y, radius);
+    } else {
+      handlePartialEraserAt(x, y, radius);
+    }
+  };
+
+  const isEraserTool =
+    activeTool === 'partial_eraser' || activeTool === 'stroke_eraser' || activeTool === 'eraser';
+
+  // Stylus & Touch Pointer Event Handlers (Zero continuous vibration on canvas for maximum comfort!)
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isPenMode) return;
 
@@ -407,15 +550,14 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
 
     isDrawingRef.current = true;
 
-    if (activeTool === 'eraser') {
-      handleEraserAt(x, y, Math.max(26, activeSize * 3.5));
+    if (isEraserTool) {
+      handleEraserAt(x, y, Math.max(18, activeSize * 2.8));
       return;
     }
 
-    triggerHaptic();
     const newStroke: InNoteStroke = {
       id: `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      tool: activeTool,
+      tool: activeTool === 'highlighter' ? 'highlighter' : 'pen',
       color: activeColor,
       size: activeSize,
       points: [{ x, y, pressure }],
@@ -440,8 +582,8 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     const y = e.clientY - rect.top;
     const pressure = isPen && e.pressure > 0 ? e.pressure : 0.5;
 
-    if (activeTool === 'eraser') {
-      handleEraserAt(x, y, Math.max(26, activeSize * 3.5));
+    if (isEraserTool) {
+      handleEraserAt(x, y, Math.max(18, activeSize * 2.8));
       return;
     }
 
@@ -455,7 +597,7 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     if (!isDrawingRef.current) return;
     isDrawingRef.current = false;
 
-    if (activeTool !== 'eraser' && currentStrokeRef.current && currentStrokeRef.current.points.length > 0) {
+    if (!isEraserTool && currentStrokeRef.current && currentStrokeRef.current.points.length > 0) {
       const nextStrokes = [...strokesRef.current, currentStrokeRef.current];
       setStrokes(nextStrokes);
       setUndoneStrokes([]);
@@ -480,9 +622,9 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
 
   const getCursorStyle = () => {
     if (!isPenMode) return 'default';
-    if (activeTool === 'eraser') return ERASER_CURSOR;
-    if (activeTool === 'highlighter') return HIGHLIGHTER_CURSOR;
-    return PEN_CURSOR;
+    if (isEraserTool) return getEraserCursor(theme);
+    if (activeTool === 'highlighter') return getHighlighterCursor(theme);
+    return getPenCursor(theme);
   };
 
   return (
@@ -493,9 +635,7 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
       className={`absolute top-0 left-0 w-full ${
-        isPenMode
-          ? 'z-20 pointer-events-auto'
-          : 'z-10 pointer-events-none'
+        isPenMode ? 'z-20 pointer-events-auto' : 'z-10 pointer-events-none'
       }`}
       style={{
         touchAction: 'none',
