@@ -3,6 +3,7 @@ export interface Note {
   title: string;
   content: string; // HTML string stored by TipTap
   plainTextPreview: string; // snippet for list preview
+  drawingStrokes?: string; // JSON string of DrawingStroke[] for seamless in-note stylus annotations
   folderId: string;
   isPinned: boolean;
   isTrash?: boolean;

@@ -28,9 +28,14 @@ export interface DbFolder {
  * Encrypts and formats a Note for PostgreSQL storage.
  */
 export async function noteToDb(note: Note, userId: string, key: CryptoKey | null): Promise<DbNote> {
+  // If note has handwritten in-note drawing strokes, bundle them securely with content
+  const rawContent = note.drawingStrokes
+    ? JSON.stringify({ html: note.content || '', strokes: note.drawingStrokes })
+    : note.content || '';
+
   const [encryptedTitle, encryptedContent, encryptedPreview] = await Promise.all([
     encryptText(note.title || '', key),
-    encryptText(note.content || '', key),
+    encryptText(rawContent, key),
     encryptText(note.plainTextPreview || '', key),
   ]);
 
@@ -58,10 +63,23 @@ export async function dbToNote(db: DbNote, key: CryptoKey | null): Promise<Note>
     decryptText(db.plain_text_preview, key),
   ]);
 
+  let content = decryptedContent;
+  let drawingStrokes: string | undefined = undefined;
+
+  // Unpack bundled drawing strokes if present
+  if (decryptedContent.startsWith('{"html":') && decryptedContent.includes('"strokes":')) {
+    try {
+      const parsed = JSON.parse(decryptedContent);
+      content = parsed.html || '';
+      drawingStrokes = parsed.strokes;
+    } catch (_) {}
+  }
+
   return {
     id: db.id,
     title: decryptedTitle,
-    content: decryptedContent,
+    content,
+    drawingStrokes,
     plainTextPreview: decryptedPreview,
     folderId: db.folder_id,
     isPinned: db.is_pinned,

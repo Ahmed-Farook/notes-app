@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import { Extension } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
@@ -18,7 +18,7 @@ import { triggerHaptic } from '../../utils/haptics';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import { EditorToolbar } from './EditorToolbar';
-import { DrawingModal } from '../Drawing/DrawingModal';
+import { InNoteCanvas } from '../Drawing/InNoteCanvas';
 
 /**
  * CustomImage: Preserves drawing strokes JSON in data-strokes attribute for re-editing
@@ -312,8 +312,44 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
 
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const [totalMatches, setTotalMatches] = useState(0);
-  const [isDrawingModalOpen, setIsDrawingModalOpen] = useState(false);
-  const [editingStrokesJson, setEditingStrokesJson] = useState<string | null>(null);
+
+  // Samsung Notes Seamless In-Note Stylus Drawing State
+  const [isPenMode, setIsPenMode] = useState(false);
+  const [activeDrawingTool, setActiveDrawingTool] = useState<'pen' | 'highlighter' | 'eraser'>('pen');
+  const [activeDrawingColor, setActiveDrawingColor] = useState(theme === 'dark' ? '#E8EEF3' : '#213A50');
+  const [activeDrawingSize, setActiveDrawingSize] = useState(5);
+  const [canDrawingUndo, setCanDrawingUndo] = useState(false);
+  const [canDrawingRedo, setCanDrawingRedo] = useState(false);
+  const [drawingUndoTrigger, setDrawingUndoTrigger] = useState(0);
+  const [drawingRedoTrigger, setDrawingRedoTrigger] = useState(0);
+  const [drawingClearTrigger, setDrawingClearTrigger] = useState(0);
+
+  // Keep drawing color contrasting with theme changes if user hasn't customized it
+  useEffect(() => {
+    if (theme === 'dark' && activeDrawingColor === '#213A50') {
+      setActiveDrawingColor('#E8EEF3');
+    } else if (theme === 'light' && activeDrawingColor === '#E8EEF3') {
+      setActiveDrawingColor('#213A50');
+    }
+  }, [theme]);
+
+  // Compute container min-height so strokes never get clipped and space dynamically expands
+  const containerMinHeight = useMemo(() => {
+    let maxY = 0;
+    if (activeNote?.drawingStrokes) {
+      try {
+        const parsed = JSON.parse(activeNote.drawingStrokes);
+        if (Array.isArray(parsed)) {
+          for (const stroke of parsed) {
+            for (const pt of stroke.points) {
+              if (pt.y > maxY) maxY = pt.y;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+    return Math.max(window.innerHeight * 0.75, maxY + 250);
+  }, [activeNote?.drawingStrokes]);
 
   const isUpdatingRef = useRef(false);
   const activeNoteRef = useRef(activeNote);
@@ -582,14 +618,23 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
 
   return (
     <div className="flex-1 bg-[#FAF6EF] dark:bg-[#131B24] flex flex-col h-full overflow-hidden relative select-text">
-      {/* Optional Toolbar */}
+      {/* Samsung Notes Toolbar */}
       <EditorToolbar
         editor={editor}
         isVisible={showToolbar}
-        onOpenDrawing={() => {
-          setEditingStrokesJson(null);
-          setIsDrawingModalOpen(true);
-        }}
+        isPenMode={isPenMode}
+        onTogglePenMode={(mode) => setIsPenMode(mode)}
+        activeDrawingTool={activeDrawingTool}
+        onChangeDrawingTool={setActiveDrawingTool}
+        activeColor={activeDrawingColor}
+        onChangeColor={setActiveDrawingColor}
+        activeSize={activeDrawingSize}
+        onChangeSize={setActiveDrawingSize}
+        canDrawingUndo={canDrawingUndo}
+        canDrawingRedo={canDrawingRedo}
+        onDrawingUndo={() => setDrawingUndoTrigger((c) => c + 1)}
+        onDrawingRedo={() => setDrawingRedoTrigger((c) => c + 1)}
+        onDrawingClear={() => setDrawingClearTrigger((c) => c + 1)}
       />
 
       {/* In-Note Search & Highlight Bar */}
@@ -669,7 +714,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
       <div
         className="flex-1 overflow-y-auto px-5 md:px-14 py-3 pb-24 md:pb-8 cursor-text select-text"
         onClick={(e) => {
-          if (editor && !activeNote.isTrash) {
+          if (editor && !activeNote.isTrash && !isPenMode) {
             const target = e.target as HTMLElement;
             // Ignore if clicked on checkbox, label, select, or button
             if (
@@ -695,57 +740,62 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
             </span>
           </div>
 
-          <EditorContent
-            editor={editor}
-            className="prose prose-neutral dark:prose-invert focus:outline-none min-h-[60vh] select-text cursor-text"
-            onClick={(e) => {
-              const target = e.target as HTMLElement;
-              // Check if clicked element is an existing drawing image to re-edit
-              const imgTarget = target.tagName === 'IMG' ? target : target.closest('img');
-              if (imgTarget && !activeNote.isTrash) {
-                const strokesData = imgTarget.getAttribute('data-strokes');
-                setEditingStrokesJson(strokesData || null);
-                setIsDrawingModalOpen(true);
-                return;
-              }
-              // If click was on a checkbox or its label, do NOT trigger focus or open keyboard
-              if (
-                target.tagName === 'INPUT' ||
-                target.closest('label') ||
-                target.closest('[data-type="taskItem"] > label')
-              ) {
-                return;
-              }
-              if (editor && !editor.isFocused && !activeNote.isTrash) {
-                editor.commands.focus();
-              }
-            }}
-          />
+          <div className="relative" style={{ minHeight: `${containerMinHeight}px` }}>
+            <EditorContent
+              editor={editor}
+              className="prose prose-neutral dark:prose-invert focus:outline-none min-h-[60vh] select-text cursor-text"
+              onClick={(e) => {
+                if (isPenMode) return;
+                const target = e.target as HTMLElement;
+                // If click was on a checkbox or its label, do NOT trigger focus or open keyboard
+                if (
+                  target.tagName === 'INPUT' ||
+                  target.closest('label') ||
+                  target.closest('[data-type="taskItem"] > label')
+                ) {
+                  return;
+                }
+                if (editor && !editor.isFocused && !activeNote.isTrash) {
+                  editor.commands.focus();
+                }
+              }}
+            />
+
+            {/* Seamless In-Note Drawing Canvas Overlay */}
+            <InNoteCanvas
+              noteId={activeNote.id}
+              initialStrokesJson={activeNote.drawingStrokes}
+              isPenMode={isPenMode}
+              activeTool={activeDrawingTool}
+              activeColor={activeDrawingColor}
+              activeSize={activeDrawingSize}
+              onStrokesUpdate={(strokesJson) => {
+                const currentNote = activeNoteRef.current;
+                if (!currentNote) return;
+
+                const updates: any = {
+                  drawingStrokes: strokesJson,
+                };
+
+                // If note has no custom title or is 'New Note', and user drew something
+                if ((!currentNote.title || currentNote.title === 'New Note') && strokesJson !== '[]') {
+                  updates.title = 'Handwritten Note';
+                  updates.plainTextPreview = '[Handwritten Drawing / Annotation]';
+                }
+
+                updateNote(currentNote.id, updates);
+              }}
+              onHistoryChange={(canUndo, canRedo) => {
+                setCanDrawingUndo(canUndo);
+                setCanDrawingRedo(canRedo);
+              }}
+              undoTrigger={drawingUndoTrigger}
+              redoTrigger={drawingRedoTrigger}
+              clearTrigger={drawingClearTrigger}
+            />
+          </div>
         </div>
       </div>
-
-      {/* Drawing / Stylus Annotations Canvas Modal */}
-      <DrawingModal
-        isOpen={isDrawingModalOpen}
-        onClose={() => {
-          setIsDrawingModalOpen(false);
-          setEditingStrokesJson(null);
-        }}
-        onSave={(dataUrl, strokesJson) => {
-          if (!editor || !activeNote) return;
-          triggerHaptic();
-          const attrs: Record<string, any> = {
-            src: dataUrl,
-            alt: 'Handwritten Drawing / Annotation',
-          };
-          if (strokesJson) {
-            attrs['data-strokes'] = strokesJson;
-          }
-          editor.chain().focus().setImage(attrs as any).run();
-        }}
-        initialStrokesJson={editingStrokesJson}
-        theme={theme}
-      />
     </div>
   );
 };
