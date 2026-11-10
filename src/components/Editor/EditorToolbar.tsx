@@ -17,6 +17,7 @@ import {
   Heading1,
   Heading2,
   Heading3,
+  PenTool,
 } from 'lucide-react';
 import { triggerHaptic } from '../../utils/haptics';
 import { toggleUnifiedCodeBlock } from '../../utils/editorCommands';
@@ -24,9 +25,10 @@ import { toggleUnifiedCodeBlock } from '../../utils/editorCommands';
 interface EditorToolbarProps {
   editor: Editor | null;
   isVisible: boolean;
+  onOpenDrawing?: () => void;
 }
 
-export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible }) => {
+export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible, onOpenDrawing }) => {
   if (!editor || !isVisible) return null;
 
   const runCommand = (cmd: () => void) => {
@@ -164,6 +166,20 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, isVisible 
       >
         <Minus size={15} />
       </button>
+
+      {/* Stylus / Drawing & Annotations */}
+      {onOpenDrawing && (
+        <button
+          onClick={() => {
+            triggerHaptic();
+            onOpenDrawing();
+          }}
+          title="Drawing & Stylus Annotations (S-Pen / Apple Pencil)"
+          className="p-1.5 rounded shrink-0 text-[#213A50] dark:text-[#7EAAD0] hover:bg-[#E5DCCB] dark:hover:bg-[#1C2733] hover:scale-105 active:scale-95 transition-all"
+        >
+          <PenTool size={15} />
+        </button>
+      )}
 
       <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#223344] mx-1 shrink-0" />
 

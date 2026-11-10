@@ -250,13 +250,79 @@ function singleDownloadAttempt(url, destPath, onProgress, redirectCount = 0) {
   });
 }
 
-// Multi-mirror resilient file downloader (tries primary URL, then ghfast.top, then ghproxy.net)
+// Native macOS curl download helper with auto-resume, retry, and connection-reset resistance
+function downloadWithCurl(url, destPath, onProgress) {
+  return new Promise((resolve, reject) => {
+    // -L follow redirects
+    // -f fail on HTTP errors (4xx/5xx)
+    // -C - automatically resume if broken
+    // --retry 5 --retry-connrefused --retry-delay 2
+    // --connect-timeout 25
+    const args = [
+      '-L',
+      '-f',
+      '-C', '-',
+      '--retry', '5',
+      '--retry-connrefused',
+      '--retry-delay', '2',
+      '--connect-timeout', '25',
+      '-o', destPath,
+      url,
+    ];
+
+    const proc = spawn('/usr/bin/curl', args);
+
+    let progressTimer = setInterval(() => {
+      try {
+        if (fs.existsSync(destPath)) {
+          const stats = fs.statSync(destPath);
+          const estimatedSize = 130 * 1024 * 1024; // ~130MB DMG
+          const pct = Math.min(99, Math.round((stats.size / estimatedSize) * 100));
+          if (onProgress) onProgress(pct);
+        }
+      } catch (_) {}
+    }, 400);
+
+    proc.on('close', (code) => {
+      clearInterval(progressTimer);
+      if (code === 0) {
+        if (onProgress) onProgress(100);
+        resolve();
+      } else {
+        reject(new Error(`curl exited with code ${code}`));
+      }
+    });
+
+    proc.on('error', (err) => {
+      clearInterval(progressTimer);
+      reject(err);
+    });
+  });
+}
+
+// Multi-mirror resilient file downloader (tries curl first on macOS, then Node HTTPS chain across mirrors)
 async function downloadFileWithProgress(originalUrl, destPath, onProgress) {
   const candidateUrls = [
     originalUrl,
     `https://ghfast.top/${originalUrl}`,
     `https://ghproxy.net/${originalUrl}`,
   ];
+
+  // On macOS, if /usr/bin/curl is available, try curl first with automatic resume and retry on ECONNRESET
+  if (process.platform === 'darwin' && fs.existsSync('/usr/bin/curl')) {
+    for (let i = 0; i < candidateUrls.length; i++) {
+      const candidate = candidateUrls[i];
+      try {
+        await downloadWithCurl(candidate, destPath, onProgress);
+        if (fs.existsSync(destPath) && fs.statSync(destPath).size > 500000) {
+          return;
+        }
+      } catch (err) {
+        console.warn(`[Updater] curl attempt ${i + 1} failed for ${candidate}:`, err.message);
+        try { fs.unlinkSync(destPath); } catch (_) {}
+      }
+    }
+  }
 
   let lastError = null;
   for (let i = 0; i < candidateUrls.length; i++) {
@@ -431,25 +497,36 @@ ipcMain.handle('updater:install-update', async (_event, downloadUrl) => {
     mainWindow?.webContents.send('updater:progress', 100);
 
     // 2. Mount DMG silently without opening a Finder window
-    const attachOutput = execSync(`hdiutil attach -nobrowse -readonly "${tempDmgPath}"`).toString();
-    const mountMatch = attachOutput.match(/\/Volumes\/[^\n\r]+/);
-    if (!mountMatch) {
-      throw new Error('Could not find DMG mount volume');
+    let mountPoint = null;
+    try {
+      const attachOutput = execSync(`hdiutil attach -nobrowse -readonly "${tempDmgPath}"`).toString();
+      const mountMatch = attachOutput.match(/\/Volumes\/[^\n\r]+/);
+      if (mountMatch) {
+        mountPoint = mountMatch[0].trim();
+      }
+    } catch (mountErr) {
+      console.warn('[Updater] Silent hdiutil attach failed:', mountErr.message);
     }
-    const mountPoint = mountMatch[0].trim();
+
+    // If mounting silently failed or no mount volume was found, fall back to opening DMG in Finder
+    if (!mountPoint) {
+      execSync(`open "${tempDmgPath}"`);
+      return { success: true, openedFinder: true };
+    }
 
     // 3. Locate the new .app inside the mounted DMG
     const files = fs.readdirSync(mountPoint);
     const appName = files.find((f) => f.endsWith('.app'));
     if (!appName) {
-      execSync(`hdiutil detach "${mountPoint}" -force`);
-      throw new Error('No .app found inside the DMG image');
+      try { execSync(`hdiutil detach "${mountPoint}" -force`); } catch (_) {}
+      execSync(`open "${tempDmgPath}"`);
+      return { success: true, openedFinder: true };
     }
     const sourceApp = path.join(mountPoint, appName);
 
     // 4. Determine current installed app path (or default to /Applications)
     let targetApp = process.execPath.replace(/\/Contents\/MacOS\/.*$/, '');
-    if (!targetApp.endsWith('.app') || !fs.existsSync(targetApp)) {
+    if (!targetApp.endsWith('.app') || !fs.existsSync(targetApp) || targetApp.startsWith('/Volumes/')) {
       if (fs.existsSync('/Applications/texo.app')) {
         targetApp = '/Applications/texo.app';
       } else if (fs.existsSync('/Applications/texō.app')) {
@@ -474,20 +551,21 @@ while kill -0 "$OLD_PID" 2>/dev/null; do
   sleep 0.2
 done
 
-# Replace installed application bundle
-rm -rf "$TARGET_APP"
-cp -a "$SOURCE_APP" "$TARGET_APP"
-
-# Detach DMG and cleanup
-hdiutil detach "$MOUNT_POINT" -force >/dev/null 2>&1
-rm -f "$DMG_PATH"
-rm -f "$0"
-
-# Remove quarantine attribute so Gatekeeper allows immediate launch
-xattr -rd com.apple.quarantine "$TARGET_APP" >/dev/null 2>&1 || true
-
-# Relaunch updated application
-open -n -a "$TARGET_APP"
+# Try replacing installed application bundle
+if rm -rf "$TARGET_APP" 2>/dev/null && cp -a "$SOURCE_APP" "$TARGET_APP" 2>/dev/null; then
+  # Remove quarantine attribute so Gatekeeper allows immediate launch
+  xattr -rd com.apple.quarantine "$TARGET_APP" >/dev/null 2>&1 || true
+  # Detach DMG and cleanup
+  hdiutil detach "$MOUNT_POINT" -force >/dev/null 2>&1
+  rm -f "$DMG_PATH"
+  rm -f "$0"
+  open -n -a "$TARGET_APP"
+else
+  # If in-place replacement cannot be done without elevated permissions, open DMG in Finder
+  hdiutil detach "$MOUNT_POINT" -force >/dev/null 2>&1
+  open "$DMG_PATH"
+  rm -f "$0"
+fi
 `;
 
     fs.writeFileSync(scriptPath, scriptContent, { mode: 0o755 });

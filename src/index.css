@@ -302,3 +302,34 @@ mark {
   border-bottom: none;
 }
 
+/* Handwritten Drawing & Stylus Annotations Styling */
+.note-drawing-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.875rem;
+  margin: 0.85rem auto;
+  border: 1px solid rgba(223, 211, 192, 0.7);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: all 0.18s ease-in-out;
+}
+
+.dark .note-drawing-image {
+  border-color: rgba(34, 51, 68, 0.85);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+}
+
+.note-drawing-image:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  outline: 2px solid rgba(33, 58, 80, 0.45);
+  outline-offset: 2px;
+}
+
+.dark .note-drawing-image:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  outline-color: rgba(126, 170, 208, 0.6);
+}
+
+

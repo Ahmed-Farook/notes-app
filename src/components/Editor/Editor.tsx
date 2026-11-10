@@ -9,6 +9,7 @@ import TaskItem from '@tiptap/extension-task-item';
 import Underline from '@tiptap/extension-underline';
 import Highlight from '@tiptap/extension-highlight';
 import Placeholder from '@tiptap/extension-placeholder';
+import Image from '@tiptap/extension-image';
 import { RotateCcw, Trash2, Search, ChevronUp, ChevronDown, X } from 'lucide-react';
 
 import { useNotes } from '../../store/NotesContext';
@@ -17,6 +18,27 @@ import { triggerHaptic } from '../../utils/haptics';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import { EditorToolbar } from './EditorToolbar';
+import { DrawingModal } from '../Drawing/DrawingModal';
+
+/**
+ * CustomImage: Preserves drawing strokes JSON in data-strokes attribute for re-editing
+ */
+const CustomImage = Image.extend({
+  name: 'image',
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      'data-strokes': {
+        default: null,
+        parseHTML: (element) => element.getAttribute('data-strokes'),
+        renderHTML: (attributes) => {
+          if (!attributes['data-strokes']) return {};
+          return { 'data-strokes': attributes['data-strokes'] };
+        },
+      },
+    };
+  },
+});
 
 /**
  * CustomTaskItem: Toggles checkbox without opening virtual keyboard or stealing cursor focus
@@ -285,10 +307,13 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     permanentlyDeleteNote,
     searchQuery,
     setSearchQuery,
+    theme,
   } = useNotes();
 
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const [totalMatches, setTotalMatches] = useState(0);
+  const [isDrawingModalOpen, setIsDrawingModalOpen] = useState(false);
+  const [editingStrokesJson, setEditingStrokesJson] = useState<string | null>(null);
 
   const isUpdatingRef = useRef(false);
   const activeNoteRef = useRef(activeNote);
@@ -311,6 +336,13 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
         placeholder: 'Type something...',
         emptyEditorClass: 'is-editor-empty',
       }),
+      CustomImage.configure({
+        inline: false,
+        allowBase64: true,
+        HTMLAttributes: {
+          class: 'note-drawing-image',
+        },
+      }),
       SearchHighlightExtension,
     ],
     content: activeNote ? activeNote.content : '',
@@ -332,10 +364,16 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
 
       // Extract title and snippet preview from text
       const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-      const title = lines.length > 0 ? lines[0].substring(0, 80) : 'New Note';
-      const plainTextPreview = lines.length > 1
+      let title = lines.length > 0 ? lines[0].substring(0, 80) : 'New Note';
+      let plainTextPreview = lines.length > 1
         ? lines.slice(1).join(' ').substring(0, 150)
         : (lines.length === 1 && lines[0] !== title ? lines[0] : 'No additional text');
+
+      // If note has a drawing but no text lines
+      if (lines.length === 0 && html.includes('<img')) {
+        title = 'Drawing Note';
+        plainTextPreview = '[Handwritten Drawing / Annotation]';
+      }
 
       updateNote(currentNote.id, {
         content: html,
@@ -545,7 +583,14 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
   return (
     <div className="flex-1 bg-[#FAF6EF] dark:bg-[#131B24] flex flex-col h-full overflow-hidden relative select-text">
       {/* Optional Toolbar */}
-      <EditorToolbar editor={editor} isVisible={showToolbar} />
+      <EditorToolbar
+        editor={editor}
+        isVisible={showToolbar}
+        onOpenDrawing={() => {
+          setEditingStrokesJson(null);
+          setIsDrawingModalOpen(true);
+        }}
+      />
 
       {/* In-Note Search & Highlight Bar */}
       {searchQuery && (
@@ -655,6 +700,14 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
             className="prose prose-neutral dark:prose-invert focus:outline-none min-h-[60vh] select-text cursor-text"
             onClick={(e) => {
               const target = e.target as HTMLElement;
+              // Check if clicked element is an existing drawing image to re-edit
+              const imgTarget = target.tagName === 'IMG' ? target : target.closest('img');
+              if (imgTarget && !activeNote.isTrash) {
+                const strokesData = imgTarget.getAttribute('data-strokes');
+                setEditingStrokesJson(strokesData || null);
+                setIsDrawingModalOpen(true);
+                return;
+              }
               // If click was on a checkbox or its label, do NOT trigger focus or open keyboard
               if (
                 target.tagName === 'INPUT' ||
@@ -670,6 +723,29 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
           />
         </div>
       </div>
+
+      {/* Drawing / Stylus Annotations Canvas Modal */}
+      <DrawingModal
+        isOpen={isDrawingModalOpen}
+        onClose={() => {
+          setIsDrawingModalOpen(false);
+          setEditingStrokesJson(null);
+        }}
+        onSave={(dataUrl, strokesJson) => {
+          if (!editor || !activeNote) return;
+          triggerHaptic();
+          const attrs: Record<string, any> = {
+            src: dataUrl,
+            alt: 'Handwritten Drawing / Annotation',
+          };
+          if (strokesJson) {
+            attrs['data-strokes'] = strokesJson;
+          }
+          editor.chain().focus().setImage(attrs as any).run();
+        }}
+        initialStrokesJson={editingStrokesJson}
+        theme={theme}
+      />
     </div>
   );
 };
