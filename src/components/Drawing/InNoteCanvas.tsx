@@ -111,6 +111,204 @@ function getStrokesBounds(strokes: InNoteStroke[], selectedIds: Set<string>) {
   };
 }
 
+function perpendicularDist(
+  p: { x: number; y: number },
+  a: { x: number; y: number },
+  b: { x: number; y: number }
+): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+function rdpSimplify(points: InNotePoint[], eps: number): InNotePoint[] {
+  if (points.length < 3) return points;
+  let maxDist = 0;
+  let idx = 0;
+  const first = points[0];
+  const last = points[points.length - 1];
+  for (let i = 1; i < points.length - 1; i++) {
+    const d = perpendicularDist(points[i], first, last);
+    if (d > maxDist) {
+      maxDist = d;
+      idx = i;
+    }
+  }
+  if (maxDist > eps) {
+    const left = rdpSimplify(points.slice(0, idx + 1), eps);
+    const right = rdpSimplify(points.slice(idx), eps);
+    return left.slice(0, -1).concat(right);
+  }
+  return [first, last];
+}
+
+/**
+ * Recognizes rough hand-drawn shapes (Line, Circle/Ellipse, Rectangle, Triangle)
+ * when user draws and holds briefly, returning snapped clean stroke points.
+ */
+function detectAndSnapShape(points: InNotePoint[]): InNotePoint[] | null {
+  if (points.length < 6) return null;
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let pathLen = 0;
+
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+    if (i > 0) {
+      pathLen += Math.hypot(p.x - points[i - 1].x, p.y - points[i - 1].y);
+    }
+  }
+
+  const w = maxX - minX;
+  const h = maxY - minY;
+  const diag = Math.hypot(w, h);
+  if (pathLen < 35 || diag < 24) return null;
+
+  const start = points[0];
+  const end = points[points.length - 1];
+  const endDist = Math.hypot(end.x - start.x, end.y - start.y);
+  const avgPressure = points.reduce((s, p) => s + (p.pressure ?? 0.5), 0) / points.length;
+
+  // 1. Straight Line (open stroke with low perpendicular deviation)
+  if (endDist > 30 && endDist / pathLen > 0.85) {
+    let maxDev = 0;
+    for (const p of points) {
+      const d = perpendicularDist(p, start, end);
+      if (d > maxDev) maxDev = d;
+    }
+    if (maxDev < Math.max(10, endDist * 0.08)) {
+      let sx = start.x;
+      let sy = start.y;
+      let ex = end.x;
+      let ey = end.y;
+      const angle = Math.abs(Math.atan2(ey - sy, ex - sx) * (180 / Math.PI));
+      // Subtle snap to exact horizontal or vertical when close
+      if (angle < 5 || angle > 175) {
+        const midY = (sy + ey) / 2;
+        sy = midY;
+        ey = midY;
+      } else if (Math.abs(angle - 90) < 5) {
+        const midX = (sx + ex) / 2;
+        sx = midX;
+        ex = midX;
+      }
+      const out: InNotePoint[] = [];
+      for (let i = 0; i <= 14; i++) {
+        const t = i / 14;
+        out.push({
+          x: sx + (ex - sx) * t,
+          y: sy + (ey - sy) * t,
+          pressure: avgPressure,
+        });
+      }
+      return out;
+    }
+  }
+
+  // Closed shape threshold
+  const isClosed = endDist < Math.max(40, diag * 0.3);
+  if (!isClosed || pathLen < diag * 2.1) return null;
+
+  // 2. Circle / Ellipse
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const rx = w / 2;
+  const ry = h / 2;
+  if (rx > 10 && ry > 10) {
+    let errSum = 0;
+    for (const p of points) {
+      const nx = (p.x - cx) / rx;
+      const ny = (p.y - cy) / ry;
+      errSum += Math.abs(Math.hypot(nx, ny) - 1);
+    }
+    if (errSum / points.length < 0.145) {
+      const isCircle = Math.abs(rx - ry) / Math.max(rx, ry) < 0.16;
+      const frx = isCircle ? (rx + ry) / 2 : rx;
+      const fry = isCircle ? (rx + ry) / 2 : ry;
+      const out: InNotePoint[] = [];
+      for (let i = 0; i <= 48; i++) {
+        const a = (i / 48) * Math.PI * 2;
+        out.push({
+          x: cx + Math.cos(a) * frx,
+          y: cy + Math.sin(a) * fry,
+          pressure: avgPressure,
+        });
+      }
+      return out;
+    }
+  }
+
+  // 3. Axis-aligned Rectangle
+  if (w > 20 && h > 20) {
+    let edgeDistSum = 0;
+    for (const p of points) {
+      const dEdge = Math.min(
+        Math.abs(p.x - minX),
+        Math.abs(p.x - maxX),
+        Math.abs(p.y - minY),
+        Math.abs(p.y - maxY)
+      );
+      edgeDistSum += dEdge;
+    }
+    if (edgeDistSum / points.length / Math.max(w, h) < 0.1) {
+      const corners = [
+        { x: minX, y: minY },
+        { x: maxX, y: minY },
+        { x: maxX, y: maxY },
+        { x: minX, y: maxY },
+        { x: minX, y: minY },
+      ];
+      const out: InNotePoint[] = [];
+      for (let c = 0; c < 4; c++) {
+        for (let s = 0; s < 6; s++) {
+          const t = s / 6;
+          out.push({
+            x: corners[c].x + (corners[c + 1].x - corners[c].x) * t,
+            y: corners[c].y + (corners[c + 1].y - corners[c].y) * t,
+            pressure: avgPressure,
+          });
+        }
+      }
+      out.push({ x: minX, y: minY, pressure: avgPressure });
+      return out;
+    }
+  }
+
+  // 4. Triangle (via RDP simplification)
+  const simp = rdpSimplify(points, diag * 0.11);
+  if (simp.length === 4 || simp.length === 5) {
+    const verts = simp.slice(0, simp.length - 1);
+    if (verts.length === 3) {
+      const out: InNotePoint[] = [];
+      const loop = [...verts, verts[0]];
+      for (let c = 0; c < 3; c++) {
+        for (let s = 0; s < 6; s++) {
+          const t = s / 6;
+          out.push({
+            x: loop[c].x + (loop[c + 1].x - loop[c].x) * t,
+            y: loop[c].y + (loop[c + 1].y - loop[c].y) * t,
+            pressure: avgPressure,
+          });
+        }
+      }
+      out.push({ x: loop[0].x, y: loop[0].y, pressure: avgPressure });
+      return out;
+    }
+  }
+
+  return null;
+}
+
 /**
  * Erases points inside the eraser circle, splitting the stroke into surviving sub-strokes
  */
@@ -235,6 +433,11 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
   const activeTouchStartTimeRef = useRef<number>(0);
   const lastTouchMidYRef = useRef<number | null>(null);
   const prevNoteIdRef = useRef<string>(noteId);
+
+  // Auto-shape snap (draw & hold briefly) state
+  const shapeHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastHoldCheckPosRef = useRef<{ x: number; y: number } | null>(null);
+  const snappedThisStrokeRef = useRef(false);
 
   const commitStrokesWithHistory = useCallback(
     (nextStrokes: InNoteStroke[], prevSnapshot: InNoteStroke[]) => {
@@ -741,6 +944,17 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
       return;
     }
 
+    const clearShapeHoldTimer = () => {
+      if (shapeHoldTimerRef.current) {
+        clearTimeout(shapeHoldTimerRef.current);
+        shapeHoldTimerRef.current = null;
+      }
+    };
+
+    clearShapeHoldTimer();
+    snappedThisStrokeRef.current = false;
+    lastHoldCheckPosRef.current = { x, y };
+
     const newStroke: InNoteStroke = {
       id: `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       tool: activeTool === 'highlighter' ? 'highlighter' : 'pen',
@@ -793,12 +1007,40 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     }
 
     if (currentStrokeRef.current) {
+      if (snappedThisStrokeRef.current) return;
       currentStrokeRef.current.points.push({ x, y, pressure });
       redrawCanvas();
+
+      // Draw & Hold Auto-Shape Snap: if pointer moves >7px, reset 420ms stillness timer
+      const lastPos = lastHoldCheckPosRef.current;
+      if (!lastPos || Math.hypot(x - lastPos.x, y - lastPos.y) > 7) {
+        lastHoldCheckPosRef.current = { x, y };
+        if (shapeHoldTimerRef.current) {
+          clearTimeout(shapeHoldTimerRef.current);
+        }
+        shapeHoldTimerRef.current = setTimeout(() => {
+          if (!isDrawingRef.current || !currentStrokeRef.current || snappedThisStrokeRef.current) {
+            return;
+          }
+          const snapped = detectAndSnapShape(currentStrokeRef.current.points);
+          if (snapped) {
+            currentStrokeRef.current.points = snapped;
+            snappedThisStrokeRef.current = true;
+            triggerHaptic();
+            redrawCanvas();
+          }
+        }, 420);
+      }
     }
   };
 
   const finishDrawing = () => {
+    if (shapeHoldTimerRef.current) {
+      clearTimeout(shapeHoldTimerRef.current);
+      shapeHoldTimerRef.current = null;
+    }
+    lastHoldCheckPosRef.current = null;
+    snappedThisStrokeRef.current = false;
     eraserPreviewRef.current = null;
     if (!isDrawingRef.current) {
       redrawCanvas();

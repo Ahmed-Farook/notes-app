@@ -619,12 +619,10 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
   };
 
   const handleNextMatch = () => {
-    triggerHaptic();
     goToMatch(currentMatchIndex + 1);
   };
 
   const handlePrevMatch = () => {
-    triggerHaptic();
     goToMatch(currentMatchIndex - 1);
   };
 
@@ -652,7 +650,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
 
   if (!activeNote) {
     return (
-      <div className="flex-1 bg-[#FAF6EF] dark:bg-[#131B24] flex flex-col items-center justify-center text-[#6E7E8E] dark:text-[#8AA0B4] select-none p-6 text-center">
+      <div className="flex-1 apple-paper-bg flex flex-col items-center justify-center text-[#6E7E8E] dark:text-[#8AA0B4] select-none p-6 text-center">
         <p className="text-sm mb-3">Select a note or create a new one</p>
         <button
           onClick={() => createNote()}
@@ -665,7 +663,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
   }
 
   return (
-    <div className="flex-1 bg-[#FAF6EF] dark:bg-[#131B24] flex flex-col h-full overflow-hidden relative select-text">
+    <div className="flex-1 apple-paper-bg flex flex-col h-full overflow-hidden relative select-text animate-editor-enter">
       {/* Samsung Notes Toolbar */}
       <EditorToolbar
         editor={editor}
@@ -728,7 +726,6 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
             <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#243547] mx-1" />
             <button
               onClick={() => {
-                triggerHaptic();
                 setSearchQuery('');
               }}
               title="Close search (Esc)"
@@ -745,7 +742,6 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
         <div className="bg-[#EFE7D8] dark:bg-[#16202A] border-b border-[#DFD3C0] dark:border-[#223344] px-4 md:px-8 py-2.5 flex items-center justify-between text-xs transition-colors">
           <button
             onClick={() => {
-              triggerHaptic();
               restoreNote(activeNote.id);
             }}
             className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-[#DFD3C0] dark:border-[#2A3E52] bg-[#FAF6EF] dark:bg-[#1C2733] hover:bg-[#E5DCCB] dark:hover:bg-[#25394C] text-[#213A50] dark:text-[#7EAAD0] font-medium transition-all shadow-xs active:scale-95"

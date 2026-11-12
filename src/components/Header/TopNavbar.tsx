@@ -104,11 +104,10 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         {mobileView === 'editor' && (
           <button
             onClick={() => {
-              triggerHaptic();
               setMobileView('list');
               setActiveNoteId(null);
             }}
-            className="md:hidden flex items-center space-x-1 text-apple-yellow hover:text-apple-yellowHover dark:text-[#7EAAD0] dark:hover:text-[#9DC3E6] text-xs font-semibold py-1 px-1 rounded active:opacity-70"
+            className="md:hidden flex items-center space-x-1 text-apple-yellow hover:text-apple-yellowHover dark:text-[#7EAAD0] dark:hover:text-[#9DC3E6] text-xs font-semibold py-1 px-1 rounded active:opacity-70 transition-opacity"
           >
             <ChevronLeft size={18} />
             <span>Notes</span>
@@ -119,7 +118,6 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         {mobileView === 'list' && (
           <button
             onClick={() => {
-              triggerHaptic();
               setIsFolderPickerOpen(true);
             }}
             className="md:hidden flex items-center space-x-1.5 text-xs font-semibold text-[#1C2B36] dark:text-[#E8EEF3] bg-[#E5DCCB]/80 dark:bg-[#1C2733] hover:bg-[#E5DCCB] dark:hover:bg-[#223344] px-2.5 py-1 rounded-full transition-all active:scale-95 border border-[#DFD3C0] dark:border-[#263747] shadow-xs ml-1"
@@ -146,10 +144,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         {/* View Mode Toggle (Desktop only) */}
         <div className="hidden md:flex bg-[#E5DCCB] dark:bg-[#1A2530] border border-[#DFD3C0] dark:border-[#223344] rounded-md p-0.5">
           <button
-            onClick={() => {
-              triggerHaptic();
-              setViewMode('list');
-            }}
+            onClick={() => setViewMode('list')}
             title="List View"
             className={`p-1 rounded text-xs transition-colors ${
               viewMode === 'list'
@@ -160,10 +155,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             <ListIcon size={15} />
           </button>
           <button
-            onClick={() => {
-              triggerHaptic();
-              setViewMode('gallery');
-            }}
+            onClick={() => setViewMode('gallery')}
             title="Gallery View"
             className={`p-1 rounded text-xs transition-colors ${
               viewMode === 'gallery'
@@ -205,10 +197,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         {/* Import button */}
         <button
           type="button"
-          onClick={() => {
-            triggerHaptic();
-            importInputRef.current?.click();
-          }}
+          onClick={() => importInputRef.current?.click()}
           title="Import Notes (.txt, .md, .zip)"
           className="p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 transition-colors active:scale-95"
         >
@@ -221,7 +210,6 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              triggerHaptic();
               setShowExportMenu((prev) => !prev);
             }}
             disabled={!noteToExport}
@@ -236,6 +224,16 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
               <div className="px-3 py-1 font-semibold text-[#5A6E82] dark:text-[#8AA0B4] uppercase tracking-wider text-[10px]">
                 Export Note As
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  exportCurrentNote('pdf', noteToExport);
+                  setShowExportMenu(false);
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-700 dark:text-neutral-200 font-medium transition-colors"
+              >
+                PDF Document (.pdf)
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -273,10 +271,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         {/* Update notification button (Desktop only, if available) */}
         {hasUpdate && (
           <button
-            onClick={() => {
-              triggerHaptic();
-              onCheckUpdates?.();
-            }}
+            onClick={() => onCheckUpdates?.()}
             title="Software Update Available"
             className="hidden md:flex items-center space-x-1 px-2 py-1 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-medium hover:bg-amber-500/25 transition-all active:scale-95"
           >
@@ -287,10 +282,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
 
         {/* Cloud Sync Button */}
         <button
-          onClick={() => {
-            triggerHaptic();
-            openAuthModal();
-          }}
+          onClick={() => openAuthModal()}
           title={
             user
               ? `Cloud Sync Active (${user.email}) • Status: ${syncStatus}`
@@ -333,8 +325,8 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             <button
               key="mobile-nav-delete-btn"
               onClick={() => {
-                triggerHaptic();
                 deleteNote(activeNote.id);
+                setActiveNoteId(null);
                 setMobileView('list');
               }}
               title="Delete Note"
@@ -346,10 +338,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         ) : (
           <button
             key="mobile-nav-update-btn"
-            onClick={() => {
-              triggerHaptic();
-              onCheckUpdates?.();
-            }}
+            onClick={() => onCheckUpdates?.()}
             title="Check for Software Updates"
             className={`md:hidden flex items-center space-x-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors duration-150 active:scale-95 outline-none focus:outline-none focus:ring-0 ${
               hasUpdate

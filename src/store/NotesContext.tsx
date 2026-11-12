@@ -76,7 +76,7 @@ interface NotesContextType {
   togglePinSelectedNotes: () => void;
   moveSelectedNotesToFolder: (folderId: string) => void;
   restoreSelectedNotes: () => void;
-  exportSelectedNotes: (formatType?: 'txt' | 'markdown' | 'html') => Promise<void>;
+  exportSelectedNotes: (formatType?: 'txt' | 'markdown' | 'html' | 'pdf') => Promise<void>;
 
   // Recycle Bin Confirmation Modal State
   pendingTrashDelete: PendingTrashDelete;
@@ -105,7 +105,7 @@ interface NotesContextType {
   renameFolder: (id: string, newName: string) => void;
   deleteFolder: (id: string) => void;
   deleteFolders: (ids: string[]) => void;
-  exportCurrentNote: (formatType: 'markdown' | 'txt' | 'html', noteToExport?: Note) => void;
+  exportCurrentNote: (formatType: 'markdown' | 'txt' | 'html' | 'pdf', noteToExport?: Note) => Promise<void> | void;
   importNotes: (files: FileList | File[]) => Promise<number>;
 }
 
@@ -365,12 +365,10 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }, []);
 
   const toggleTheme = useCallback(() => {
-    triggerHaptic();
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   }, []);
 
   const toggleSidebar = useCallback(() => {
-    triggerHaptic();
     setIsSidebarOpen(prev => !prev);
   }, []);
 
@@ -554,10 +552,16 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
 
     if (activeNoteId === id) {
-      const remaining = filteredNotes.filter(n => n.id !== id);
-      setActiveNoteId(remaining.length > 0 ? remaining[0].id : null);
-      if (remaining.length === 0) {
+      const isMobileViewport = typeof window !== 'undefined' && window.innerWidth < 768;
+      if (isMobileViewport) {
+        setActiveNoteIdState(null);
         setMobileView('list');
+      } else {
+        const remaining = filteredNotes.filter(n => n.id !== id);
+        setActiveNoteId(remaining.length > 0 ? remaining[0].id : null);
+        if (remaining.length === 0) {
+          setMobileView('list');
+        }
       }
     }
   }, [activeNoteId, filteredNotes, user, setActiveNoteId]);
@@ -685,21 +689,20 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   }, [selectedFolderId, user]);
 
-  // Export current note (preserves line breaks cleanly via DOM block walker)
+  // Export current note (preserves line breaks cleanly & includes drawings in PDF)
   const exportCurrentNote = useCallback(
-    (formatType: 'markdown' | 'txt' | 'html', specificNote?: Note) => {
+    async (formatType: 'markdown' | 'txt' | 'html' | 'pdf', specificNote?: Note) => {
       const targetNote = specificNote || activeNote;
       if (!targetNote) return;
-      exportSingleNote(targetNote, formatType);
+      await exportSingleNote(targetNote, formatType);
     },
     [activeNote]
   );
 
   // Bulk export selected notes as a ZIP archive
   const exportSelectedNotes = useCallback(
-    async (formatType: 'txt' | 'markdown' | 'html' = 'txt') => {
+    async (formatType: 'txt' | 'markdown' | 'html' | 'pdf' = 'txt') => {
       if (selectedNoteIds.length === 0) return;
-      triggerHaptic();
       const idSet = new Set(selectedNoteIds);
       const selected = notesRef.current.filter((n) => idSet.has(n.id));
       await exportNotesAsZip(selected, formatType);
@@ -715,7 +718,6 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const parsed = await parseImportedFiles(files);
       if (parsed.length === 0) return 0;
 
-      triggerHaptic();
       const targetFolder =
         selectedFolderId === 'trash' ||
         selectedFolderId === 'all' ||
@@ -767,31 +769,26 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }, []);
 
   const exitSelectionMode = useCallback(() => {
-    triggerHaptic();
     setIsSelectionMode(false);
     setSelectedNoteIds([]);
   }, []);
 
   const toggleSelectNote = useCallback((noteId: string) => {
-    triggerHaptic();
     setSelectedNoteIds(prev =>
       prev.includes(noteId) ? prev.filter(id => id !== noteId) : [...prev, noteId]
     );
   }, []);
 
   const selectAllNotes = useCallback(() => {
-    triggerHaptic();
     setSelectedNoteIds(filteredNotes.map(n => n.id));
   }, [filteredNotes]);
 
   const deselectAllNotes = useCallback(() => {
-    triggerHaptic();
     setSelectedNoteIds([]);
   }, []);
 
   const deleteSelectedNotes = useCallback(() => {
     if (selectedNoteIds.length === 0) return;
-    triggerHaptic();
     const idsToDelete = new Set(selectedNoteIds);
     const targetNotes = notesRef.current.filter(n => idsToDelete.has(n.id));
     const hasTrashedNotes = targetNotes.some(n => n.isTrash);
@@ -805,6 +802,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       return;
     }
 
+    triggerHaptic();
     const deletedAt = Date.now();
     setNotes(prev =>
       prev.map(note => {
@@ -835,10 +833,16 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
 
     if (activeNoteId && idsToRemove.has(activeNoteId)) {
-      const remaining = filteredNotes.filter(n => !idsToRemove.has(n.id));
-      setActiveNoteIdState(remaining.length > 0 ? remaining[0].id : null);
-      if (remaining.length === 0) {
+      const isMobileViewport = typeof window !== 'undefined' && window.innerWidth < 768;
+      if (isMobileViewport) {
+        setActiveNoteIdState(null);
         setMobileView('list');
+      } else {
+        const remaining = filteredNotes.filter(n => !idsToRemove.has(n.id));
+        setActiveNoteIdState(remaining.length > 0 ? remaining[0].id : null);
+        if (remaining.length === 0) {
+          setMobileView('list');
+        }
       }
     }
 

@@ -143,7 +143,6 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
       e.stopPropagation();
       toggleSelectNote(note.id);
     } else {
-      triggerHaptic();
       setActiveNoteId(note.id);
     }
   };

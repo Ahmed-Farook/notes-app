@@ -94,7 +94,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   if (!editor || !isVisible) return null;
 
   const runCommand = (cmd: () => void) => {
-    triggerHaptic();
     cmd();
   };
 
@@ -118,10 +117,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           <button
             type="button"
             onMouseDown={(e) => e.preventDefault()}
-            onClick={() => {
-              triggerHaptic();
-              onTogglePenMode(false);
-            }}
+            onClick={() => onTogglePenMode(false)}
             title="Type (Keyboard Text Mode)"
             className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-semibold transition-all outline-none focus:outline-none ${
               !isPenMode
@@ -136,10 +132,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           <button
             type="button"
             onMouseDown={(e) => e.preventDefault()}
-            onClick={() => {
-              triggerHaptic();
-              onTogglePenMode(true);
-            }}
+            onClick={() => onTogglePenMode(true)}
             title="Draw (Samsung Notes Stylus & Pen Mode)"
             className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-semibold transition-all outline-none focus:outline-none ${
               isPenMode
@@ -158,10 +151,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             <button
               type="button"
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                triggerHaptic();
-                onDrawingUndo();
-              }}
+              onClick={() => onDrawingUndo()}
               disabled={!canDrawingUndo}
               title="Undo stroke"
               className="p-1.5 rounded-md shrink-0 text-[#213A50] dark:text-[#CBD8E3] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] disabled:opacity-30 disabled:pointer-events-none transition-colors outline-none focus:outline-none"
@@ -171,10 +161,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             <button
               type="button"
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                triggerHaptic();
-                onDrawingRedo();
-              }}
+              onClick={() => onDrawingRedo()}
               disabled={!canDrawingRedo}
               title="Redo stroke"
               className="p-1.5 rounded-md shrink-0 text-[#213A50] dark:text-[#CBD8E3] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] disabled:opacity-30 disabled:pointer-events-none transition-colors outline-none focus:outline-none"
@@ -221,7 +208,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => {
                   e.preventDefault();
-                  triggerHaptic();
                   onChangeDrawingTool('pen');
                 }}
                 title="Pen (Natural Ink with Stylus Pressure)"
@@ -240,7 +226,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => {
                   e.preventDefault();
-                  triggerHaptic();
                   onChangeDrawingTool('highlighter');
                 }}
                 title="Highlighter (Translucent Chisel)"
@@ -259,7 +244,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => {
                   e.preventDefault();
-                  triggerHaptic();
                   onChangeDrawingTool('lasso');
                 }}
                 title="Lasso Select (Move, Resize, or Delete Portion of Drawing)"
@@ -278,7 +262,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => {
                   e.preventDefault();
-                  triggerHaptic();
                   onChangeDrawingTool('partial_eraser');
                 }}
                 title="Part Eraser (Erases part of stroke)"
@@ -297,7 +280,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => {
                   e.preventDefault();
-                  triggerHaptic();
                   onChangeDrawingTool('stroke_eraser');
                 }}
                 title="Stroke Eraser (Erases entire stroke)"
@@ -319,7 +301,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => {
                 e.preventDefault();
-                triggerHaptic();
                 onToggleStylusOnly();
               }}
               title={
@@ -347,10 +328,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                       key={col.value}
                       type="button"
                       onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        triggerHaptic();
-                        onChangeColor(col.value);
-                      }}
+                      onClick={() => onChangeColor(col.value)}
                       title={col.name}
                       className={`w-5 h-5 rounded-full transition-transform shrink-0 outline-none focus:outline-none border border-black/10 dark:border-white/15 ${
                         activeColor === col.value
@@ -391,10 +369,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                       key={sz.label}
                       type="button"
                       onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        triggerHaptic();
-                        onChangeSize(sz.value);
-                      }}
+                      onClick={() => onChangeSize(sz.value)}
                       title={`${sz.label} (${sz.value}px)`}
                       className={`w-6 h-6 rounded-md flex items-center justify-center transition-all outline-none focus:outline-none ${
                         activeSize === sz.value

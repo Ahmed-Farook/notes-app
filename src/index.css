@@ -332,4 +332,112 @@ mark {
   outline-color: rgba(126, 170, 208, 0.6);
 }
 
+/* ==========================================================================
+   Subtle Apple Notes Paper Texture (Applied cleanly to all notes)
+   ========================================================================== */
+.apple-paper-bg {
+  background-color: #FAF6EF;
+  background-image:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.45) 0%, rgba(250, 246, 239, 0) 70%),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='paperNoise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.88' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23paperNoise)' opacity='0.032'/%3E%3C/svg%3E");
+  background-repeat: no-repeat, repeat;
+  background-size: 100% 100%, 180px 180px;
+}
+
+.dark .apple-paper-bg {
+  background-color: #131B24;
+  background-image:
+    radial-gradient(ellipse at 50% 0%, rgba(42, 68, 95, 0.14) 0%, rgba(19, 27, 36, 0) 70%),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='paperNoiseDark'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.88' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23paperNoiseDark)' opacity='0.03'/%3E%3C/svg%3E");
+  background-repeat: no-repeat, repeat;
+  background-size: 100% 100%, 180px 180px;
+}
+
+/* ==========================================================================
+   Smooth Apple-Grade Spring Animations & Micro-Interactions
+   ========================================================================== */
+@keyframes texoFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes texoZoomIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes texoSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes texoEditorEnter {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes texoListEnter {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-in {
+  animation-duration: 210ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-fill-mode: both;
+}
+
+.fade-in {
+  animation-name: texoFadeIn;
+}
+
+.zoom-in-95 {
+  animation-name: texoZoomIn;
+}
+
+.slide-in-from-bottom {
+  animation-name: texoSlideUp;
+}
+
+.animate-editor-enter {
+  animation: texoEditorEnter 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-list-enter {
+  animation: texoListEnter 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-in,
+  .animate-editor-enter,
+  .animate-list-enter {
+    animation: none !important;
+  }
+}
+
+
 

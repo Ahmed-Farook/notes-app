@@ -257,7 +257,7 @@ export const NotesList: React.FC<NotesListProps> = ({
   const allSelected = filteredNotes.length > 0 && selectedNoteIds.length === filteredNotes.length;
 
   return (
-    <section className="w-full md:w-72 bg-[#F6EFE4] dark:bg-[#16202A] md:border-r border-apple-border dark:border-apple-borderDark h-full flex flex-col select-none shrink-0 relative">
+    <section className="w-full md:w-72 bg-[#F6EFE4] dark:bg-[#16202A] md:border-r border-apple-border dark:border-apple-borderDark h-full flex flex-col select-none shrink-0 relative animate-list-enter md:animate-none">
       {/* Top Header: Selection Header vs Normal Folder Selector Pill */}
       {isSelectionMode ? (
         <div className="h-10 px-3.5 flex items-center justify-between border-b border-apple-border dark:border-apple-borderDark bg-[#EFE7D8]/95 dark:bg-[#131B24]/95 backdrop-blur-md shrink-0">
@@ -905,6 +905,16 @@ export const NotesList: React.FC<NotesListProps> = ({
                 <div className="px-3 py-1 font-semibold text-[#5A6E82] dark:text-[#8AA0B4] uppercase tracking-wider text-[10px]">
                   Export {selectedNoteIds.length} Notes (.zip)
                 </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBulkExportMenu(false);
+                    exportSelectedNotes('pdf');
+                  }}
+                  className="w-full text-left px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-700 dark:text-neutral-200 font-medium transition-colors"
+                >
+                  PDF Documents (.pdf ZIP)
+                </button>
                 <button
                   type="button"
                   onClick={() => {
