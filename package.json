@@ -3,6 +3,7 @@
   "version": "0.2.35",
   "description": "texō cross-platform note taking application",
   "author": "Ahmed Farook",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "scripts": {
