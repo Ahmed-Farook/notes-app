@@ -1,4 +1,5 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import { Trash2, X } from 'lucide-react';
 import { triggerHaptic } from '../../utils/haptics';
 
 export interface InNotePoint {
@@ -15,7 +16,13 @@ export interface InNoteStroke {
   points: InNotePoint[];
 }
 
-export type DrawingToolType = 'pen' | 'highlighter' | 'partial_eraser' | 'stroke_eraser' | 'eraser';
+export type DrawingToolType =
+  | 'pen'
+  | 'highlighter'
+  | 'partial_eraser'
+  | 'stroke_eraser'
+  | 'lasso'
+  | 'eraser';
 
 interface InNoteCanvasProps {
   noteId: string;
@@ -25,6 +32,8 @@ interface InNoteCanvasProps {
   activeTool: DrawingToolType;
   activeColor: string;
   activeSize: number;
+  stylusOnly?: boolean;
+  onStylusDetected?: () => void;
   onStrokesUpdate: (strokesJson: string) => void;
   onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
   undoTrigger?: number;
@@ -57,6 +66,49 @@ function getEraserCursor(theme?: 'light' | 'dark') {
   const stroke = isDark ? '%23FFFFFF' : '%231C2B36';
   const fill = isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.08)';
   return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26' fill='none'%3E%3Ccircle cx='13' cy='13' r='10' stroke='${stroke}' stroke-width='2' stroke-dasharray='3 2' fill='${fill}'/%3E%3Ccircle cx='13' cy='13' r='1.5' fill='${stroke}'/%3E%3C/svg%3E") 13 13, crosshair`;
+}
+
+function isPointInPolygon(px: number, py: number, poly: { x: number; y: number }[]): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x;
+    const yi = poly[i].y;
+    const xj = poly[j].x;
+    const yj = poly[j].y;
+    const intersect =
+      yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi + 1e-9) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function getStrokesBounds(strokes: InNoteStroke[], selectedIds: Set<string>) {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let count = 0;
+
+  for (const s of strokes) {
+    if (!selectedIds.has(s.id)) continue;
+    const pad = Math.max(4, (s.tool === 'highlighter' ? s.size * 2.8 : s.size) / 2);
+    for (const p of s.points) {
+      if (p.x - pad < minX) minX = p.x - pad;
+      if (p.y - pad < minY) minY = p.y - pad;
+      if (p.x + pad > maxX) maxX = p.x + pad;
+      if (p.y + pad > maxY) maxY = p.y + pad;
+      count++;
+    }
+  }
+
+  if (count === 0) return null;
+  const padding = 8;
+  return {
+    x: minX - padding,
+    y: minY - padding,
+    width: Math.max(32, maxX - minX + padding * 2),
+    height: Math.max(32, maxY - minY + padding * 2),
+  };
 }
 
 /**
@@ -109,15 +161,13 @@ function erasePartOfStroke(
 
     if (!isInside) {
       currentSegment.push(pt);
-    } else {
-      if (currentSegment.length > 0) {
-        resultingStrokes.push({
-          ...stroke,
-          id: `${stroke.id}-${resultingStrokes.length}-${Date.now().toString(36)}`,
-          points: currentSegment,
-        });
-        currentSegment = [];
-      }
+    } else if (currentSegment.length > 0) {
+      resultingStrokes.push({
+        ...stroke,
+        id: `${stroke.id}-${resultingStrokes.length}-${Date.now().toString(36)}`,
+        points: currentSegment,
+      });
+      currentSegment = [];
     }
   }
 
@@ -140,6 +190,8 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
   activeTool,
   activeColor,
   activeSize,
+  stylusOnly = false,
+  onStylusDetected,
   onStrokesUpdate,
   onHistoryChange,
   undoTrigger,
@@ -149,24 +201,64 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const [strokes, setStrokes] = useState<InNoteStroke[]>([]);
-  const [undoneStrokes, setUndoneStrokes] = useState<InNoteStroke[]>([]);
+  // Snapshot history stacks for reliable Undo/Redo across draw, erase, lasso move/resize/delete
+  const [undoStack, setUndoStack] = useState<InNoteStroke[][]>([]);
+  const [redoStack, setRedoStack] = useState<InNoteStroke[][]>([]);
+  const [selectedStrokeIds, setSelectedStrokeIds] = useState<Set<string>>(new Set());
 
   const isDrawingRef = useRef(false);
   const currentStrokeRef = useRef<InNoteStroke | null>(null);
   const strokesRef = useRef<InNoteStroke[]>([]);
   strokesRef.current = strokes;
 
-  // Track if active drawing is using a hardware stylus
-  const isStylusActiveRef = useRef(false);
-  const lastTouchMidYRef = useRef<number | null>(null);
+  // Snapshot captured when starting an eraser drag or lasso transform so the whole gesture is 1 undo step
+  const gestureInitialSnapshotRef = useRef<InNoteStroke[] | null>(null);
+  const gestureMutatedRef = useRef(false);
 
-  // Track the noteId that current strokes belong to
+  // Live eraser preview circle coordinates (so mobile & tablet users see exact eraser size!)
+  const eraserPreviewRef = useRef<{ x: number; y: number; radius: number } | null>(null);
+
+  // Lasso selection loop points while dragging
+  const lassoPointsRef = useRef<InNotePoint[]>([]);
+
+  // Selection move / resize interaction state
+  const transformDragRef = useRef<{
+    mode: 'move' | 'nw' | 'ne' | 'sw' | 'se';
+    startX: number;
+    startY: number;
+    origBounds: { x: number; y: number; width: number; height: number };
+    origStrokes: InNoteStroke[];
+  } | null>(null);
+
+  // Palm rejection & hardware stylus state
+  const isStylusActiveRef = useRef(false);
+  const activeTouchStartTimeRef = useRef<number>(0);
+  const lastTouchMidYRef = useRef<number | null>(null);
   const prevNoteIdRef = useRef<string>(noteId);
+
+  const commitStrokesWithHistory = useCallback(
+    (nextStrokes: InNoteStroke[], prevSnapshot: InNoteStroke[]) => {
+      setUndoStack((prev) => [...prev.slice(-39), prevSnapshot]);
+      setRedoStack([]);
+      setStrokes(nextStrokes);
+      onStrokesUpdate(JSON.stringify(nextStrokes));
+    },
+    [onStrokesUpdate]
+  );
 
   // Notify parent of undo/redo availability
   useEffect(() => {
-    onHistoryChange?.(strokes.length > 0, undoneStrokes.length > 0);
-  }, [strokes.length, undoneStrokes.length, onHistoryChange]);
+    onHistoryChange?.(undoStack.length > 0, redoStack.length > 0);
+  }, [undoStack.length, redoStack.length, onHistoryChange]);
+
+  // Clear lasso selection when leaving lasso tool or pen mode
+  useEffect(() => {
+    if (!isPenMode || activeTool !== 'lasso') {
+      setSelectedStrokeIds(new Set());
+      lassoPointsRef.current = [];
+      transformDragRef.current = null;
+    }
+  }, [isPenMode, activeTool]);
 
   // Load strokes when switching notes or remote sync arrives
   useEffect(() => {
@@ -174,20 +266,20 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     prevNoteIdRef.current = noteId;
 
     if (isDifferentNote) {
+      setUndoStack([]);
+      setRedoStack([]);
+      setSelectedStrokeIds(new Set());
       if (initialStrokesJson) {
         try {
           const parsed = JSON.parse(initialStrokesJson);
           if (Array.isArray(parsed)) {
             setStrokes(parsed);
-            setUndoneStrokes([]);
             return;
           }
         } catch (_) {}
       }
       setStrokes([]);
-      setUndoneStrokes([]);
-    } else if (!isDrawingRef.current) {
-      // Remote sync or external change while staying on same note
+    } else if (!isDrawingRef.current && !transformDragRef.current) {
       const currentJson = JSON.stringify(strokesRef.current);
       if (initialStrokesJson && initialStrokesJson !== currentJson) {
         try {
@@ -200,7 +292,7 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     }
   }, [noteId, initialStrokesJson]);
 
-  // Redraw canvas (transparent background so text beneath shows through seamlessly)
+  // Redraw canvas (transparent background + strokes + lasso + live eraser circle)
   const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -210,7 +302,6 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     const width = canvas.width;
     const height = canvas.height;
 
-    // Reset transform & clear completely to transparent
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, width, height);
 
@@ -250,7 +341,6 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
         continue;
       }
 
-      // Smooth Bézier curve interpolation
       ctx.beginPath();
       ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
 
@@ -272,7 +362,43 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
       ctx.stroke();
       ctx.restore();
     }
-  }, []);
+
+    // Draw live freehand Lasso polygon while dragging
+    if (lassoPointsRef.current.length > 1) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(lassoPointsRef.current[0].x, lassoPointsRef.current[0].y);
+      for (let i = 1; i < lassoPointsRef.current.length; i++) {
+        ctx.lineTo(lassoPointsRef.current[i].x, lassoPointsRef.current[i].y);
+      }
+      ctx.closePath();
+      ctx.fillStyle =
+        theme === 'dark' ? 'rgba(126, 170, 208, 0.12)' : 'rgba(33, 58, 80, 0.08)';
+      ctx.fill();
+      ctx.lineWidth = 1.6;
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = theme === 'dark' ? '#7EAAD0' : '#213A50';
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Draw live Eraser Preview Circle (especially helpful on mobile/touch!)
+    const ep = eraserPreviewRef.current;
+    if (ep) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(ep.x, ep.y, ep.radius, 0, Math.PI * 2);
+      ctx.fillStyle =
+        theme === 'dark' ? 'rgba(255, 255, 255, 0.14)' : 'rgba(33, 58, 80, 0.10)';
+      ctx.fill();
+      ctx.lineWidth = 1.6;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeStyle =
+        theme === 'dark' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(220, 38, 38, 0.85)';
+      ctx.stroke();
+      ctx.restore();
+    }
+  }, [theme]);
 
   // Sync canvas dimensions with parent content wrapper (with Retina/High-DPI)
   const resizeCanvas = useCallback(() => {
@@ -293,7 +419,6 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     }
 
     const width = Math.max(300, Math.floor(rect.width));
-    // Use maximum of container height, full scroll height, and max stroke Y
     const height = Math.max(500, Math.floor(Math.max(rect.height, scrollH, maxStrokeY + 250)));
 
     if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
@@ -327,7 +452,7 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     redrawCanvas();
   }, [strokes, redrawCanvas]);
 
-  // Native non-passive touch listeners on canvas to guarantee zero scrolling during single-finger drawing/highlighting/erasing
+  // Native non-passive touch listeners: prevent scrolling on 1 finger while allowing 2-finger scroll
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -335,13 +460,14 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     const onTouchStart = (e: TouchEvent) => {
       if (!isPenMode) return;
       if (e.touches.length === 1) {
-        // Prevent default browser touch scrolling on single finger/pen
         e.preventDefault();
       } else if (e.touches.length >= 2) {
-        // Multi-touch: user wants to scroll the page with two fingers
+        // Multi-touch: cancel any active drawing stroke (palm/finger) and pan
         if (isDrawingRef.current) {
           isDrawingRef.current = false;
           currentStrokeRef.current = null;
+          lassoPointsRef.current = [];
+          eraserPreviewRef.current = null;
           redrawCanvas();
         }
         lastTouchMidYRef.current = (e.touches[0].clientY + e.touches[1].clientY) / 2;
@@ -351,10 +477,8 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     const onTouchMove = (e: TouchEvent) => {
       if (!isPenMode) return;
       if (e.touches.length === 1) {
-        // Single finger/pen drawing: prevent browser scroll gesture
         e.preventDefault();
       } else if (e.touches.length >= 2) {
-        // Two fingers: smooth natural document scroll
         const currentMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
         if (lastTouchMidYRef.current !== null) {
           const deltaY = currentMidY - lastTouchMidYRef.current;
@@ -375,6 +499,8 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
 
     const onTouchCancel = () => {
       lastTouchMidYRef.current = null;
+      eraserPreviewRef.current = null;
+      redrawCanvas();
     };
 
     canvas.addEventListener('touchstart', onTouchStart, { passive: false });
@@ -395,32 +521,32 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
   useEffect(() => {
     if (undoTrigger !== undefined && undoTrigger !== prevUndoTrigger.current) {
       prevUndoTrigger.current = undoTrigger;
-      if (strokesRef.current.length > 0) {
-        triggerHaptic();
-        const last = strokesRef.current[strokesRef.current.length - 1];
-        const next = strokesRef.current.slice(0, -1);
-        setStrokes(next);
-        setUndoneStrokes((prev) => [...prev, last]);
-        onStrokesUpdate(JSON.stringify(next));
+      if (undoStack.length > 0) {
+        const previousSnapshot = undoStack[undoStack.length - 1];
+        setUndoStack((prev) => prev.slice(0, -1));
+        setRedoStack((prev) => [...prev, strokesRef.current]);
+        setStrokes(previousSnapshot);
+        setSelectedStrokeIds(new Set());
+        onStrokesUpdate(JSON.stringify(previousSnapshot));
       }
     }
-  }, [undoTrigger, onStrokesUpdate]);
+  }, [undoTrigger, undoStack, onStrokesUpdate]);
 
   // Handle external Redo trigger
   const prevRedoTrigger = useRef(redoTrigger);
   useEffect(() => {
     if (redoTrigger !== undefined && redoTrigger !== prevRedoTrigger.current) {
       prevRedoTrigger.current = redoTrigger;
-      if (undoneStrokes.length > 0) {
-        triggerHaptic();
-        const nextStroke = undoneStrokes[undoneStrokes.length - 1];
-        const next = [...strokesRef.current, nextStroke];
-        setUndoneStrokes((prev) => prev.slice(0, -1));
-        setStrokes(next);
-        onStrokesUpdate(JSON.stringify(next));
+      if (redoStack.length > 0) {
+        const nextSnapshot = redoStack[redoStack.length - 1];
+        setRedoStack((prev) => prev.slice(0, -1));
+        setUndoStack((prev) => [...prev, strokesRef.current]);
+        setStrokes(nextSnapshot);
+        setSelectedStrokeIds(new Set());
+        onStrokesUpdate(JSON.stringify(nextSnapshot));
       }
     }
-  }, [redoTrigger, undoneStrokes, onStrokesUpdate]);
+  }, [redoTrigger, redoStack, onStrokesUpdate]);
 
   // Handle external Clear trigger
   const prevClearTrigger = useRef(clearTrigger);
@@ -428,15 +554,38 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     if (clearTrigger !== undefined && clearTrigger !== prevClearTrigger.current) {
       prevClearTrigger.current = clearTrigger;
       if (strokesRef.current.length > 0) {
-        triggerHaptic();
-        setUndoneStrokes((prev) => [...prev, ...strokesRef.current]);
-        setStrokes([]);
-        onStrokesUpdate(JSON.stringify([]));
+        commitStrokesWithHistory([], strokesRef.current);
+        setSelectedStrokeIds(new Set());
       }
     }
-  }, [clearTrigger, onStrokesUpdate]);
+  }, [clearTrigger, commitStrokesWithHistory]);
 
-  // Point-to-segment distance for whole-stroke eraser collision
+  // Delete currently lasso-selected strokes
+  const deleteSelectedStrokes = useCallback(() => {
+    if (selectedStrokeIds.size === 0) return;
+    triggerHaptic();
+    const prevSnapshot = strokesRef.current;
+    const remaining = prevSnapshot.filter((s) => !selectedStrokeIds.has(s.id));
+    commitStrokesWithHistory(remaining, prevSnapshot);
+    setSelectedStrokeIds(new Set());
+  }, [selectedStrokeIds, commitStrokesWithHistory]);
+
+  // Support Backspace / Delete keyboard shortcut for lasso selection on desktop
+  useEffect(() => {
+    if (!isPenMode || selectedStrokeIds.size === 0) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        deleteSelectedStrokes();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setSelectedStrokeIds(new Set());
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPenMode, selectedStrokeIds, deleteSelectedStrokes]);
+
   const distanceToSegment = (
     px: number,
     py: number,
@@ -452,16 +601,14 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
   };
 
-  // 1. Partial Eraser: Erases points inside the eraser circle, splitting strokes cleanly
-  const handlePartialEraserAt = (x: number, y: number, radius = 20) => {
+  // Partial Eraser
+  const handlePartialEraserAt = (x: number, y: number, radius: number) => {
     let changed = false;
     const r2 = (radius + 2) * (radius + 2);
-
     const nextStrokes: InNoteStroke[] = [];
 
     for (const stroke of strokesRef.current) {
       let strokeHit = false;
-
       for (const pt of stroke.points) {
         const dx = pt.x - x;
         const dy = pt.y - y;
@@ -470,24 +617,22 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
           break;
         }
       }
-
       if (!strokeHit) {
         nextStrokes.push(stroke);
       } else {
         changed = true;
-        const parts = erasePartOfStroke(stroke, x, y, radius);
-        nextStrokes.push(...parts);
+        nextStrokes.push(...erasePartOfStroke(stroke, x, y, radius));
       }
     }
 
     if (changed) {
+      gestureMutatedRef.current = true;
       setStrokes(nextStrokes);
-      onStrokesUpdate(JSON.stringify(nextStrokes));
     }
   };
 
-  // 2. Stroke Eraser: Deletes the entire stroke object on contact
-  const handleStrokeEraserAt = (x: number, y: number, radius = 24) => {
+  // Whole Stroke Eraser
+  const handleStrokeEraserAt = (x: number, y: number, radius: number) => {
     const remaining = strokesRef.current.filter((stroke) => {
       for (let i = 0; i < stroke.points.length; i++) {
         const pt = stroke.points[i];
@@ -505,39 +650,63 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     });
 
     if (remaining.length !== strokesRef.current.length) {
+      gestureMutatedRef.current = true;
       setStrokes(remaining);
-      onStrokesUpdate(JSON.stringify(remaining));
-    }
-  };
-
-  // Route erasing to partial or whole-stroke eraser
-  const handleEraserAt = (x: number, y: number, radius: number) => {
-    if (activeTool === 'stroke_eraser') {
-      handleStrokeEraserAt(x, y, radius);
-    } else {
-      handlePartialEraserAt(x, y, radius);
     }
   };
 
   const isEraserTool =
     activeTool === 'partial_eraser' || activeTool === 'stroke_eraser' || activeTool === 'eraser';
+  const getEraserRadius = () => Math.max(16, activeSize * 2.5);
 
-  // Stylus & Touch Pointer Event Handlers (Zero continuous vibration on canvas for maximum comfort!)
+  /**
+   * Hardware Palm Rejection Helper:
+   * - If pointerType === 'pen', notify parent & allow immediately (and cancel any recent accidental palm touch)
+   * - If stylusOnly is enabled and pointerType === 'touch', reject!
+   * - If contact width/height indicates a palm (>28px) on touch, reject!
+   */
+  const shouldAllowPointer = (e: React.PointerEvent<HTMLCanvasElement>): boolean => {
+    const isPen = e.pointerType === 'pen';
+    const isTouch = e.pointerType === 'touch';
+
+    if (isPen) {
+      isStylusActiveRef.current = true;
+      onStylusDetected?.();
+
+      // Retrospective palm cancellation: if a touch stroke started within last 180ms, cancel it!
+      if (
+        isDrawingRef.current &&
+        currentStrokeRef.current &&
+        Date.now() - activeTouchStartTimeRef.current < 180
+      ) {
+        currentStrokeRef.current = null;
+        isDrawingRef.current = false;
+        redrawCanvas();
+      }
+      return true;
+    }
+
+    if (isTouch) {
+      if (stylusOnly || isStylusActiveRef.current) return false;
+      if (e.isPrimary === false) return false;
+      // Reject wide palm / wrist contact geometry on touch digitizers
+      if ((e.width && e.width > 28) || (e.height && e.height > 28)) return false;
+    }
+
+    return true;
+  };
+
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isPenMode) return;
+    if (!shouldAllowPointer(e)) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const isPen = e.pointerType === 'pen';
-
-    // Palm rejection: If stylus is currently active, ignore secondary touch pointers
-    if (!isPen && isStylusActiveRef.current) return;
-    if (isPen) {
-      isStylusActiveRef.current = true;
+    if (e.pointerType === 'touch') {
+      activeTouchStartTimeRef.current = Date.now();
     }
-
-    if (!isPen && e.isPrimary === false) return;
 
     try {
       canvas.setPointerCapture(e.pointerId);
@@ -550,8 +719,25 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
 
     isDrawingRef.current = true;
 
+    if (activeTool === 'lasso') {
+      // Starting a new lasso loop clears any prior selection
+      setSelectedStrokeIds(new Set());
+      lassoPointsRef.current = [{ x, y }];
+      redrawCanvas();
+      return;
+    }
+
     if (isEraserTool) {
-      handleEraserAt(x, y, Math.max(18, activeSize * 2.8));
+      const r = getEraserRadius();
+      eraserPreviewRef.current = { x, y, radius: r };
+      gestureInitialSnapshotRef.current = strokesRef.current;
+      gestureMutatedRef.current = false;
+      if (activeTool === 'stroke_eraser') {
+        handleStrokeEraserAt(x, y, r);
+      } else {
+        handlePartialEraserAt(x, y, r);
+      }
+      redrawCanvas();
       return;
     }
 
@@ -569,10 +755,15 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isPenMode) return;
-    if (!isDrawingRef.current) return;
 
-    const isPen = e.pointerType === 'pen';
-    if (!isPen && isStylusActiveRef.current) return;
+    // Even when hovering (e.g. S-Pen approaching screen), detect pen to lock out palm!
+    if (e.pointerType === 'pen') {
+      isStylusActiveRef.current = true;
+      onStylusDetected?.();
+    }
+
+    if (!isDrawingRef.current) return;
+    if (e.pointerType === 'touch' && (stylusOnly || isStylusActiveRef.current)) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -580,10 +771,24 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    const isPen = e.pointerType === 'pen';
     const pressure = isPen && e.pressure > 0 ? e.pressure : 0.5;
 
+    if (activeTool === 'lasso') {
+      lassoPointsRef.current.push({ x, y });
+      redrawCanvas();
+      return;
+    }
+
     if (isEraserTool) {
-      handleEraserAt(x, y, Math.max(18, activeSize * 2.8));
+      const r = getEraserRadius();
+      eraserPreviewRef.current = { x, y, radius: r };
+      if (activeTool === 'stroke_eraser') {
+        handleStrokeEraserAt(x, y, r);
+      } else {
+        handlePartialEraserAt(x, y, r);
+      }
+      redrawCanvas();
       return;
     }
 
@@ -594,15 +799,56 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
   };
 
   const finishDrawing = () => {
-    if (!isDrawingRef.current) return;
+    eraserPreviewRef.current = null;
+    if (!isDrawingRef.current) {
+      redrawCanvas();
+      return;
+    }
     isDrawingRef.current = false;
 
-    if (!isEraserTool && currentStrokeRef.current && currentStrokeRef.current.points.length > 0) {
-      const nextStrokes = [...strokesRef.current, currentStrokeRef.current];
-      setStrokes(nextStrokes);
-      setUndoneStrokes([]);
+    if (activeTool === 'lasso') {
+      const poly = lassoPointsRef.current;
+      lassoPointsRef.current = [];
+      if (poly.length >= 3) {
+        const hitIds = new Set<string>();
+        for (const stroke of strokesRef.current) {
+          for (const pt of stroke.points) {
+            if (isPointInPolygon(pt.x, pt.y, poly)) {
+              hitIds.add(stroke.id);
+              break;
+            }
+          }
+        }
+        setSelectedStrokeIds(hitIds);
+      } else if (poly.length > 0) {
+        // Quick tap on canvas near a stroke selects that single stroke
+        const tap = poly[0];
+        const hitIds = new Set<string>();
+        for (const stroke of strokesRef.current) {
+          const hit = stroke.points.some((pt) => Math.hypot(pt.x - tap.x, pt.y - tap.y) <= 18);
+          if (hit) hitIds.add(stroke.id);
+        }
+        setSelectedStrokeIds(hitIds);
+      }
+      redrawCanvas();
+      return;
+    }
+
+    if (isEraserTool) {
+      if (gestureMutatedRef.current && gestureInitialSnapshotRef.current) {
+        commitStrokesWithHistory(strokesRef.current, gestureInitialSnapshotRef.current);
+      }
+      gestureInitialSnapshotRef.current = null;
+      gestureMutatedRef.current = false;
+      redrawCanvas();
+      return;
+    }
+
+    if (currentStrokeRef.current && currentStrokeRef.current.points.length > 0) {
+      const prevSnapshot = strokesRef.current;
+      const nextStrokes = [...prevSnapshot, currentStrokeRef.current];
       currentStrokeRef.current = null;
-      onStrokesUpdate(JSON.stringify(nextStrokes));
+      commitStrokesWithHistory(nextStrokes, prevSnapshot);
     }
     redrawCanvas();
   };
@@ -611,7 +857,7 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     if (e.pointerType === 'pen') {
       setTimeout(() => {
         isStylusActiveRef.current = false;
-      }, 150);
+      }, 250);
     }
     finishDrawing();
   };
@@ -620,27 +866,218 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     finishDrawing();
   };
 
+  // Interactive Selection Box Move / Resize Handlers
+  const selectionBounds = useMemo(() => {
+    if (selectedStrokeIds.size === 0) return null;
+    return getStrokesBounds(strokes, selectedStrokeIds);
+  }, [strokes, selectedStrokeIds]);
+
+  const startTransformDrag = (
+    mode: 'move' | 'nw' | 'ne' | 'sw' | 'se',
+    e: React.PointerEvent<HTMLDivElement>
+  ) => {
+    if (!selectionBounds) return;
+    e.stopPropagation();
+    e.preventDefault();
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch (_) {}
+
+    transformDragRef.current = {
+      mode,
+      startX: e.clientX,
+      startY: e.clientY,
+      origBounds: { ...selectionBounds },
+      origStrokes: strokesRef.current.map((s) => ({
+        ...s,
+        points: s.points.map((p) => ({ ...p })),
+      })),
+    };
+  };
+
+  const handleTransformMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const drag = transformDragRef.current;
+    if (!drag) return;
+    e.stopPropagation();
+
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    const { origBounds, origStrokes, mode } = drag;
+
+    if (mode === 'move') {
+      const updated = origStrokes.map((s) => {
+        if (!selectedStrokeIds.has(s.id)) return s;
+        return {
+          ...s,
+          points: s.points.map((p) => ({
+            ...p,
+            x: p.x + dx,
+            y: p.y + dy,
+          })),
+        };
+      });
+      setStrokes(updated);
+      return;
+    }
+
+    // Corner resize anchored at the opposite corner
+    const minDim = 24;
+    let anchorX = origBounds.x;
+    let anchorY = origBounds.y;
+    let newWidth = origBounds.width;
+    let newHeight = origBounds.height;
+
+    if (mode === 'se') {
+      anchorX = origBounds.x;
+      anchorY = origBounds.y;
+      newWidth = Math.max(minDim, origBounds.width + dx);
+      newHeight = Math.max(minDim, origBounds.height + dy);
+    } else if (mode === 'nw') {
+      anchorX = origBounds.x + origBounds.width;
+      anchorY = origBounds.y + origBounds.height;
+      newWidth = Math.max(minDim, origBounds.width - dx);
+      newHeight = Math.max(minDim, origBounds.height - dy);
+    } else if (mode === 'ne') {
+      anchorX = origBounds.x;
+      anchorY = origBounds.y + origBounds.height;
+      newWidth = Math.max(minDim, origBounds.width + dx);
+      newHeight = Math.max(minDim, origBounds.height - dy);
+    } else if (mode === 'sw') {
+      anchorX = origBounds.x + origBounds.width;
+      anchorY = origBounds.y;
+      newWidth = Math.max(minDim, origBounds.width - dx);
+      newHeight = Math.max(minDim, origBounds.height + dy);
+    }
+
+    const scaleX = newWidth / origBounds.width;
+    const scaleY = newHeight / origBounds.height;
+    const sizeScale = Math.sqrt(scaleX * scaleY);
+
+    const updated = origStrokes.map((s) => {
+      if (!selectedStrokeIds.has(s.id)) return s;
+      return {
+        ...s,
+        size: Math.max(1.5, Math.min(36, s.size * sizeScale)),
+        points: s.points.map((p) => ({
+          ...p,
+          x: anchorX + (p.x - anchorX) * scaleX,
+          y: anchorY + (p.y - anchorY) * scaleY,
+        })),
+      };
+    });
+    setStrokes(updated);
+  };
+
+  const finishTransformDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    const drag = transformDragRef.current;
+    if (!drag) return;
+    e.stopPropagation();
+    transformDragRef.current = null;
+
+    if (
+      Math.abs(e.clientX - drag.startX) > 2 ||
+      Math.abs(e.clientY - drag.startY) > 2
+    ) {
+      commitStrokesWithHistory(strokesRef.current, drag.origStrokes);
+    }
+  };
+
   const getCursorStyle = () => {
     if (!isPenMode) return 'default';
+    if (activeTool === 'lasso') return 'crosshair';
     if (isEraserTool) return getEraserCursor(theme);
     if (activeTool === 'highlighter') return getHighlighterCursor(theme);
     return getPenCursor(theme);
   };
 
   return (
-    <canvas
-      ref={canvasRef}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerCancel}
-      className={`absolute top-0 left-0 w-full ${
-        isPenMode ? 'z-20 pointer-events-auto' : 'z-10 pointer-events-none'
-      }`}
-      style={{
-        touchAction: 'none',
-        cursor: getCursorStyle(),
-      }}
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        className={`absolute top-0 left-0 w-full ${
+          isPenMode ? 'z-20 pointer-events-auto' : 'z-10 pointer-events-none'
+        }`}
+        style={{
+          touchAction: 'none',
+          cursor: getCursorStyle(),
+        }}
+      />
+
+      {/* Interactive Lasso Selection Box (Move, 4-Corner Resize, Delete) */}
+      {isPenMode && activeTool === 'lasso' && selectionBounds && (
+        <div
+          style={{
+            left: `${selectionBounds.x}px`,
+            top: `${selectionBounds.y}px`,
+            width: `${selectionBounds.width}px`,
+            height: `${selectionBounds.height}px`,
+            touchAction: 'none',
+          }}
+          onPointerDown={(e) => startTransformDrag('move', e)}
+          onPointerMove={handleTransformMove}
+          onPointerUp={finishTransformDrag}
+          onPointerCancel={finishTransformDrag}
+          className="absolute z-30 border-2 border-dashed border-[#213A50] dark:border-[#7EAAD0] bg-[#213A50]/5 dark:bg-[#7EAAD0]/10 rounded cursor-move select-none"
+        >
+          {/* Floating Action Pill (Delete / Deselect) */}
+          <div
+            onPointerDown={(e) => e.stopPropagation()}
+            className="absolute -top-10 left-1/2 -translate-x-1/2 flex items-center space-x-1 bg-[#FAF6EF] dark:bg-[#16202A] border border-[#DFD3C0] dark:border-[#263747] rounded-full px-2 py-1 shadow-lg whitespace-nowrap"
+          >
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteSelectedStrokes();
+              }}
+              className="flex items-center space-x-1 px-2 py-0.5 rounded-full text-[11px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors"
+              title="Delete Selected Drawing"
+            >
+              <Trash2 size={13} />
+              <span>Delete</span>
+            </button>
+            <div className="w-px h-3 bg-[#DFD3C0] dark:bg-[#263747]" />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedStrokeIds(new Set());
+              }}
+              className="p-0.5 rounded-full text-[#6E7E8E] dark:text-[#8AA0B4] hover:bg-[#E5DCCB] dark:hover:bg-[#223344] transition-colors"
+              title="Done"
+            >
+              <X size={13} />
+            </button>
+          </div>
+
+          {/* 4 Corner Resize Handles */}
+          {(['nw', 'ne', 'sw', 'se'] as const).map((corner) => {
+            const posClass =
+              corner === 'nw'
+                ? '-top-2 -left-2 cursor-nwse-resize'
+                : corner === 'ne'
+                ? '-top-2 -right-2 cursor-nesw-resize'
+                : corner === 'sw'
+                ? '-bottom-2 -left-2 cursor-nesw-resize'
+                : '-bottom-2 -right-2 cursor-nwse-resize';
+            return (
+              <div
+                key={corner}
+                onPointerDown={(e) => startTransformDrag(corner, e)}
+                onPointerMove={handleTransformMove}
+                onPointerUp={finishTransformDrag}
+                onPointerCancel={finishTransformDrag}
+                className={`absolute w-4 h-4 rounded-full bg-white dark:bg-[#1E293B] border-2 border-[#213A50] dark:border-[#7EAAD0] shadow-md ${posClass}`}
+                style={{ touchAction: 'none' }}
+              />
+            );
+          })}
+        </div>
+      )}
+    </>
   );
 };

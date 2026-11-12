@@ -34,6 +34,18 @@ import {
   DbNote,
   DbFolder,
 } from '../utils/supabaseSync';
+import {
+  exportSingleNote,
+  exportNotesAsZip,
+  parseImportedFiles,
+} from '../utils/noteExportImport';
+
+export type PendingTrashDelete =
+  | { type: 'single'; id: string; title?: string }
+  | { type: 'bulk'; ids: string[] }
+  | null;
+
+const TRASH_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface NotesContextType {
   notes: Note[];
@@ -64,6 +76,12 @@ interface NotesContextType {
   togglePinSelectedNotes: () => void;
   moveSelectedNotesToFolder: (folderId: string) => void;
   restoreSelectedNotes: () => void;
+  exportSelectedNotes: (formatType?: 'txt' | 'markdown' | 'html') => Promise<void>;
+
+  // Recycle Bin Confirmation Modal State
+  pendingTrashDelete: PendingTrashDelete;
+  confirmPendingTrashDelete: () => void;
+  cancelPendingTrashDelete: () => void;
 
   // Actions
   setActiveNoteId: (id: string | null) => void;
@@ -88,6 +106,7 @@ interface NotesContextType {
   deleteFolder: (id: string) => void;
   deleteFolders: (ids: string[]) => void;
   exportCurrentNote: (formatType: 'markdown' | 'txt' | 'html', noteToExport?: Note) => void;
+  importNotes: (files: FileList | File[]) => Promise<number>;
 }
 
 const NotesContext = createContext<NotesContextType | undefined>(undefined);
@@ -95,8 +114,8 @@ const NotesContext = createContext<NotesContextType | undefined>(undefined);
 export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [notes, setNotes] = useState<Note[]>(() => loadStoredNotes());
   const [folders, setFolders] = useState<Folder[]>(() => loadStoredFolders());
-  const [selectedFolderId, setSelectedFolderId] = useState<string>('default');
-  const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+  const [selectedFolderId, setSelectedFolderIdState] = useState<string>('default');
+  const [activeNoteId, setActiveNoteIdState] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
@@ -109,6 +128,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [isFolderPickerOpen, setIsFolderPickerOpen] = useState<boolean>(false);
   const [isSelectionMode, setIsSelectionMode] = useState<boolean>(false);
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
+  const [pendingTrashDelete, setPendingTrashDelete] = useState<PendingTrashDelete>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('apple_notes_theme');
@@ -130,6 +150,30 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   foldersRef.current = folders;
   const cloudSaveTimers = useRef<Record<string, NodeJS.Timeout>>({});
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Tracks newly created notes that haven't received any edits yet so exiting discards them cleanly
+  const uneditedNewNoteIdsRef = useRef<Set<string>>(new Set());
+
+  const setActiveNoteId = useCallback((nextId: string | null) => {
+    setActiveNoteIdState((prevId) => {
+      if (prevId && prevId !== nextId && uneditedNewNoteIdsRef.current.has(prevId)) {
+        uneditedNewNoteIdsRef.current.delete(prevId);
+        setNotes((curr) => curr.filter((n) => n.id !== prevId));
+      }
+      return nextId;
+    });
+  }, []);
+
+  const setSelectedFolderId = useCallback((folderId: string) => {
+    setActiveNoteIdState((prevId) => {
+      if (prevId && uneditedNewNoteIdsRef.current.has(prevId)) {
+        uneditedNewNoteIdsRef.current.delete(prevId);
+        setNotes((curr) => curr.filter((n) => n.id !== prevId));
+        return null;
+      }
+      return prevId;
+    });
+    setSelectedFolderIdState(folderId);
+  }, []);
 
   // Sync with Supabase on user sign-in & listen to Realtime changes
   useEffect(() => {
@@ -255,11 +299,33 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     localStorage.setItem('apple_notes_theme', theme);
   }, [theme]);
 
-  // Snappy debounced persistence: never blocks typing or UI updates
+  // Auto-purge notes in Recently Deleted older than 7 days
+  useEffect(() => {
+    const purgeExpiredTrash = () => {
+      const now = Date.now();
+      setNotes((prev) => {
+        const expired = prev.filter(
+          (n) => n.isTrash && now - (n.deletedAt ?? n.updatedAt) >= TRASH_RETENTION_MS
+        );
+        if (expired.length === 0) return prev;
+        if (user) {
+          expired.forEach((n) => deleteNoteFromCloud(n.id));
+        }
+        const expiredSet = new Set(expired.map((n) => n.id));
+        return prev.filter((n) => !expiredSet.has(n.id));
+      });
+    };
+
+    purgeExpiredTrash();
+    const interval = setInterval(purgeExpiredTrash, 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  // Snappy debounced persistence: never blocks typing or UI updates (and skips unedited drafts)
   useEffect(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      saveStoredNotes(notes);
+      saveStoredNotes(notes.filter((n) => !uneditedNewNoteIdsRef.current.has(n.id)));
     }, 250);
 
     return () => {
@@ -272,7 +338,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const handleFlush = () => {
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
-        saveStoredNotes(notes);
+        saveStoredNotes(notes.filter((n) => !uneditedNewNoteIdsRef.current.has(n.id)));
       }
     };
     window.addEventListener('beforeunload', handleFlush);
@@ -385,12 +451,12 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   }, [filteredNotes, activeNoteId]);
 
-  // Create new note
+  // Create new note (kept as local draft until user makes first edit or drawing)
   const createNote = useCallback((folderId?: string): Note => {
     triggerHaptic();
     const targetFolder =
       folderId ||
-      (selectedFolderId === 'trash'
+      (selectedFolderId === 'trash' || selectedFolderId === 'all' || selectedFolderId === 'pinned'
         ? 'default'
         : selectedFolderId);
 
@@ -406,15 +472,13 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       updatedAt: Date.now(),
     };
 
+    uneditedNewNoteIdsRef.current.add(newNote.id);
     setNotes(prev => [newNote, ...prev]);
     setActiveNoteId(newNote.id);
     setMobileView('editor');
 
-    if (user) {
-      upsertNoteToCloud(newNote, user.id, encryptionKeyRef.current);
-    }
     return newNote;
-  }, [selectedFolderId, user]);
+  }, [selectedFolderId, setActiveNoteId]);
 
   // Update note
   const updateNote = useCallback((id: string, updates: Partial<Note>) => {
@@ -426,6 +490,10 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             (updates.title !== undefined && updates.title !== note.title) ||
             (updates.plainTextPreview !== undefined && updates.plainTextPreview !== note.plainTextPreview) ||
             (updates.drawingStrokes !== undefined && updates.drawingStrokes !== note.drawingStrokes);
+
+          if (hasContentChanged) {
+            uneditedNewNoteIdsRef.current.delete(id);
+          }
 
           const newUpdatedAt = hasContentChanged ? Date.now() : (updates.updatedAt ?? note.updatedAt);
 
@@ -452,27 +520,38 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     );
   }, [user]);
 
-  // Delete note
+  // Move note to Recycle Bin (or open confirmation modal if already in Recycle Bin)
   const deleteNote = useCallback((id: string) => {
-    triggerHaptic();
-    setNotes(prev => {
-      const note = prev.find(n => n.id === id);
-      if (!note) return prev;
+    const target = notesRef.current.find(n => n.id === id);
+    if (!target) return;
 
-      if (note.isTrash) {
-        if (user) {
-          deleteNoteFromCloud(id);
-        }
-        return prev.filter(n => n.id !== id);
-      } else {
-        // Automatically unpin note when moving to trash
-        const trashed: Note = { ...note, isTrash: true, isPinned: false };
-        if (user) {
-          upsertNoteToCloud(trashed, user.id, encryptionKeyRef.current);
-        }
-        return prev.map(n => (n.id === id ? trashed : n));
+    // If it's an untouched new draft, simply discard it silently
+    if (uneditedNewNoteIdsRef.current.has(id)) {
+      uneditedNewNoteIdsRef.current.delete(id);
+      setNotes(prev => prev.filter(n => n.id !== id));
+      if (activeNoteId === id) {
+        setActiveNoteIdState(null);
+        setMobileView('list');
       }
-    });
+      return;
+    }
+
+    triggerHaptic();
+    if (target.isTrash) {
+      setPendingTrashDelete({ type: 'single', id: target.id, title: target.title });
+      return;
+    }
+
+    const trashed: Note = {
+      ...target,
+      isTrash: true,
+      isPinned: false,
+      deletedAt: Date.now(),
+    };
+    setNotes(prev => prev.map(n => (n.id === id ? trashed : n)));
+    if (user) {
+      upsertNoteToCloud(trashed, user.id, encryptionKeyRef.current);
+    }
 
     if (activeNoteId === id) {
       const remaining = filteredNotes.filter(n => n.id !== id);
@@ -481,29 +560,25 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         setMobileView('list');
       }
     }
-  }, [activeNoteId, filteredNotes, user]);
+  }, [activeNoteId, filteredNotes, user, setActiveNoteId]);
 
   const permanentlyDeleteNote = useCallback((id: string) => {
+    const target = notesRef.current.find(n => n.id === id);
     triggerHaptic();
-    setNotes(prev => prev.filter(n => n.id !== id));
-    if (user) {
-      deleteNoteFromCloud(id);
-    }
-    if (activeNoteId === id) {
-      const remaining = filteredNotes.filter(n => n.id !== id);
-      setActiveNoteId(remaining.length > 0 ? remaining[0].id : null);
-      if (remaining.length === 0) {
-        setMobileView('list');
-      }
-    }
-  }, [activeNoteId, filteredNotes, user]);
+    setPendingTrashDelete({ type: 'single', id, title: target?.title });
+  }, []);
 
   const restoreNote = useCallback((id: string) => {
     triggerHaptic();
     setNotes(prev =>
       prev.map(n => {
         if (n.id === id) {
-          const restored: Note = { ...n, isTrash: false, updatedAt: Date.now() };
+          const restored: Note = {
+            ...n,
+            isTrash: false,
+            deletedAt: undefined,
+            updatedAt: Date.now(),
+          };
           if (user) {
             upsertNoteToCloud(restored, user.id, encryptionKeyRef.current);
           }
@@ -610,49 +685,73 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   }, [selectedFolderId, user]);
 
-  // Export current note
-  const exportCurrentNote = useCallback((formatType: 'markdown' | 'txt' | 'html', specificNote?: Note) => {
-    const targetNote = specificNote || activeNote;
-    if (!targetNote) return;
+  // Export current note (preserves line breaks cleanly via DOM block walker)
+  const exportCurrentNote = useCallback(
+    (formatType: 'markdown' | 'txt' | 'html', specificNote?: Note) => {
+      const targetNote = specificNote || activeNote;
+      if (!targetNote) return;
+      exportSingleNote(targetNote, formatType);
+    },
+    [activeNote]
+  );
 
-    let contentToExport = targetNote.content;
-    const filename = `${targetNote.title || 'Untitled'}.${
-      formatType === 'markdown' ? 'md' : formatType
-    }`;
-    let mimeType = 'text/plain';
+  // Bulk export selected notes as a ZIP archive
+  const exportSelectedNotes = useCallback(
+    async (formatType: 'txt' | 'markdown' | 'html' = 'txt') => {
+      if (selectedNoteIds.length === 0) return;
+      triggerHaptic();
+      const idSet = new Set(selectedNoteIds);
+      const selected = notesRef.current.filter((n) => idSet.has(n.id));
+      await exportNotesAsZip(selected, formatType);
+      setIsSelectionMode(false);
+      setSelectedNoteIds([]);
+    },
+    [selectedNoteIds]
+  );
 
-    if (formatType === 'txt') {
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = targetNote.content;
-      contentToExport = tempDiv.textContent || tempDiv.innerText || '';
-    } else if (formatType === 'markdown') {
-      contentToExport = targetNote.content
-        .replace(/<h1>(.*?)<\/h1>/gi, '# $1\n\n')
-        .replace(/<h2>(.*?)<\/h2>/gi, '## $1\n\n')
-        .replace(/<h3>(.*?)<\/h3>/gi, '### $1\n\n')
-        .replace(/<strong>(.*?)<\/strong>/gi, '**$1**')
-        .replace(/<b>(.*?)<\/b>/gi, '**$1**')
-        .replace(/<em>(.*?)<\/em>/gi, '*$1*')
-        .replace(/<i>(.*?)<\/i>/gi, '*$1*')
-        .replace(/<p>(.*?)<\/p>/gi, '$1\n\n')
-        .replace(/<br\s*[\/]?>/gi, '\n')
-        .replace(/<[^>]+>/g, '');
-      mimeType = 'text/markdown';
-    } else if (formatType === 'html') {
-      contentToExport = `<!DOCTYPE html><html><head><title>${targetNote.title}</title><meta charset="utf-8"></head><body>${targetNote.content}</body></html>`;
-      mimeType = 'text/html';
-    }
+  // Import text / markdown / html / zip files into notes
+  const importNotes = useCallback(
+    async (files: FileList | File[]): Promise<number> => {
+      const parsed = await parseImportedFiles(files);
+      if (parsed.length === 0) return 0;
 
-    const blob = new Blob([contentToExport], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, [activeNote]);
+      triggerHaptic();
+      const targetFolder =
+        selectedFolderId === 'trash' ||
+        selectedFolderId === 'all' ||
+        selectedFolderId === 'pinned'
+          ? 'default'
+          : selectedFolderId;
+
+      const now = Date.now();
+      const created: Note[] = parsed.map((item, idx) => ({
+        id: `note-${now + idx}-${Math.random().toString(36).substring(2, 6)}`,
+        title: item.title,
+        content: item.content,
+        plainTextPreview: item.plainTextPreview,
+        folderId: targetFolder,
+        isPinned: false,
+        isTrash: false,
+        createdAt: now + idx,
+        updatedAt: now + idx,
+      }));
+
+      setNotes((prev) => [...created, ...prev]);
+      if (created.length > 0) {
+        setActiveNoteId(created[0].id);
+        setMobileView('editor');
+      }
+
+      if (user) {
+        created.forEach((note) => {
+          upsertNoteToCloud(note, user.id, encryptionKeyRef.current);
+        });
+      }
+
+      return created.length;
+    },
+    [selectedFolderId, user, setActiveNoteId]
+  );
 
   // Auto-exit selection mode if active folder changes
   useEffect(() => {
@@ -694,28 +793,66 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     if (selectedNoteIds.length === 0) return;
     triggerHaptic();
     const idsToDelete = new Set(selectedNoteIds);
+    const targetNotes = notesRef.current.filter(n => idsToDelete.has(n.id));
+    const hasTrashedNotes = targetNotes.some(n => n.isTrash);
 
+    // Require explicit "Are you sure?" confirmation if permanently deleting from Recycle Bin
+    if (hasTrashedNotes) {
+      setPendingTrashDelete({
+        type: 'bulk',
+        ids: targetNotes.filter(n => n.isTrash).map(n => n.id),
+      });
+      return;
+    }
+
+    const deletedAt = Date.now();
     setNotes(prev =>
-      prev
-        .map(note => {
-          if (idsToDelete.has(note.id)) {
-            if (note.isTrash) {
-              if (user) deleteNoteFromCloud(note.id);
-              return null as unknown as Note;
-            } else {
-              const trashed: Note = { ...note, isTrash: true, isPinned: false };
-              if (user) upsertNoteToCloud(trashed, user.id, encryptionKeyRef.current);
-              return trashed;
-            }
-          }
-          return note;
-        })
-        .filter(Boolean)
+      prev.map(note => {
+        if (idsToDelete.has(note.id)) {
+          const trashed: Note = { ...note, isTrash: true, isPinned: false, deletedAt };
+          if (user) upsertNoteToCloud(trashed, user.id, encryptionKeyRef.current);
+          return trashed;
+        }
+        return note;
+      })
     );
 
     setIsSelectionMode(false);
     setSelectedNoteIds([]);
   }, [selectedNoteIds, user]);
+
+  const confirmPendingTrashDelete = useCallback(() => {
+    if (!pendingTrashDelete) return;
+    triggerHaptic();
+
+    const idsToRemove = new Set(
+      pendingTrashDelete.type === 'single' ? [pendingTrashDelete.id] : pendingTrashDelete.ids
+    );
+
+    setNotes(prev => prev.filter(n => !idsToRemove.has(n.id)));
+    if (user) {
+      idsToRemove.forEach(id => deleteNoteFromCloud(id));
+    }
+
+    if (activeNoteId && idsToRemove.has(activeNoteId)) {
+      const remaining = filteredNotes.filter(n => !idsToRemove.has(n.id));
+      setActiveNoteIdState(remaining.length > 0 ? remaining[0].id : null);
+      if (remaining.length === 0) {
+        setMobileView('list');
+      }
+    }
+
+    if (pendingTrashDelete.type === 'bulk') {
+      setIsSelectionMode(false);
+      setSelectedNoteIds([]);
+    }
+
+    setPendingTrashDelete(null);
+  }, [pendingTrashDelete, user, activeNoteId, filteredNotes]);
+
+  const cancelPendingTrashDelete = useCallback(() => {
+    setPendingTrashDelete(null);
+  }, []);
 
   const restoreSelectedNotes = useCallback(() => {
     if (selectedNoteIds.length === 0) return;
@@ -725,7 +862,12 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setNotes(prev =>
       prev.map(note => {
         if (idsToRestore.has(note.id)) {
-          const restored: Note = { ...note, isTrash: false };
+          const restored: Note = {
+            ...note,
+            isTrash: false,
+            deletedAt: undefined,
+            updatedAt: Date.now(),
+          };
           if (user) upsertNoteToCloud(restored, user.id, encryptionKeyRef.current);
           return restored;
         }
@@ -810,6 +952,10 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         togglePinSelectedNotes,
         moveSelectedNotesToFolder,
         restoreSelectedNotes,
+        exportSelectedNotes,
+        pendingTrashDelete,
+        confirmPendingTrashDelete,
+        cancelPendingTrashDelete,
         setActiveNoteId: (id) => {
           setActiveNoteId(id);
           if (id) setMobileView('editor');
@@ -832,6 +978,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         deleteFolder,
         deleteFolders,
         exportCurrentNote,
+        importNotes,
       }}
     >
       {children}

@@ -28,9 +28,14 @@ export interface DbFolder {
  * Encrypts and formats a Note for PostgreSQL storage.
  */
 export async function noteToDb(note: Note, userId: string, key: CryptoKey | null): Promise<DbNote> {
-  // If note has handwritten in-note drawing strokes, bundle them securely with content
-  const rawContent = note.drawingStrokes
-    ? JSON.stringify({ html: note.content || '', strokes: note.drawingStrokes })
+  // Bundle handwritten drawing strokes and trash deletion timestamp securely with content
+  const needsBundle = Boolean(note.drawingStrokes || note.deletedAt);
+  const rawContent = needsBundle
+    ? JSON.stringify({
+        html: note.content || '',
+        ...(note.drawingStrokes ? { strokes: note.drawingStrokes } : {}),
+        ...(note.deletedAt ? { deletedAt: note.deletedAt } : {}),
+      })
     : note.content || '';
 
   const [encryptedTitle, encryptedContent, encryptedPreview] = await Promise.all([
@@ -65,13 +70,17 @@ export async function dbToNote(db: DbNote, key: CryptoKey | null): Promise<Note>
 
   let content = decryptedContent;
   let drawingStrokes: string | undefined = undefined;
+  let deletedAt: number | undefined = undefined;
 
-  // Unpack bundled drawing strokes if present
-  if (decryptedContent.startsWith('{"html":') && decryptedContent.includes('"strokes":')) {
+  // Unpack bundled drawing strokes / deletedAt if present
+  if (decryptedContent.startsWith('{"html":')) {
     try {
       const parsed = JSON.parse(decryptedContent);
       content = parsed.html || '';
       drawingStrokes = parsed.strokes;
+      if (typeof parsed.deletedAt === 'number') {
+        deletedAt = parsed.deletedAt;
+      }
     } catch (_) {}
   }
 
@@ -84,6 +93,7 @@ export async function dbToNote(db: DbNote, key: CryptoKey | null): Promise<Note>
     folderId: db.folder_id,
     isPinned: db.is_pinned,
     isTrash: db.is_trash,
+    deletedAt,
     createdAt: Number(db.created_at),
     updatedAt: Number(db.updated_at),
   };

@@ -7,6 +7,7 @@ import {
   Sun,
   Moon,
   Download,
+  Upload,
   ChevronLeft,
   Sparkles,
   Cloud,
@@ -41,6 +42,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     theme,
     toggleTheme,
     exportCurrentNote,
+    importNotes,
     mobileView,
     setMobileView,
     setActiveNoteId,
@@ -59,6 +61,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     );
   });
   const exportRef = useRef<HTMLDivElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (window.electronAPI?.isMac) {
@@ -183,6 +186,35 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
 
       {/* Right controls */}
       <div className="flex items-center space-x-1 sm:space-x-1.5 [app-region:no-drag]">
+        {/* Hidden file input for importing .txt, .md, .html, or .zip archives */}
+        <input
+          ref={importInputRef}
+          type="file"
+          multiple
+          accept=".txt,.md,.markdown,.html,.htm,.zip,text/plain,text/markdown,application/zip"
+          className="hidden"
+          onChange={async (e) => {
+            const files = e.target.files;
+            if (files && files.length > 0) {
+              await importNotes(files);
+            }
+            e.target.value = '';
+          }}
+        />
+
+        {/* Import button */}
+        <button
+          type="button"
+          onClick={() => {
+            triggerHaptic();
+            importInputRef.current?.click();
+          }}
+          title="Import Notes (.txt, .md, .zip)"
+          className="p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 transition-colors active:scale-95"
+        >
+          <Upload size={17} />
+        </button>
+
         {/* Export dropdown */}
         <div className="relative" ref={exportRef}>
           <button

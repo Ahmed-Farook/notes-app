@@ -15,6 +15,7 @@ import {
   FolderPlus,
   MoreVertical,
   Pencil,
+  Download,
 } from 'lucide-react';
 import { useNotes } from '../../store/NotesContext';
 import { NoteCard } from './NoteCard';
@@ -65,9 +66,11 @@ export const NotesList: React.FC<NotesListProps> = ({
     togglePinSelectedNotes,
     moveSelectedNotesToFolder,
     restoreSelectedNotes,
+    exportSelectedNotes,
   } = useNotes();
 
   const [showMovePicker, setShowMovePicker] = useState(false);
+  const [showBulkExportMenu, setShowBulkExportMenu] = useState(false);
   const [isAddingFolder, setIsAddingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
@@ -790,6 +793,13 @@ export const NotesList: React.FC<NotesListProps> = ({
         </div>
       </div>
 
+      {/* 7-day auto-purge notice in Recently Deleted */}
+      {selectedFolderId === 'trash' && (
+        <div className="px-3 py-1.5 bg-[#EFE7D8]/70 dark:bg-[#131B24]/70 border-b border-apple-border/60 dark:border-apple-borderDark/60 text-[11px] text-[#6E7E8E] dark:text-[#8AA0B4] text-center shrink-0">
+          Notes in Recently Deleted are permanently deleted after 7 days.
+        </div>
+      )}
+
       {/* Notes List / Gallery container */}
       <div className="flex-1 overflow-y-auto p-2">
         {filteredNotes.length === 0 ? (
@@ -883,7 +893,52 @@ export const NotesList: React.FC<NotesListProps> = ({
 
       {/* Bulk Action Bottom Toolbar (Active during Multi-Select) */}
       {isSelectionMode && (
-        <div className="border-t border-apple-border dark:border-apple-borderDark bg-[#EFE7D8]/95 dark:bg-[#131B24]/95 backdrop-blur-md px-6 py-2.5 flex items-center justify-between shrink-0 z-30 shadow-lg">
+        <div className="relative border-t border-apple-border dark:border-apple-borderDark bg-[#EFE7D8]/95 dark:bg-[#131B24]/95 backdrop-blur-md px-5 py-2.5 flex items-center justify-between shrink-0 z-30 shadow-lg">
+          {/* Bulk ZIP Export Format Popover */}
+          {showBulkExportMenu && selectedNoteIds.length > 0 && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setShowBulkExportMenu(false)}
+              />
+              <div className="absolute right-3 bottom-full mb-2 w-48 bg-[#FAF6EF] dark:bg-[#1C2733] rounded-xl shadow-2xl border border-apple-border dark:border-apple-borderDark py-1.5 z-50 text-xs backdrop-blur-md animate-in fade-in zoom-in-95 duration-100">
+                <div className="px-3 py-1 font-semibold text-[#5A6E82] dark:text-[#8AA0B4] uppercase tracking-wider text-[10px]">
+                  Export {selectedNoteIds.length} Notes (.zip)
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBulkExportMenu(false);
+                    exportSelectedNotes('txt');
+                  }}
+                  className="w-full text-left px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-700 dark:text-neutral-200 transition-colors"
+                >
+                  Plain Text (.txt in ZIP)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBulkExportMenu(false);
+                    exportSelectedNotes('markdown');
+                  }}
+                  className="w-full text-left px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-700 dark:text-neutral-200 transition-colors"
+                >
+                  Markdown (.md in ZIP)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBulkExportMenu(false);
+                    exportSelectedNotes('html');
+                  }}
+                  className="w-full text-left px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-700 dark:text-neutral-200 transition-colors"
+                >
+                  HTML (.html in ZIP)
+                </button>
+              </div>
+            </>
+          )}
+
           {selectedFolderId === 'trash' ? (
             <>
               {/* Restore */}
@@ -894,6 +949,19 @@ export const NotesList: React.FC<NotesListProps> = ({
               >
                 <RotateCcw size={18} />
                 <span className="text-[10px] font-medium">Restore</span>
+              </button>
+
+              {/* Export ZIP */}
+              <button
+                onClick={() => {
+                  triggerHaptic();
+                  setShowBulkExportMenu((prev) => !prev);
+                }}
+                disabled={selectedNoteIds.length === 0}
+                className="flex flex-col items-center space-y-1 text-neutral-700 dark:text-[#CBD8E3] hover:text-apple-yellow dark:hover:text-[#7EAAD0] disabled:opacity-30 disabled:pointer-events-none transition-colors"
+              >
+                <Download size={18} />
+                <span className="text-[10px] font-medium">Export</span>
               </button>
 
               {/* Delete Permanently */}
@@ -929,6 +997,19 @@ export const NotesList: React.FC<NotesListProps> = ({
               >
                 <Pin size={18} />
                 <span className="text-[10px] font-medium">Pin / Unpin</span>
+              </button>
+
+              {/* Export ZIP */}
+              <button
+                onClick={() => {
+                  triggerHaptic();
+                  setShowBulkExportMenu((prev) => !prev);
+                }}
+                disabled={selectedNoteIds.length === 0}
+                className="flex flex-col items-center space-y-1 text-neutral-700 dark:text-[#CBD8E3] hover:text-apple-yellow dark:hover:text-[#7EAAD0] disabled:opacity-30 disabled:pointer-events-none transition-colors"
+              >
+                <Download size={18} />
+                <span className="text-[10px] font-medium">Export</span>
               </button>
 
               {/* Delete */}

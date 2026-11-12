@@ -12,6 +12,7 @@ import { triggerHaptic } from '../utils/haptics';
 import { useAppUpdater } from '../hooks/useAppUpdater';
 import { UpdateBanner } from './Updates/UpdateBanner';
 import { UpdateModal } from './Updates/UpdateModal';
+import { ConfirmDeleteModal } from './common/ConfirmDeleteModal';
 
 export const Layout: React.FC = () => {
   const {
@@ -28,6 +29,9 @@ export const Layout: React.FC = () => {
     setSelectedFolderId,
     isSelectionMode,
     exitSelectionMode,
+    pendingTrashDelete,
+    confirmPendingTrashDelete,
+    cancelPendingTrashDelete,
   } = useNotes();
   const { isAuthModalOpen, closeAuthModal } = useAuth();
   const [showFormatToolbar, setShowFormatToolbar] = useState(true);
@@ -270,6 +274,15 @@ export const Layout: React.FC = () => {
         isChecking={updater.isChecking}
         error={updater.error}
         onCheckAgain={updater.checkAgain}
+      />
+
+      {/* Recycle Bin Permanent Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(pendingTrashDelete)}
+        onClose={cancelPendingTrashDelete}
+        onConfirm={confirmPendingTrashDelete}
+        count={pendingTrashDelete?.type === 'bulk' ? pendingTrashDelete.ids.length : 1}
+        noteTitle={pendingTrashDelete?.type === 'single' ? pendingTrashDelete.title : undefined}
       />
     </div>
   );

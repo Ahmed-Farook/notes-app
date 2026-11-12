@@ -18,7 +18,7 @@ import { triggerHaptic } from '../../utils/haptics';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import { EditorToolbar } from './EditorToolbar';
-import { InNoteCanvas } from '../Drawing/InNoteCanvas';
+import { InNoteCanvas, DrawingToolType } from '../Drawing/InNoteCanvas';
 
 /**
  * CustomImage: Preserves drawing strokes JSON in data-strokes attribute for re-editing
@@ -315,16 +315,46 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
 
   // Samsung Notes Seamless In-Note Stylus Drawing State
   const [isPenMode, setIsPenMode] = useState(false);
-  const [activeDrawingTool, setActiveDrawingTool] = useState<
-    'pen' | 'highlighter' | 'partial_eraser' | 'stroke_eraser' | 'eraser'
-  >('pen');
+  const [activeDrawingTool, setActiveDrawingTool] = useState<DrawingToolType>('pen');
   const [activeDrawingColor, setActiveDrawingColor] = useState(theme === 'dark' ? '#E8EEF3' : '#213A50');
   const [activeDrawingSize, setActiveDrawingSize] = useState(5);
+  const [stylusOnly, setStylusOnly] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('texo_stylus_only') === 'true';
+    } catch (_) {
+      return false;
+    }
+  });
+  const manualFingerOverrideRef = useRef(false);
   const [canDrawingUndo, setCanDrawingUndo] = useState(false);
   const [canDrawingRedo, setCanDrawingRedo] = useState(false);
   const [drawingUndoTrigger, setDrawingUndoTrigger] = useState(0);
   const [drawingRedoTrigger, setDrawingRedoTrigger] = useState(0);
   const [drawingClearTrigger, setDrawingClearTrigger] = useState(0);
+
+  const handleToggleStylusOnly = () => {
+    setStylusOnly((prev) => {
+      const next = !prev;
+      if (!next) {
+        manualFingerOverrideRef.current = true;
+      } else {
+        manualFingerOverrideRef.current = false;
+      }
+      try {
+        localStorage.setItem('texo_stylus_only', String(next));
+      } catch (_) {}
+      return next;
+    });
+  };
+
+  const handleStylusDetected = () => {
+    if (!stylusOnly && !manualFingerOverrideRef.current) {
+      setStylusOnly(true);
+      try {
+        localStorage.setItem('texo_stylus_only', 'true');
+      } catch (_) {}
+    }
+  };
 
   // Keep drawing color contrasting with theme changes if user hasn't customized it
   useEffect(() => {
@@ -656,6 +686,8 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
         onChangeColor={setActiveDrawingColor}
         activeSize={activeDrawingSize}
         onChangeSize={setActiveDrawingSize}
+        stylusOnly={stylusOnly}
+        onToggleStylusOnly={handleToggleStylusOnly}
         canDrawingUndo={canDrawingUndo}
         canDrawingRedo={canDrawingRedo}
         onDrawingUndo={() => setDrawingUndoTrigger((c) => c + 1)}
@@ -721,12 +753,16 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
             <RotateCcw size={14} className="stroke-[2.2]" />
             <span>Restore</span>
           </button>
+          <div className="hidden sm:flex items-center text-[11px] text-[#6E7E8E] dark:text-[#8AA0B4]">
+            {(() => {
+              const elapsed = Date.now() - (activeNote.deletedAt ?? activeNote.updatedAt);
+              const daysLeft = Math.max(0, Math.ceil((7 * 24 * 60 * 60 * 1000 - elapsed) / (24 * 60 * 60 * 1000)));
+              return daysLeft === 0 ? 'Deleting soon' : `${daysLeft}d left in Recently Deleted`;
+            })()}
+          </div>
           <button
             onClick={() => {
-              triggerHaptic();
-              if (confirm('Permanently delete this note? This action cannot be undone.')) {
-                permanentlyDeleteNote(activeNote.id);
-              }
+              permanentlyDeleteNote(activeNote.id);
             }}
             className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900/60 bg-red-500/10 dark:bg-red-950/40 hover:bg-red-500/20 dark:hover:bg-red-900/60 text-red-600 dark:text-red-400 font-medium transition-all shadow-xs active:scale-95"
           >
@@ -796,6 +832,8 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
               activeTool={activeDrawingTool}
               activeColor={activeDrawingColor}
               activeSize={activeDrawingSize}
+              stylusOnly={stylusOnly}
+              onStylusDetected={handleStylusDetected}
               onStrokesUpdate={(strokesJson) => {
                 const currentNote = activeNoteRef.current;
                 if (!currentNote) return;

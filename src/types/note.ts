@@ -7,6 +7,7 @@ export interface Note {
   folderId: string;
   isPinned: boolean;
   isTrash?: boolean;
+  deletedAt?: number; // timestamp when moved to Recently Deleted for 7-day auto-purge
   createdAt: number;
   updatedAt: number;
 }
