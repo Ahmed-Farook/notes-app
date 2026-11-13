@@ -228,8 +228,8 @@ const CustomTaskItem = TaskItem.extend({
 
 /**
  * EnforceTitleExtension:
- * Enforces that the first line of every note is ALWAYS an h3 heading (the note title).
- * When backspace or delete is pressed in an empty title or at pos 0, it stays an h3 heading
+ * Enforces that the first line of every note is ALWAYS an h1 heading (the note title).
+ * When backspace or delete is pressed in an empty title or at pos 0, it stays an h1 heading
  * instead of reverting to normal paragraph text.
  */
 const EnforceTitleExtension = Extension.create({
@@ -308,15 +308,15 @@ const EnforceTitleExtension = Extension.create({
 
           const firstNode = doc.firstChild;
 
-          // If document is completely empty, insert an h3 heading
+          // If document is completely empty, insert an h1 heading
           if (!firstNode) {
-            tr.insert(0, headingType.create({ level: 3 }));
+            tr.insert(0, headingType.create({ level: 1 }));
             return tr;
           }
 
-          // If first child is not an h3 heading, convert it to h3 heading
-          if (firstNode.type.name !== 'heading' || firstNode.attrs.level !== 3) {
-            tr.setNodeMarkup(0, headingType, { level: 3 });
+          // If first child is not an h1 heading, convert it to h1 heading
+          if (firstNode.type.name !== 'heading' || firstNode.attrs.level !== 1) {
+            tr.setNodeMarkup(0, headingType, { level: 1 });
             return tr;
           }
 

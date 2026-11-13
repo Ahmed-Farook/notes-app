@@ -278,3 +278,4 @@ export const MathBlock = Node.create<MathBlockOptions>({
     };
   },
 });
+

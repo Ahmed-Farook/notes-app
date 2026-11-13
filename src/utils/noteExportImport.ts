@@ -537,9 +537,20 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
   // Scoped typography styles matching the editor so lists, code blocks, tables, math & checkboxes render faithfully
   const styleEl = document.createElement('style');
   styleEl.textContent = `
-    .pdf-root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 13.5px; line-height: 1.6; color: #2D3748; }
-    .pdf-root * { box-sizing: border-box; }
-    .pdf-root h1 { font-size: 22px; line-height: 1.3; font-weight: 700; margin: 14px 0 8px 0; color: #1C2B36; white-space: pre-wrap; word-break: break-word; }
+    .pdf-root {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: #2D3748;
+      letter-spacing: 0.05px;
+      word-spacing: 1px;
+    }
+    .pdf-root * {
+      box-sizing: border-box;
+      letter-spacing: 0.05px;
+      overflow-wrap: break-word;
+    }
+    .pdf-root h1 { font-size: 24px; line-height: 1.3; font-weight: 700; margin: 14px 0 8px 0; color: #1C2B36; white-space: pre-wrap; word-break: break-word; }
     .pdf-root h2 { font-size: 18px; line-height: 1.35; font-weight: 600; margin: 12px 0 6px 0; color: #1C2B36; white-space: pre-wrap; word-break: break-word; }
     .pdf-root h3 { font-size: 16px; line-height: 1.4; font-weight: 600; margin: 12px 0 6px 0; color: #1C2B36; white-space: pre-wrap; word-break: break-word; }
     .pdf-root p { font-size: 13.5px; line-height: 1.65; margin: 0 0 10px 0; color: #2D3748; min-height: 16px; white-space: pre-wrap; word-break: break-word; }
@@ -560,26 +571,24 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
     .pdf-root .pdf-cb {
       position: absolute;
       left: 0;
-      top: 2px;
-      width: 16px;
-      height: 16px;
-      max-width: 16px;
-      max-height: 16px;
-      min-width: 16px;
-      min-height: 16px;
+      top: 3px;
+      width: 15px;
+      height: 15px;
+      max-width: 15px;
+      max-height: 15px;
+      min-width: 15px;
+      min-height: 15px;
       border-radius: 50%;
       border: 1.5px solid #213A50;
       box-sizing: border-box;
       display: flex;
       align-items: center;
       justify-content: center;
-      text-align: center;
-      font-size: 10px;
-      font-weight: 700;
-      line-height: 1;
-      overflow: hidden;
     }
-    .pdf-root .pdf-cb.checked { background: #213A50; color: #FFFFFF; }
+    .pdf-root .pdf-cb.checked {
+      background: #213A50;
+      border-color: #213A50;
+    }
     .pdf-root li[data-checked="true"] > div { text-decoration: line-through; color: #718096; }
     .pdf-root blockquote { border-left: 3px solid #213A50; padding: 4px 0 4px 14px; margin: 12px 0; font-style: italic; color: #4A5568; white-space: pre-wrap; }
     .pdf-root pre { background: #1E293B; color: #F8FAFC; padding: 12px 14px; border-radius: 6px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; margin: 12px 0; white-space: pre-wrap; word-break: break-all; }
@@ -622,7 +631,7 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
     }
   });
 
-  // Replace TipTap native checkbox inputs with reliable absolute CSS circles so html2canvas never stretches them
+  // Replace TipTap native checkbox inputs with crisp vector SVG circles so html2canvas renders ticks sharply
   proseLayer.querySelectorAll('li[data-type="taskItem"]').forEach((li) => {
     const isChecked =
       li.getAttribute('data-checked') === 'true' ||
@@ -631,10 +640,44 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
     if (label) {
       const box = document.createElement('div');
       box.className = `pdf-cb${isChecked ? ' checked' : ''}`;
-      box.textContent = isChecked ? '✓' : '';
+      if (isChecked) {
+        box.innerHTML = `<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:auto;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+      }
       label.replaceWith(box);
     }
   });
+
+  // Ensure spaces between words are never collapsed by macOS/WebKit/html2canvas Range bounds bug
+  // by converting regular spaces in text nodes into non-breaking spaces + zero-width spaces (\u00A0\u200B)
+  const walker = document.createTreeWalker(proseLayer, NodeFilter.SHOW_TEXT, {
+    acceptNode: (node) => {
+      let parent = node.parentElement;
+      while (parent && parent !== proseLayer) {
+        const tag = parent.tagName.toLowerCase();
+        if (
+          tag === 'pre' ||
+          tag === 'code' ||
+          parent.classList.contains('katex') ||
+          parent.classList.contains('katex-mathml')
+        ) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        parent = parent.parentElement;
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+
+  const textNodes: Text[] = [];
+  while (walker.nextNode()) {
+    textNodes.push(walker.currentNode as Text);
+  }
+
+  for (const textNode of textNodes) {
+    if (textNode.nodeValue) {
+      textNode.nodeValue = textNode.nodeValue.replace(/ /g, '\u00A0\u200B');
+    }
+  }
 
   contentLayer.appendChild(proseLayer);
 

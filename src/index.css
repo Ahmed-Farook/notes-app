@@ -127,17 +127,17 @@
   margin-bottom: 0.35rem;
 }
 
-/* Note Title: The first line of every note is an h3 with prominent, distinct title styling */
-.tiptap > h3:first-child {
-  font-size: 1.35rem;
-  line-height: 1.8rem;
+/* Note Title: The first line of every note is an h1 with prominent, distinct title styling */
+.tiptap > h1:first-child {
+  font-size: 1.55rem;
+  line-height: 2rem;
   font-weight: 700;
   margin-top: 0.25rem;
   margin-bottom: 0.65rem;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.02em;
   color: #1C2B36;
 }
-.dark .tiptap > h3:first-child {
+.dark .tiptap > h1:first-child {
   color: #E8EEF3;
 }
 
