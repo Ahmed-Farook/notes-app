@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
+import katex from 'katex';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
@@ -512,14 +513,15 @@ export async function saveOrShareBlob(blob: Blob, filename: string): Promise<voi
 }
 
 /**
- * Renders both formatted note text/checklists/tables/images and handwritten InNoteCanvas strokes
- * into a clean, well-spaced, multi-page A4 PDF Blob with professional margins and page numbers.
+ * Renders both formatted note text/checklists/tables/images, mathematical formulas,
+ * and handwritten InNoteCanvas strokes into a clean, well-spaced, multi-page A4 PDF Blob.
+ * Clean layout: starts directly with note content, no dates/branding or page numbers.
  */
 export async function generateNotePdfBlob(note: Note): Promise<Blob> {
   const pageWidthPx = 720;
   const host = document.createElement('div');
   host.style.position = 'fixed';
-  host.style.left = '-10000px';
+  host.style.left = '0';
   host.style.top = '0';
   host.style.width = `${pageWidthPx}px`;
   host.style.backgroundColor = '#FFFFFF';
@@ -528,25 +530,58 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
   host.style.boxSizing = 'border-box';
   host.style.fontFamily =
     '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
-  host.style.zIndex = '-1';
+  host.style.zIndex = '-99999';
   host.style.opacity = '1';
   host.style.pointerEvents = 'none';
 
-  // Scoped typography styles matching the editor so lists, code blocks, tables & checkboxes render faithfully
+  // Scoped typography styles matching the editor so lists, code blocks, tables, math & checkboxes render faithfully
   const styleEl = document.createElement('style');
   styleEl.textContent = `
-    .pdf-root h1 { font-size: 22px; line-height: 1.3; font-weight: 700; margin: 18px 0 8px 0; color: #1C2B36; }
-    .pdf-root h2 { font-size: 18px; line-height: 1.35; font-weight: 600; margin: 15px 0 6px 0; color: #1C2B36; }
-    .pdf-root h3 { font-size: 16px; line-height: 1.4; font-weight: 600; margin: 14px 0 6px 0; color: #1C2B36; }
-    .pdf-root p { font-size: 13.5px; line-height: 1.65; margin: 0 0 10px 0; color: #2D3748; min-height: 16px; }
+    .pdf-root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 13.5px; line-height: 1.6; color: #2D3748; }
+    .pdf-root * { box-sizing: border-box; }
+    .pdf-root h1 { font-size: 22px; line-height: 1.3; font-weight: 700; margin: 14px 0 8px 0; color: #1C2B36; white-space: pre-wrap; word-break: break-word; }
+    .pdf-root h2 { font-size: 18px; line-height: 1.35; font-weight: 600; margin: 12px 0 6px 0; color: #1C2B36; white-space: pre-wrap; word-break: break-word; }
+    .pdf-root h3 { font-size: 16px; line-height: 1.4; font-weight: 600; margin: 12px 0 6px 0; color: #1C2B36; white-space: pre-wrap; word-break: break-word; }
+    .pdf-root p { font-size: 13.5px; line-height: 1.65; margin: 0 0 10px 0; color: #2D3748; min-height: 16px; white-space: pre-wrap; word-break: break-word; }
     .pdf-root ul:not([data-type="taskList"]) { list-style: disc; padding-left: 22px; margin: 0 0 12px 0; font-size: 13.5px; line-height: 1.6; color: #2D3748; }
     .pdf-root ol { list-style: decimal; padding-left: 22px; margin: 0 0 12px 0; font-size: 13.5px; line-height: 1.6; color: #2D3748; }
     .pdf-root ul[data-type="taskList"] { list-style: none; padding: 0; margin: 6px 0 12px 0; }
-    .pdf-root ul[data-type="taskList"] li { display: flex; align-items: flex-start; margin-bottom: 7px; font-size: 13.5px; line-height: 1.5; color: #2D3748; }
-    .pdf-root .pdf-cb { width: 15px; height: 15px; border-radius: 50%; border: 1.5px solid #213A50; margin-right: 9px; margin-top: 2px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; box-sizing: border-box; }
+    .pdf-root ul[data-type="taskList"] li {
+      position: relative;
+      padding-left: 26px;
+      margin-bottom: 8px;
+      font-size: 13.5px;
+      line-height: 1.5;
+      color: #2D3748;
+      min-height: 20px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .pdf-root .pdf-cb {
+      position: absolute;
+      left: 0;
+      top: 2px;
+      width: 16px;
+      height: 16px;
+      max-width: 16px;
+      max-height: 16px;
+      min-width: 16px;
+      min-height: 16px;
+      border-radius: 50%;
+      border: 1.5px solid #213A50;
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+      overflow: hidden;
+    }
     .pdf-root .pdf-cb.checked { background: #213A50; color: #FFFFFF; }
     .pdf-root li[data-checked="true"] > div { text-decoration: line-through; color: #718096; }
-    .pdf-root blockquote { border-left: 3px solid #213A50; padding: 4px 0 4px 14px; margin: 12px 0; font-style: italic; color: #4A5568; }
+    .pdf-root blockquote { border-left: 3px solid #213A50; padding: 4px 0 4px 14px; margin: 12px 0; font-style: italic; color: #4A5568; white-space: pre-wrap; }
     .pdf-root pre { background: #1E293B; color: #F8FAFC; padding: 12px 14px; border-radius: 6px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; margin: 12px 0; white-space: pre-wrap; word-break: break-all; }
     .pdf-root code:not(pre code) { background: #EDF2F7; color: #1A202C; padding: 2px 5px; border-radius: 4px; font-family: ui-monospace, monospace; font-size: 12px; }
     .pdf-root mark { background: #FEF08A; color: #1C2B36; padding: 1px 3px; border-radius: 3px; }
@@ -555,33 +590,9 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
     .pdf-root th { background: #F1F5F9; font-weight: 600; text-align: left; padding: 8px 10px; border: 1px solid #CBD5E1; color: #1E293B; }
     .pdf-root td { padding: 7px 10px; border: 1px solid #CBD5E1; color: #334155; vertical-align: top; }
     .pdf-root img { max-width: 100%; height: auto; border-radius: 6px; margin: 10px 0; display: block; }
+    .pdf-root .katex-math-block { margin: 14px 0; padding: 8px 12px; text-align: center; overflow-x: auto; background: #F8FAFC; border-radius: 6px; border: 1px solid #E2E8F0; }
   `;
   host.appendChild(styleEl);
-
-  // Clean Header Metadata with Subtle Divider
-  const headerContainer = document.createElement('div');
-  headerContainer.style.marginBottom = '20px';
-  headerContainer.style.paddingBottom = '12px';
-  headerContainer.style.borderBottom = '1px solid #E2E8F0';
-  headerContainer.style.display = 'flex';
-  headerContainer.style.justifyContent = 'space-between';
-  headerContainer.style.alignItems = 'flex-end';
-
-  const dateLeft = document.createElement('div');
-  dateLeft.style.fontSize = '11px';
-  dateLeft.style.fontWeight = '500';
-  dateLeft.style.color = '#718096';
-  dateLeft.textContent = formatEditorDate(note.updatedAt || Date.now());
-
-  const brandingRight = document.createElement('div');
-  brandingRight.style.fontSize = '11px';
-  brandingRight.style.fontWeight = '600';
-  brandingRight.style.color = '#A0AEC0';
-  brandingRight.textContent = 'texō';
-
-  headerContainer.appendChild(dateLeft);
-  headerContainer.appendChild(brandingRight);
-  host.appendChild(headerContainer);
 
   const contentLayer = document.createElement('div');
   contentLayer.className = 'pdf-root';
@@ -590,7 +601,28 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
   const proseLayer = document.createElement('div');
   proseLayer.innerHTML = note.content || '<p></p>';
 
-  // Replace TipTap native checkbox inputs with reliable pure-CSS circles so html2canvas renders ticks sharply
+  // Render any MathBlock elements or raw $$...$$ formulas with KaTeX
+  proseLayer.querySelectorAll('[data-type="math-block"]').forEach((el) => {
+    const latex = el.getAttribute('data-latex') || el.textContent || '';
+    if (latex) {
+      try {
+        el.innerHTML = katex.renderToString(latex, { displayMode: true, throwOnError: false });
+      } catch (_) {}
+    }
+  });
+
+  proseLayer.querySelectorAll('p').forEach((p) => {
+    const text = p.textContent?.trim() || '';
+    const match = text.match(/^\$\$([\s\S]+?)\$\$$/);
+    if (match) {
+      try {
+        p.innerHTML = katex.renderToString(match[1].trim(), { displayMode: true, throwOnError: false });
+        p.className = 'katex-math-block';
+      } catch (_) {}
+    }
+  });
+
+  // Replace TipTap native checkbox inputs with reliable absolute CSS circles so html2canvas never stretches them
   proseLayer.querySelectorAll('li[data-type="taskItem"]').forEach((li) => {
     const isChecked =
       li.getAttribute('data-checked') === 'true' ||
@@ -710,6 +742,9 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
 
     host.appendChild(contentLayer);
 
+    // Ensure all web fonts (including KaTeX math glyphs) are fully loaded
+    await (document as any).fonts?.ready;
+
     const renderedCanvas = await html2canvas(host, {
       scale: 2,
       backgroundColor: '#FFFFFF',
@@ -730,7 +765,6 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
 
     let sourceY = 0;
     let pageIndex = 0;
-    const totalPages = Math.max(1, Math.ceil(totalCanvasHeight / canvasPageHeightPx));
 
     while (sourceY < totalCanvasHeight) {
       if (pageIndex > 0) {
@@ -759,16 +793,6 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
       const sliceImgData = sliceCanvas.toDataURL('image/png');
       const renderedMmHeight = (sliceHeightPx * printWidth) / renderedCanvas.width;
       pdf.addImage(sliceImgData, 'PNG', marginMm, marginMm, printWidth, renderedMmHeight);
-
-      // Centered subtle page number footer
-      pdf.setFontSize(8);
-      pdf.setTextColor(160, 174, 192);
-      pdf.text(
-        `Page ${pageIndex + 1} of ${totalPages}`,
-        pdfWidth / 2,
-        pdfHeight - 8,
-        { align: 'center' }
-      );
 
       sourceY += sliceHeightPx;
       pageIndex++;

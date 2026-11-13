@@ -26,6 +26,7 @@ import {
   Trash2,
   Table as TableIcon,
   ImagePlus,
+  Sigma,
 } from 'lucide-react';
 import { triggerHaptic } from '../../utils/haptics';
 import { toggleUnifiedCodeBlock } from '../../utils/editorCommands';
@@ -102,8 +103,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 }) => {
   const [showPenPopover, setShowPenPopover] = useState(false);
   const [showEraserPopover, setShowEraserPopover] = useState(false);
-  const penPopoverRef = useRef<HTMLDivElement>(null);
-  const eraserPopoverRef = useRef<HTMLDivElement>(null);
+  const penContainerRef = useRef<HTMLDivElement>(null);
+  const eraserContainerRef = useRef<HTMLDivElement>(null);
   const toolbarScrollRef = useRef<HTMLDivElement>(null);
   const prevIsTableRef = useRef(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -112,17 +113,18 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   useEffect(() => {
     if (!showPenPopover && !showEraserPopover) return;
     const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node;
       if (
         showPenPopover &&
-        penPopoverRef.current &&
-        !penPopoverRef.current.contains(e.target as Node)
+        penContainerRef.current &&
+        !penContainerRef.current.contains(target)
       ) {
         setShowPenPopover(false);
       }
       if (
         showEraserPopover &&
-        eraserPopoverRef.current &&
-        !eraserPopoverRef.current.contains(e.target as Node)
+        eraserContainerRef.current &&
+        !eraserContainerRef.current.contains(target)
       ) {
         setShowEraserPopover(false);
       }
@@ -215,40 +217,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       ref={toolbarScrollRef}
       className="h-11 md:h-10 flex flex-nowrap items-center gap-1 px-2.5 border-t md:border-t-0 md:border-b border-apple-border dark:border-apple-borderDark bg-[#F2ECE0]/95 dark:bg-[#151E28]/95 backdrop-blur md:sticky md:top-0 z-30 select-none text-xs shrink-0 overflow-x-auto no-scrollbar order-last md:order-first"
     >
-      {/* 1. Undo & Redo (Positioned simply at the start) */}
-      <button
-        type="button"
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => {
-          triggerHaptic();
-          if (isPenMode) onDrawingUndo();
-          else editor.chain().focus().undo().run();
-        }}
-        disabled={isPenMode ? !canDrawingUndo : !editor.can().undo()}
-        title="Undo"
-        className="p-1.5 rounded shrink-0 text-[#213A50] dark:text-[#CBD8E3] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] disabled:opacity-30 disabled:pointer-events-none transition-colors outline-none focus:outline-none"
-      >
-        <Undo2 size={15} />
-      </button>
-
-      <button
-        type="button"
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => {
-          triggerHaptic();
-          if (isPenMode) onDrawingRedo();
-          else editor.chain().focus().redo().run();
-        }}
-        disabled={isPenMode ? !canDrawingRedo : !editor.can().redo()}
-        title="Redo"
-        className="p-1.5 rounded shrink-0 text-[#213A50] dark:text-[#CBD8E3] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] disabled:opacity-30 disabled:pointer-events-none transition-colors outline-none focus:outline-none"
-      >
-        <Redo2 size={15} />
-      </button>
-
-      <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#223344] shrink-0 mx-0.5" />
-
-      {/* 2. Mode Switcher: Type vs Draw */}
+      {/* 1. Mode Switcher: Type vs Draw */}
       <div className="flex items-center bg-[#E5DCCB]/90 dark:bg-[#1A2530] border border-[#DFD3C0] dark:border-[#263747] rounded-lg p-0.5 shrink-0 shadow-xs">
         <button
           type="button"
@@ -291,16 +260,47 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
       <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#223344] shrink-0 mx-0.5" />
 
+      {/* 2. Undo & Redo (Positioned immediately after Type & Draw) */}
+      <button
+        type="button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => {
+          triggerHaptic();
+          if (isPenMode) onDrawingUndo();
+          else editor.chain().focus().undo().run();
+        }}
+        disabled={isPenMode ? !canDrawingUndo : !editor.can().undo()}
+        title="Undo"
+        className="p-1.5 rounded shrink-0 text-[#213A50] dark:text-[#CBD8E3] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] disabled:opacity-30 disabled:pointer-events-none transition-colors outline-none focus:outline-none"
+      >
+        <Undo2 size={15} />
+      </button>
+
+      <button
+        type="button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => {
+          triggerHaptic();
+          if (isPenMode) onDrawingRedo();
+          else editor.chain().focus().redo().run();
+        }}
+        disabled={isPenMode ? !canDrawingRedo : !editor.can().redo()}
+        title="Redo"
+        className="p-1.5 rounded shrink-0 text-[#213A50] dark:text-[#CBD8E3] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] disabled:opacity-30 disabled:pointer-events-none transition-colors outline-none focus:outline-none"
+      >
+        <Redo2 size={15} />
+      </button>
+
+      <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#223344] shrink-0 mx-0.5" />
+
       {/* 3. DRAWING MODE TOOLS (Samsung Notes Style with Double-Tap / 2nd-Click Popovers) */}
       {isPenMode ? (
         <>
           {/* Pen Button (Click to select, click again for color & thickness options) */}
-          <div className="relative shrink-0">
+          <div ref={penContainerRef} className="relative shrink-0">
             <button
               type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={(e) => {
-                e.preventDefault();
+              onClick={() => {
                 triggerHaptic();
                 setShowEraserPopover(false);
                 if (!isPenActive) {
@@ -329,7 +329,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             {/* Pen Options Popover */}
             {showPenPopover && (
               <div
-                ref={penPopoverRef}
                 className="absolute left-0 top-full mt-2 bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0] dark:border-[#263747] rounded-xl shadow-2xl p-3 z-50 text-xs w-72 animate-in fade-in zoom-in-95 duration-100"
               >
                 <div className="font-semibold text-[#5A6E82] dark:text-[#8AA0B4] uppercase tracking-wider text-[10px] mb-2">
@@ -429,12 +428,10 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           </div>
 
           {/* Eraser Button (Classic Eraser Icon; click to select, click again for Area vs Stroke & size) */}
-          <div className="relative shrink-0">
+          <div ref={eraserContainerRef} className="relative shrink-0">
             <button
               type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={(e) => {
-                e.preventDefault();
+              onClick={() => {
                 triggerHaptic();
                 setShowPenPopover(false);
                 if (!isEraserActive) {
@@ -459,7 +456,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             {/* Eraser Options Popover */}
             {showEraserPopover && (
               <div
-                ref={eraserPopoverRef}
                 className="absolute left-0 top-full mt-2 bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0] dark:border-[#263747] rounded-xl shadow-2xl p-3 z-50 text-xs w-64 animate-in fade-in zoom-in-95 duration-100"
               >
                 <div className="font-semibold text-[#5A6E82] dark:text-[#8AA0B4] uppercase tracking-wider text-[10px] mb-2">
@@ -789,6 +785,35 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           >
             <TableIcon size={15} />
             <span className="hidden sm:inline">Table</span>
+          </button>
+
+          {/* Math Formula Insertion */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              triggerHaptic();
+              editor
+                .chain()
+                .focus()
+                .insertContent({
+                  type: 'mathBlock',
+                  attrs: {
+                    latex:
+                      '\\frac{\\partial L}{\\partial w_3} = \\delta_2 \\times x_1 = (-0.00435)(1) = \\mathbf{-0.00435}',
+                  },
+                })
+                .run();
+            }}
+            title="Insert Math Equation ($$...$$)"
+            className={`flex items-center space-x-1 p-1.5 rounded shrink-0 transition-colors outline-none focus:outline-none ${
+              editor.isActive('mathBlock')
+                ? 'bg-[#E5DCCB] dark:bg-[#203448] text-[#213A50] dark:text-[#7EAAD0] font-bold shadow-xs'
+                : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3]'
+            }`}
+          >
+            <Sigma size={15} />
+            <span className="hidden sm:inline">Math</span>
           </button>
 
           {/* Contextual Table Controls (visible whenever cursor is inside a table) */}

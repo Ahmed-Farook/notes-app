@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import { Extension } from '@tiptap/core';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Plugin, PluginKey, Selection } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import StarterKit from '@tiptap/starter-kit';
 import TaskList from '@tiptap/extension-task-list';
@@ -23,6 +23,7 @@ import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import { EditorToolbar } from './EditorToolbar';
 import { InNoteCanvas, DrawingToolType } from '../Drawing/InNoteCanvas';
+import { MathBlock } from '../../extensions/MathExtension';
 
 /**
  * CustomImage: Preserves drawing strokes JSON in data-strokes attribute for re-editing
@@ -262,6 +263,18 @@ const EnforceTitleExtension = Extension.create({
           if ($from.parentOffset === 0) {
             return editor.chain().focus().liftListItem('taskItem').clearNodes().run();
           }
+        }
+
+        // When pressing backspace on an empty textblock (like an empty paragraph after a checklist or table),
+        // cleanly delete the empty paragraph and place cursor at the end of the previous block
+        // instead of allowing ProseMirror joinBackward to convert it into a taskItem/checkbox!
+        if (empty && $from.parent.isTextblock && $from.parent.content.size === 0 && $from.pos > 1) {
+          const beforePos = $from.before();
+          const tr = state.tr.delete(beforePos, $from.after());
+          const targetPos = Math.max(1, beforePos - 1);
+          tr.setSelection(Selection.near(tr.doc.resolve(targetPos), -1));
+          editor.view.dispatch(tr);
+          return true;
         }
 
         return false;
@@ -558,7 +571,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
         }
       } catch (_) {}
     }
-    return Math.max(window.innerHeight * 0.75, maxY + 250);
+    return maxY > 0 ? Math.ceil(maxY + 60) : 0;
   }, [activeNote?.drawingStrokes]);
 
   const isUpdatingRef = useRef(false);
@@ -588,6 +601,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
       TableRow,
       TableHeader,
       TableCell,
+      MathBlock,
       Placeholder.configure({
         placeholder: ({ pos }) => {
           if (pos === 0) {
@@ -611,7 +625,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     editable: Boolean(activeNote && !activeNote.isTrash),
     editorProps: {
       attributes: {
-        class: 'focus:outline-none min-h-[60vh] cursor-text select-text',
+        class: 'focus:outline-none min-h-[140px] cursor-text select-text',
       },
     },
     onUpdate: ({ editor, transaction }) => {
@@ -653,6 +667,13 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
       });
     }
   }, [editor, onRegisterToggleChecklist]);
+
+  // Reset scroll position to top whenever switching notes so the new note starts cleanly from the top
+  useEffect(() => {
+    if (editorScrollContainerRef.current) {
+      editorScrollContainerRef.current.scrollTop = 0;
+    }
+  }, [activeNote?.id]);
 
   // Update editor content and editable state when active note changes or remote sync arrives
   useEffect(() => {
@@ -993,10 +1014,10 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
             </span>
           </div>
 
-          <div className="relative" style={{ minHeight: `${containerMinHeight}px` }}>
+          <div className="relative" style={{ minHeight: containerMinHeight > 0 ? `${containerMinHeight}px` : undefined }}>
             <EditorContent
               editor={editor}
-              className="prose prose-neutral dark:prose-invert focus:outline-none min-h-[60vh] select-text cursor-text"
+              className="prose prose-neutral dark:prose-invert focus:outline-none min-h-[140px] select-text cursor-text"
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
@@ -1019,7 +1040,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
             />
 
             {/* 5 lines of non-editable bottom visual padding so text never touches bottom */}
-            <div className="h-28 pointer-events-none select-none" aria-hidden="true" />
+            <div className="h-16 pointer-events-none select-none" aria-hidden="true" />
 
             {/* Seamless In-Note Drawing Canvas Overlay */}
             <InNoteCanvas

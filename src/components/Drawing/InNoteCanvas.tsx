@@ -622,7 +622,8 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     }
 
     const width = Math.max(300, Math.floor(rect.width));
-    const height = Math.max(500, Math.floor(Math.max(rect.height, scrollH, maxStrokeY + 250)));
+    const targetHeight = maxStrokeY > 0 ? Math.max(rect.height, maxStrokeY + 60) : rect.height;
+    const height = Math.max(140, Math.floor(targetHeight));
 
     if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
       canvas.width = width * dpr;
@@ -632,6 +633,10 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
       redrawCanvas();
     }
   }, [redrawCanvas]);
+
+  useEffect(() => {
+    resizeCanvas();
+  }, [noteId, resizeCanvas]);
 
   useEffect(() => {
     resizeCanvas();
