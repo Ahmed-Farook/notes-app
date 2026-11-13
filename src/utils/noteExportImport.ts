@@ -515,18 +515,30 @@ export async function saveOrShareBlob(blob: Blob, filename: string): Promise<voi
 /**
  * Renders both formatted note text/checklists/tables/images, mathematical formulas,
  * and handwritten InNoteCanvas strokes into a clean, well-spaced, multi-page A4 PDF Blob.
- * Clean layout: starts directly with note content, no dates/branding or page numbers.
+ * 
+ * Logic Highlights:
+ * 1. Uses editor-faithful typography & spacing instead of separate incompatible PDF styling.
+ * 2. Preserves natural word spacing and line wrapping (no artificial non-breaking spaces).
+ * 3. Does NOT force first block to H1; keeps authentic user note structure.
+ * 4. Calculates intelligent page breaks between lines & elements (avoiding slicing through text,
+ *    images, tables, or formulas, and preventing orphan headings).
+ * 5. Captures one page at a time to prevent massive oversized canvases and blank pages on mobile.
  */
 export async function generateNotePdfBlob(note: Note): Promise<Blob> {
   const pageWidthPx = 720;
+  // A4 dimensions: 210mm x 297mm with 15mm margins on all sides.
+  // Printable area: 180mm x 267mm -> Aspect ratio = 267 / 180 ≈ 1.4833
+  const pageHeightPx = Math.floor(pageWidthPx * (267 / 180)); // 1068px
+
   const host = document.createElement('div');
   host.style.position = 'fixed';
   host.style.left = '0';
   host.style.top = '0';
   host.style.width = `${pageWidthPx}px`;
   host.style.backgroundColor = '#FFFFFF';
-  host.style.color = '#111827';
+  host.style.color = '#1C2B36';
   host.style.padding = '0';
+  host.style.margin = '0';
   host.style.boxSizing = 'border-box';
   host.style.fontFamily =
     '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
@@ -534,232 +546,202 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
   host.style.opacity = '1';
   host.style.pointerEvents = 'none';
 
-  // Scoped typography styles matching the editor so lists, code blocks, tables, math & checkboxes render faithfully
+  // Scoped typography styles matching the editor faithfully
   const styleEl = document.createElement('style');
   styleEl.textContent = `
-    .pdf-root {
+    .prose-print {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      font-size: 13.5px;
-      line-height: 1.6;
-      color: #1F2937;
-      letter-spacing: normal;
-      word-spacing: normal;
+      font-size: 15px;
+      line-height: 1.625;
+      color: #1C2B36;
+      background-color: #FFFFFF;
       padding: 0;
       margin: 0;
+      width: 100%;
+      word-wrap: break-word;
     }
-    .pdf-root * {
+    .prose-print * {
       box-sizing: border-box;
-      letter-spacing: normal;
-      word-spacing: normal;
-      overflow-wrap: break-word;
     }
-    .pdf-root h1 {
-      font-size: 26px;
+    .prose-print h1 {
+      font-size: 28px;
       line-height: 1.25;
       font-weight: 700;
-      margin: 0 0 16px 0;
-      color: #111827;
-      letter-spacing: -0.02em;
+      margin-top: 6px;
+      margin-bottom: 14px;
+      letter-spacing: -0.025em;
+      color: #1C2B36;
       word-break: break-word;
     }
-    .pdf-root h2 {
-      font-size: 19px;
+    .prose-print h2 {
+      font-size: 20px;
       line-height: 1.35;
-      font-weight: 700;
-      margin: 22px 0 8px 0;
-      color: #111827;
-      letter-spacing: -0.015em;
+      font-weight: 600;
+      margin-top: 18px;
+      margin-bottom: 8px;
+      letter-spacing: -0.02em;
+      color: #1C2B36;
       word-break: break-word;
     }
-    .pdf-root h3 {
-      font-size: 16px;
+    .prose-print h3 {
+      font-size: 17px;
       line-height: 1.4;
       font-weight: 600;
-      margin: 16px 0 6px 0;
-      color: #1F2937;
+      margin-top: 14px;
+      margin-bottom: 6px;
+      color: #1C2B36;
       word-break: break-word;
     }
-    .pdf-root p {
-      font-size: 13.5px;
-      line-height: 1.6;
-      margin: 0 0 10px 0;
-      color: #2D3748;
-      min-height: 16px;
+    .prose-print p {
+      font-size: 15px;
+      line-height: 1.625;
+      margin-top: 0;
+      margin-bottom: 8px;
+      color: #1C2B36;
+      min-height: 1.5em;
       word-break: break-word;
     }
-    .pdf-root ul:not([data-type="taskList"]) {
-      list-style: disc;
-      padding-left: 22px;
-      margin: 0 0 12px 0;
-      font-size: 13.5px;
-      line-height: 1.6;
-      color: #2D3748;
-    }
-    .pdf-root ol {
-      list-style: decimal;
-      padding-left: 22px;
-      margin: 0 0 12px 0;
-      font-size: 13.5px;
-      line-height: 1.6;
-      color: #2D3748;
-    }
-    .pdf-root ul[data-type="taskList"] {
-      list-style: none;
-      padding: 0;
-      margin: 8px 0 14px 0;
-    }
-    .pdf-root ul[data-type="taskList"] li {
-      position: relative;
+    .prose-print ul:not([data-type="taskList"]) {
+      list-style-type: disc;
       padding-left: 24px;
-      margin: 0 0 7px 0;
-      font-size: 13.5px;
-      line-height: 1.5;
-      color: #1F2937;
-      min-height: 19px;
-      word-break: break-word;
+      margin-top: 4px;
+      margin-bottom: 12px;
     }
-    .pdf-root ul[data-type="taskList"] li > div {
-      margin: 0;
-      padding: 0;
+    .prose-print ol {
+      list-style-type: decimal;
+      padding-left: 24px;
+      margin-top: 4px;
+      margin-bottom: 12px;
     }
-    .pdf-root ul[data-type="taskList"] li > div > p {
-      margin: 0 !important;
-      padding: 0 !important;
-      font-size: 13.5px !important;
-      line-height: 1.5 !important;
-      color: inherit;
+    .prose-print li {
+      font-size: 15px;
+      line-height: 1.6;
+      margin-bottom: 4px;
     }
-    .pdf-root .pdf-cb {
-      position: absolute;
-      left: 0;
-      top: 2px;
-      width: 15px;
-      height: 15px;
-      max-width: 15px;
-      max-height: 15px;
-      min-width: 15px;
-      min-height: 15px;
-      border-radius: 50%;
-      border: 1.5px solid #213A50;
-      box-sizing: border-box;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .pdf-root .pdf-cb.checked {
-      background: #213A50;
-      border-color: #213A50;
-    }
-    .pdf-root li[data-checked="true"] > div {
-      text-decoration: line-through;
-      color: #64748B;
-    }
-    .pdf-root blockquote {
+    .prose-print blockquote {
       border-left: 3px solid #213A50;
-      padding: 4px 0 4px 14px;
+      padding-left: 14px;
       margin: 12px 0;
       font-style: italic;
-      color: #4A5568;
+      color: #395060;
     }
-    .pdf-root pre {
-      background: #1E293B;
+    .prose-print pre {
+      background: #192531;
       color: #F8FAFC;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       padding: 12px 14px;
-      border-radius: 6px;
-      font-family: ui-monospace, Menlo, monospace;
-      font-size: 12px;
+      border-radius: 8px;
       margin: 12px 0;
+      font-size: 13px;
+      line-height: 1.5;
+      white-space: pre-wrap;
       word-break: break-all;
     }
-    .pdf-root code:not(pre code) {
-      background: #EDF2F7;
-      color: #1A202C;
+    .prose-print code:not(pre code) {
+      background: #E8F1F7;
+      color: #213A50;
       padding: 2px 5px;
       border-radius: 4px;
+      font-size: 13px;
       font-family: ui-monospace, monospace;
-      font-size: 12px;
     }
-    .pdf-root mark {
+    .prose-print mark {
       background: #FEF08A;
       color: #1C2B36;
       padding: 1px 3px;
       border-radius: 3px;
     }
-    .pdf-root hr {
+    .prose-print hr {
       border: none;
-      border-top: 1px solid #E2E8F0;
+      border-top: 1px solid #DFD3C0;
       margin: 16px 0;
     }
-    .pdf-root table {
-      border-collapse: collapse;
+    .prose-print table {
       width: 100%;
-      margin: 14px 0;
+      border-collapse: collapse;
+      margin: 12px 0;
       border: 1px solid #CBD5E1;
-      border-radius: 0;
-      overflow: hidden;
-      font-size: 12.5px;
+      font-size: 14px;
     }
-    .pdf-root th {
+    .prose-print th {
       background: #F1F5F9;
       font-weight: 600;
       text-align: left;
-      padding: 8px 10px;
+      padding: 8px 12px;
       border: 1px solid #CBD5E1;
-      color: #1E293B;
+      color: #1C2B36;
     }
-    .pdf-root td {
-      padding: 7px 10px;
+    .prose-print td {
+      padding: 8px 12px;
       border: 1px solid #CBD5E1;
-      color: #334155;
+      color: #1C2B36;
       vertical-align: top;
     }
-    .pdf-root img {
+    .prose-print img {
       max-width: 100%;
       height: auto;
       border-radius: 6px;
-      margin: 10px 0;
+      margin: 12px 0;
       display: block;
     }
-    .pdf-root .katex-math-block {
+    .prose-print .katex-math-block {
       margin: 14px 0;
-      padding: 8px 12px;
+      padding: 10px 14px;
       text-align: center;
-      overflow-x: auto;
       background: #F8FAFC;
-      border-radius: 6px;
+      border-radius: 8px;
       border: 1px solid #E2E8F0;
+      color: #1C2B36;
+    }
+    .prose-print ul[data-type="taskList"] {
+      list-style: none;
+      padding: 0;
+      margin: 6px 0 10px 0;
+    }
+    .prose-print ul[data-type="taskList"] li {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 6px;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+    .prose-print ul[data-type="taskList"] li > div {
+      flex: 1 1 auto;
+      min-width: 1px;
+    }
+    .prose-print ul[data-type="taskList"] li > div > p {
+      margin: 0 !important;
+      padding: 0 !important;
+      line-height: 1.5 !important;
+      min-height: 1.5em !important;
     }
   `;
   host.appendChild(styleEl);
 
   const contentLayer = document.createElement('div');
-  contentLayer.className = 'pdf-root';
+  contentLayer.className = 'tiptap ProseMirror prose prose-neutral prose-print';
   contentLayer.style.position = 'relative';
+  contentLayer.style.width = '100%';
+  contentLayer.style.backgroundColor = '#FFFFFF';
+  contentLayer.style.color = '#1C2B36';
 
   const proseLayer = document.createElement('div');
   proseLayer.innerHTML = note.content || '<p></p>';
 
-  // Ensure note title (first element child) is always an <h1> with commanding styling
-  const firstEl = proseLayer.firstElementChild;
-  if (firstEl && firstEl.tagName !== 'H1') {
-    const h1 = document.createElement('h1');
-    h1.innerHTML = firstEl.innerHTML;
-    firstEl.replaceWith(h1);
-  }
-
-  // Render any MathBlock elements or raw $$...$$ formulas with KaTeX
+  // Render mathematical formulas with KaTeX
   proseLayer.querySelectorAll('[data-type="math-block"]').forEach((el) => {
     const latex = el.getAttribute('data-latex') || el.textContent || '';
     if (latex) {
       try {
         el.innerHTML = katex.renderToString(latex, { displayMode: true, throwOnError: false });
+        el.className = 'katex-math-block';
       } catch (_) {}
     }
   });
 
   proseLayer.querySelectorAll('p').forEach((p) => {
     const text = p.textContent?.trim() || '';
-    const match = text.match(/^\$\$([\s\S]+?)\$\$$/);
+    const match = text.match(/^\$\$([\s\S]+?)\$\$$/) || text.match(/^\\\[([\s\S]+?)\\\]$/);
     if (match) {
       try {
         p.innerHTML = katex.renderToString(match[1].trim(), { displayMode: true, throwOnError: false });
@@ -768,7 +750,7 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
     }
   });
 
-  // Replace TipTap native checkbox inputs with crisp vector SVG circles so html2canvas renders ticks sharply
+  // Render crisp vector SVG checklist items aligned with text line height
   proseLayer.querySelectorAll('li[data-type="taskItem"]').forEach((li) => {
     const isChecked =
       li.getAttribute('data-checked') === 'true' ||
@@ -776,50 +758,42 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
     const label = li.querySelector(':scope > label');
     if (label) {
       const box = document.createElement('div');
-      box.className = `pdf-cb${isChecked ? ' checked' : ''}`;
+      box.style.display = 'inline-flex';
+      box.style.alignItems = 'center';
+      box.style.justifyContent = 'center';
+      box.style.width = '18px';
+      box.style.height = '18px';
+      box.style.minWidth = '18px';
+      box.style.minHeight = '18px';
+      box.style.marginRight = '10px';
+      box.style.marginTop = '2px';
+      box.style.borderRadius = '50%';
+      box.style.flexShrink = '0';
+      box.style.boxSizing = 'border-box';
       if (isChecked) {
-        box.innerHTML = `<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:auto;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+        box.style.backgroundColor = '#213A50';
+        box.style.border = '1.5px solid #213A50';
+        box.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+      } else {
+        box.style.backgroundColor = 'transparent';
+        box.style.border = '1.5px solid #C2B5A1';
       }
       label.replaceWith(box);
     }
-  });
-
-  // Ensure spaces between words are never collapsed by converting regular spaces in text nodes to standard non-breaking spaces
-  const walker = document.createTreeWalker(proseLayer, NodeFilter.SHOW_TEXT, {
-    acceptNode: (node) => {
-      let parent = node.parentElement;
-      while (parent && parent !== proseLayer) {
-        const tag = parent.tagName.toLowerCase();
-        if (
-          tag === 'pre' ||
-          tag === 'code' ||
-          parent.classList.contains('katex') ||
-          parent.classList.contains('katex-mathml')
-        ) {
-          return NodeFilter.FILTER_REJECT;
-        }
-        parent = parent.parentElement;
+    if (isChecked) {
+      const textDiv = li.querySelector(':scope > div');
+      if (textDiv) {
+        (textDiv as HTMLElement).style.textDecoration = 'line-through';
+        (textDiv as HTMLElement).style.color = '#8A99A8';
       }
-      return NodeFilter.FILTER_ACCEPT;
-    },
-  });
-
-  const textNodes: Text[] = [];
-  while (walker.nextNode()) {
-    textNodes.push(walker.currentNode as Text);
-  }
-
-  for (const textNode of textNodes) {
-    if (textNode.nodeValue) {
-      textNode.nodeValue = textNode.nodeValue.replace(/ /g, '\u00A0');
     }
-  }
+  });
 
   contentLayer.appendChild(proseLayer);
   host.appendChild(contentLayer);
   document.body.appendChild(host);
 
-  // Parse drawing strokes if present
+  // Parse handwritten drawing strokes if present
   let parsedStrokes: InNoteStroke[] = [];
   let maxStrokeY = 0;
   let maxStrokeX = 0;
@@ -839,14 +813,14 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
   }
 
   try {
-    const contentWidth = contentLayer.getBoundingClientRect().width || pageWidthPx;
+    const contentWidth = pageWidthPx;
     const contentHeight = Math.max(
       contentLayer.scrollHeight,
-      maxStrokeY > 0 ? Math.ceil(maxStrokeY + 40) : 200
+      maxStrokeY > 0 ? Math.ceil(maxStrokeY + 40) : 0
     );
     contentLayer.style.minHeight = `${contentHeight}px`;
 
-    // Render all handwritten strokes onto an aligned high-DPI canvas overlay
+    // Render handwritten strokes onto an aligned high-DPI canvas overlay
     if (parsedStrokes.length > 0) {
       const strokeCanvas = document.createElement('canvas');
       const dpr = 2;
@@ -870,7 +844,7 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
 
-          // Map bright dark-mode inks to Kyoto Indigo for pristine clarity on light paper PDF
+          // Map white/light dark-mode ink to Kyoto Indigo for clarity on white paper
           let inkColor = stroke.color;
           const upper = (inkColor || '').toUpperCase();
           if (upper === '#FFFFFF' || upper === '#E8EEF3' || upper === '#FAF6EF') {
@@ -919,16 +893,148 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
       contentLayer.appendChild(strokeCanvas);
     }
 
-    // Ensure all web fonts (including KaTeX math glyphs) are fully loaded
+    // Wait for all images inside the note to fully load
+    const images = Array.from(host.querySelectorAll('img'));
+    await Promise.all(
+      images.map(
+        (img) =>
+          new Promise<void>((resolve) => {
+            if (img.complete && img.naturalHeight !== 0) {
+              resolve();
+            } else {
+              img.onload = () => resolve();
+              img.onerror = () => resolve();
+            }
+          })
+      )
+    );
+
+    // Wait for web fonts (including KaTeX math glyphs)
     await (document as any).fonts?.ready;
 
-    const renderedCanvas = await html2canvas(host, {
-      scale: 2,
-      backgroundColor: '#FFFFFF',
-      useCORS: true,
-      logging: false,
-    });
+    // Measurement & Safe Boundary Detection
+    const hostRect = contentLayer.getBoundingClientRect();
+    const totalContentHeight = Math.max(
+      contentLayer.scrollHeight,
+      Math.ceil(hostRect.height),
+      maxStrokeY > 0 ? Math.ceil(maxStrokeY + 40) : 0
+    );
 
+    interface ElementBoundary {
+      top: number;
+      bottom: number;
+      isHeading: boolean;
+      isAtomic: boolean;
+    }
+
+    const boundaries: ElementBoundary[] = [];
+    const lineBottoms: number[] = [];
+
+    const inspectElement = (el: HTMLElement) => {
+      const rect = el.getBoundingClientRect();
+      const top = Math.round(rect.top - hostRect.top);
+      const bottom = Math.round(rect.bottom - hostRect.top);
+      const tag = el.tagName.toLowerCase();
+      const isHeading = /^h[1-6]$/.test(tag);
+      const isAtomic =
+        tag === 'img' ||
+        tag === 'tr' ||
+        tag === 'li' ||
+        el.classList.contains('katex-math-block') ||
+        tag === 'pre';
+
+      boundaries.push({ top, bottom, isHeading, isAtomic });
+
+      // Collect line boxes for paragraphs, quotes, and list items
+      if (tag === 'p' || tag === 'blockquote' || tag === 'li') {
+        const clientRects = el.getClientRects();
+        for (let c = 0; c < clientRects.length; c++) {
+          const cr = clientRects[c];
+          const lb = Math.round(cr.bottom - hostRect.top);
+          if (lb > 0) {
+            lineBottoms.push(lb);
+          }
+        }
+      }
+    };
+
+    const allNodes = contentLayer.querySelectorAll(
+      'h1, h2, h3, h4, h5, h6, p, ul, ol, li, blockquote, pre, table, tr, img, .katex-math-block'
+    );
+    allNodes.forEach((node) => inspectElement(node as HTMLElement));
+
+    // Calculate smart page slices so lines, tables, formulas & images are not sliced in half
+    const slices: { startY: number; height: number }[] = [];
+    let currentY = 0;
+
+    while (currentY < totalContentHeight) {
+      const remaining = totalContentHeight - currentY;
+      if (remaining <= pageHeightPx) {
+        slices.push({ startY: currentY, height: remaining });
+        break;
+      }
+
+      const targetY = currentY + pageHeightPx;
+      // We require at least 55% of the page to be filled before considering a break point
+      const minBreakY = currentY + Math.floor(pageHeightPx * 0.55);
+
+      let chosenBreakY = targetY;
+      let foundSafeBreak = false;
+
+      // 1. Check for headings near the bottom (prevent orphan headings) or atomic elements that cross targetY
+      for (const b of boundaries) {
+        if (b.isHeading && b.top >= targetY - 90 && b.top < targetY && b.top >= minBreakY) {
+          chosenBreakY = b.top;
+          foundSafeBreak = true;
+          break;
+        }
+
+        if (b.isAtomic && b.top < targetY && b.bottom > targetY && b.top >= minBreakY) {
+          chosenBreakY = b.top;
+          foundSafeBreak = true;
+          break;
+        }
+      }
+
+      // 2. If no atomic break was needed, try to break cleanly between text lines
+      if (!foundSafeBreak) {
+        let bestLineBreak = -1;
+        for (const lb of lineBottoms) {
+          if (lb >= minBreakY && lb <= targetY - 4) {
+            if (lb > bestLineBreak) {
+              bestLineBreak = lb;
+            }
+          }
+        }
+        if (bestLineBreak > 0) {
+          chosenBreakY = bestLineBreak + 2;
+          foundSafeBreak = true;
+        }
+      }
+
+      // 3. Fallback: find any element boundary in range
+      if (!foundSafeBreak) {
+        let bestElementBreak = -1;
+        for (const b of boundaries) {
+          if (b.bottom >= minBreakY && b.bottom <= targetY && b.bottom > bestElementBreak) {
+            bestElementBreak = b.bottom;
+          }
+          if (b.top >= minBreakY && b.top <= targetY && b.top > bestElementBreak) {
+            bestElementBreak = b.top;
+          }
+        }
+        if (bestElementBreak > 0) {
+          chosenBreakY = bestElementBreak;
+          foundSafeBreak = true;
+        }
+      }
+
+      const sliceHeight = Math.max(100, Math.min(pageHeightPx, chosenBreakY - currentY));
+      slices.push({ startY: currentY, height: sliceHeight });
+      currentY += sliceHeight;
+    }
+
+    // Generate PDF page by page (avoiding a single oversized canvas and preventing memory spikes/blank pages)
     const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
     const pdfWidth = pdf.internal.pageSize.getWidth(); // 210 mm
     const pdfHeight = pdf.internal.pageSize.getHeight(); // 297 mm
@@ -936,43 +1042,69 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
     const printWidth = pdfWidth - marginMm * 2; // 180 mm
     const printHeight = pdfHeight - marginMm * 2; // 267 mm
 
-    // Number of canvas pixels matching 1 printable page height
-    const canvasPageHeightPx = Math.floor((renderedCanvas.width * printHeight) / printWidth);
-    const totalCanvasHeight = renderedCanvas.height;
-
-    let sourceY = 0;
-    let pageIndex = 0;
-
-    while (sourceY < totalCanvasHeight) {
-      if (pageIndex > 0) {
+    for (let i = 0; i < slices.length; i++) {
+      const slice = slices[i];
+      if (i > 0) {
         pdf.addPage();
       }
 
-      const sliceHeightPx = Math.min(canvasPageHeightPx, totalCanvasHeight - sourceY);
-      const sliceCanvas = document.createElement('canvas');
-      sliceCanvas.width = renderedCanvas.width;
-      sliceCanvas.height = sliceHeightPx;
-      const sliceCtx = sliceCanvas.getContext('2d');
-      if (sliceCtx) {
-        sliceCtx.drawImage(
-          renderedCanvas,
-          0,
-          sourceY,
-          renderedCanvas.width,
-          sliceHeightPx,
-          0,
-          0,
-          renderedCanvas.width,
-          sliceHeightPx
-        );
+      const pageBox = document.createElement('div');
+      pageBox.style.position = 'fixed';
+      pageBox.style.left = '0';
+      pageBox.style.top = '0';
+      pageBox.style.width = `${pageWidthPx}px`;
+      pageBox.style.height = `${slice.height}px`;
+      pageBox.style.overflow = 'hidden';
+      pageBox.style.backgroundColor = '#FFFFFF';
+      pageBox.style.zIndex = '-99999';
+      pageBox.style.pointerEvents = 'none';
+
+      const pageContent = contentLayer.cloneNode(true) as HTMLElement;
+      pageContent.style.position = 'absolute';
+      pageContent.style.left = '0';
+      pageContent.style.top = `-${slice.startY}px`;
+      pageContent.style.width = `${pageWidthPx}px`;
+
+      // Copy canvas drawing bitmaps to clone
+      const origCanvases = contentLayer.querySelectorAll('canvas');
+      const clonedCanvases = pageContent.querySelectorAll('canvas');
+      origCanvases.forEach((orig, idx) => {
+        const clone = clonedCanvases[idx];
+        if (clone) {
+          const cloneCtx = clone.getContext('2d');
+          if (cloneCtx) {
+            cloneCtx.drawImage(orig, 0, 0);
+          }
+        }
+      });
+
+      pageBox.appendChild(pageContent);
+      document.body.appendChild(pageBox);
+
+      try {
+        const pageCanvas = await html2canvas(pageBox, {
+          scale: 2,
+          backgroundColor: '#FFFFFF',
+          useCORS: true,
+          logging: false,
+          width: pageWidthPx,
+          height: slice.height,
+          windowWidth: pageWidthPx,
+          windowHeight: slice.height,
+          x: 0,
+          y: 0,
+          scrollX: 0,
+          scrollY: 0,
+        });
+
+        const imgData = pageCanvas.toDataURL('image/png');
+        const renderedMmHeight = (slice.height * printWidth) / pageWidthPx;
+        pdf.addImage(imgData, 'PNG', marginMm, marginMm, printWidth, renderedMmHeight);
+      } finally {
+        if (pageBox.parentNode) {
+          document.body.removeChild(pageBox);
+        }
       }
-
-      const sliceImgData = sliceCanvas.toDataURL('image/png');
-      const renderedMmHeight = (sliceHeightPx * printWidth) / renderedCanvas.width;
-      pdf.addImage(sliceImgData, 'PNG', marginMm, marginMm, printWidth, renderedMmHeight);
-
-      sourceY += sliceHeightPx;
-      pageIndex++;
     }
 
     return pdf.output('blob');
