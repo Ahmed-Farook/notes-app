@@ -14,7 +14,7 @@ import Table from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableCell from '@tiptap/extension-table-cell';
 import TableHeader from '@tiptap/extension-table-header';
-import { RotateCcw, Trash2, Search, ChevronUp, ChevronDown, X, Plus } from 'lucide-react';
+import { RotateCcw, Trash2, Search, ChevronUp, ChevronDown, X, Plus, Edit3 } from 'lucide-react';
 
 import { useNotes } from '../../store/NotesContext';
 import { formatEditorDate } from '../../utils/dateUtils';
@@ -455,9 +455,9 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
   // Editor scroll container ref to reset scroll position on note change
   const editorScrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Long-press / context menu state for Images and Tables
+  // Long-press / context menu state for Images, Tables and Math Formulas
   const [contextMenu, setContextMenu] = useState<{
-    type: 'image' | 'table';
+    type: 'image' | 'table' | 'math';
     targetEl: HTMLElement;
   } | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
@@ -474,9 +474,12 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     if (e.touches.length !== 1 || isPenMode) return;
     const touch = e.touches[0];
     const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+
     const img = target.closest('img') || (target.tagName === 'IMG' ? target : null);
     const table = target.closest('table');
-    if (!img && !table) return;
+    const math = target.closest('.katex-math-block') || target.closest('[data-type="math-block"]');
+    if (!img && !table && !math) return;
 
     touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
 
@@ -484,8 +487,8 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     longPressTimerRef.current = window.setTimeout(() => {
       triggerHaptic();
       setContextMenu({
-        type: img ? 'image' : 'table',
-        targetEl: (img || table) as HTMLElement,
+        type: img ? 'image' : table ? 'table' : 'math',
+        targetEl: (img || table || math) as HTMLElement,
       });
     }, 450);
   };
@@ -512,14 +515,17 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
   const handleContextMenu = (e: React.MouseEvent) => {
     if (isPenMode) return;
     const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+
     const img = target.closest('img') || (target.tagName === 'IMG' ? target : null);
     const table = target.closest('table');
-    if (img || table) {
+    const math = target.closest('.katex-math-block') || target.closest('[data-type="math-block"]');
+    if (img || table || math) {
       e.preventDefault();
       triggerHaptic();
       setContextMenu({
-        type: img ? 'image' : 'table',
-        targetEl: (img || table) as HTMLElement,
+        type: img ? 'image' : table ? 'table' : 'math',
+        targetEl: (img || table || math) as HTMLElement,
       });
     }
   };
@@ -1125,7 +1131,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
         </div>
       </div>
 
-      {/* Long-Press / Right-Click Floating Action Modal for Images and Tables */}
+      {/* Long-Press / Right-Click Floating Action Modal for Images, Tables and Math Formulas */}
       {contextMenu && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-[1px] animate-in fade-in duration-150"
@@ -1136,7 +1142,11 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-3 py-1 font-semibold text-[#5A6E82] dark:text-[#8AA0B4] uppercase tracking-wider text-[10px]">
-              {contextMenu.type === 'image' ? 'Image Options' : 'Table Options'}
+              {contextMenu.type === 'image'
+                ? 'Image Options'
+                : contextMenu.type === 'table'
+                ? 'Table Options'
+                : 'Formula Options'}
             </div>
 
             {contextMenu.type === 'image' ? (
@@ -1163,7 +1173,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
                 <Trash2 size={14} />
                 <span>Delete Image</span>
               </button>
-            ) : (
+            ) : contextMenu.type === 'table' ? (
               <div className="space-y-0.5">
                 <button
                   type="button"
@@ -1200,6 +1210,72 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
                 >
                   <Plus size={14} />
                   <span>Add Column Right</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic();
+                    if (editor && contextMenu.targetEl) {
+                      let deleted = false;
+                      try {
+                        const target = contextMenu.targetEl;
+                        editor.state.doc.descendants((node, pos) => {
+                          if (deleted) return false;
+                          if (node.type.name === 'mathBlock') {
+                            const dom = editor.view.nodeDOM(pos);
+                            if (
+                              dom === target ||
+                              (dom && (dom as HTMLElement).contains(target)) ||
+                              target.contains(dom as Node)
+                            ) {
+                              editor.chain().focus().deleteRange({ from: pos, to: pos + node.nodeSize }).run();
+                              deleted = true;
+                              return false;
+                            }
+                          }
+                          return true;
+                        });
+                      } catch (_) {}
+
+                      if (!deleted) {
+                        try {
+                          const pos = editor.view.posAtDOM(contextMenu.targetEl, 0);
+                          if (typeof pos === 'number' && pos >= 0) {
+                            const node = editor.state.doc.nodeAt(pos);
+                            const size = node ? node.nodeSize : 1;
+                            editor.chain().focus().deleteRange({ from: pos, to: pos + size }).run();
+                            deleted = true;
+                          }
+                        } catch (_) {}
+                      }
+
+                      if (!deleted) {
+                        contextMenu.targetEl.remove();
+                      }
+                    }
+                    setContextMenu(null);
+                  }}
+                  className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 font-medium transition-colors"
+                >
+                  <Trash2 size={14} />
+                  <span>Delete Formula</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic();
+                    if (contextMenu.targetEl) {
+                      contextMenu.targetEl.click();
+                    }
+                    setContextMenu(null);
+                  }}
+                  className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-[#213A50] dark:text-[#E8EEF3] hover:bg-[#EBE2D3] dark:hover:bg-[#263747] transition-colors"
+                >
+                  <Edit3 size={14} />
+                  <span>Edit Formula</span>
                 </button>
               </div>
             )}

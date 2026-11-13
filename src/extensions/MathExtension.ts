@@ -197,8 +197,28 @@ export const MathBlock = Node.create<MathBlockOptions>({
             finishEditing();
           };
 
+          const deleteBtn = document.createElement('button');
+          deleteBtn.type = 'button';
+          deleteBtn.className =
+            'px-2.5 py-1.5 text-xs font-semibold rounded-md text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors';
+          deleteBtn.textContent = 'Delete';
+          deleteBtn.title = 'Delete Formula';
+          deleteBtn.onmousedown = (e) => e.preventDefault();
+          deleteBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (typeof getPos === 'function') {
+              const pos = getPos();
+              if (typeof pos === 'number') {
+                editor.chain().focus().deleteRange({ from: pos, to: pos + node.nodeSize }).run();
+                return;
+              }
+            }
+            dom.remove();
+          };
+
           editWrapper.appendChild(input);
           editWrapper.appendChild(doneBtn);
+          editWrapper.appendChild(deleteBtn);
           dom.appendChild(editWrapper);
 
           setTimeout(() => {
@@ -225,14 +245,15 @@ export const MathBlock = Node.create<MathBlockOptions>({
           const badge = document.createElement('span');
           badge.className =
             'absolute top-1.5 right-2 text-[10px] text-[#8AA0B4] opacity-0 group-hover:opacity-100 transition-opacity bg-black/5 dark:bg-white/10 px-1.5 py-0.5 rounded pointer-events-none select-none';
-          badge.textContent = 'Click to edit';
+          badge.textContent = 'Click to edit · Right click to delete';
 
           dom.appendChild(mathContainer);
           dom.appendChild(badge);
         }
       };
 
-      dom.addEventListener('click', () => {
+      dom.addEventListener('click', (e) => {
+        if (e.button !== 0) return;
         if (!isEditing && editor.isEditable) {
           isEditing = true;
           renderView();
