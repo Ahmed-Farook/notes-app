@@ -461,7 +461,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const newNote: Note = {
       id: `note-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       title: 'New Note',
-      content: '<h1>New Note</h1><p></p>',
+      content: '<h3>New Note</h3><p></p>',
       plainTextPreview: 'No additional text',
       folderId: targetFolder,
       isPinned: false,

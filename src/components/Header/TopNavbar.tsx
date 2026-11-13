@@ -226,9 +226,10 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  exportCurrentNote('pdf', noteToExport);
+                onClick={async () => {
+                  triggerHaptic();
                   setShowExportMenu(false);
+                  await exportCurrentNote('pdf', noteToExport);
                 }}
                 className="w-full text-left px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-700 dark:text-neutral-200 font-medium transition-colors"
               >
@@ -236,9 +237,10 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  exportCurrentNote('markdown', noteToExport);
+                onClick={async () => {
+                  triggerHaptic();
                   setShowExportMenu(false);
+                  await exportCurrentNote('markdown', noteToExport);
                 }}
                 className="w-full text-left px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-700 dark:text-neutral-200 transition-colors"
               >
@@ -246,9 +248,10 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  exportCurrentNote('txt', noteToExport);
+                onClick={async () => {
+                  triggerHaptic();
                   setShowExportMenu(false);
+                  await exportCurrentNote('txt', noteToExport);
                 }}
                 className="w-full text-left px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-700 dark:text-neutral-200 transition-colors"
               >
@@ -256,9 +259,10 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  exportCurrentNote('html', noteToExport);
+                onClick={async () => {
+                  triggerHaptic();
                   setShowExportMenu(false);
+                  await exportCurrentNote('html', noteToExport);
                 }}
                 className="w-full text-left px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-700 dark:text-neutral-200 transition-colors"
               >

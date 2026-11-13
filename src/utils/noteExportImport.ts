@@ -1,6 +1,9 @@
 import JSZip from 'jszip';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 import { Note } from '../types/note';
 import { formatEditorDate } from './dateUtils';
 import type { InNoteStroke } from '../components/Drawing/InNoteCanvas';
@@ -433,7 +436,7 @@ function sanitizeFilename(name: string): string {
 }
 
 /**
- * Triggers browser/native download of a Blob.
+ * Triggers browser download of a Blob as an <a> download fallback.
  */
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
@@ -443,58 +446,142 @@ export function downloadBlob(blob: Blob, filename: string): void {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
 /**
- * Renders both formatted note text/checklists and handwritten InNoteCanvas strokes into a clean
- * multi-page A4 PDF Blob using jsPDF + html2canvas.
+ * Universal export delivery handler supporting:
+ * 1. Capacitor Native Android & iOS (saves to device cache and summons native Share / Save sheet)
+ * 2. Mobile web browsers (uses Web Share API if supported)
+ * 3. Desktop / Web browser standard download
+ */
+export async function saveOrShareBlob(blob: Blob, filename: string): Promise<void> {
+  // 1. Capacitor Native App on Android or iOS
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = reject;
+        reader.onload = () => {
+          const res = reader.result as string;
+          const commaIdx = res.indexOf(',');
+          resolve(commaIdx >= 0 ? res.substring(commaIdx + 1) : res);
+        };
+        reader.readAsDataURL(blob);
+      });
+
+      const savedFile = await Filesystem.writeFile({
+        path: filename,
+        data: base64Data,
+        directory: Directory.Cache,
+      });
+
+      await Share.share({
+        title: filename,
+        url: savedFile.uri,
+        dialogTitle: `Export ${filename}`,
+      });
+      return;
+    } catch (nativeErr) {
+      console.warn('Capacitor native export failed, falling back to browser download:', nativeErr);
+    }
+  }
+
+  // 2. Mobile Web Browsers (Safari / Chrome Mobile) with Web Share API
+  if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+    try {
+      const file = new File([blob], filename, {
+        type: blob.type || 'application/octet-stream',
+      });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: filename,
+        });
+        return;
+      }
+    } catch (shareErr) {
+      if ((shareErr as any)?.name === 'AbortError') {
+        return; // User intentionally dismissed the share sheet
+      }
+    }
+  }
+
+  // 3. Desktop / standard web fallback
+  downloadBlob(blob, filename);
+}
+
+/**
+ * Renders both formatted note text/checklists/tables/images and handwritten InNoteCanvas strokes
+ * into a clean, well-spaced, multi-page A4 PDF Blob with professional margins and page numbers.
  */
 export async function generateNotePdfBlob(note: Note): Promise<Blob> {
-  const pageWidthPx = 768; // Matches TipTap max-w-3xl width cleanly so drawing coordinates align!
+  const pageWidthPx = 720;
   const host = document.createElement('div');
-  host.style.position = 'fixed';
-  host.style.left = '-10000px';
+  host.style.position = 'absolute';
+  host.style.left = '0';
   host.style.top = '0';
   host.style.width = `${pageWidthPx}px`;
-  host.style.backgroundColor = '#FAF6EF';
-  host.style.color = '#1C2B36';
-  host.style.padding = '36px 48px 48px 48px';
+  host.style.backgroundColor = '#FFFFFF';
+  host.style.color = '#1A202C';
+  host.style.padding = '36px 44px 44px 44px';
   host.style.boxSizing = 'border-box';
   host.style.fontFamily =
     '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
-  host.style.zIndex = '-1';
+  host.style.zIndex = '-9999';
+  host.style.opacity = '0';
+  host.style.pointerEvents = 'none';
 
-  // Scoped typography styles matching the editor so lists, code blocks & checkboxes render faithfully
+  // Scoped typography styles matching the editor so lists, code blocks, tables & checkboxes render faithfully
   const styleEl = document.createElement('style');
   styleEl.textContent = `
-    .pdf-root h1 { font-size: 28px; line-height: 1.25; font-weight: 700; margin: 4px 0 12px 0; color: #1C2B36; }
-    .pdf-root h2 { font-size: 22px; line-height: 1.3; font-weight: 600; margin: 12px 0 8px 0; color: #1C2B36; }
-    .pdf-root h3 { font-size: 18px; line-height: 1.35; font-weight: 600; margin: 8px 0 6px 0; color: #1C2B36; }
-    .pdf-root p { font-size: 15px; line-height: 1.6; margin: 0 0 8px 0; min-height: 16px; }
-    .pdf-root ul:not([data-type="taskList"]) { list-style: disc; padding-left: 24px; margin: 0 0 10px 0; font-size: 15px; }
-    .pdf-root ol { list-style: decimal; padding-left: 24px; margin: 0 0 10px 0; font-size: 15px; }
-    .pdf-root ul[data-type="taskList"] { list-style: none; padding: 0; margin: 6px 0 10px 0; }
-    .pdf-root ul[data-type="taskList"] li { display: flex; align-items: flex-start; margin-bottom: 6px; }
-    .pdf-root .pdf-cb { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid #213A50; margin-right: 10px; margin-top: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+    .pdf-root h1 { font-size: 22px; line-height: 1.3; font-weight: 700; margin: 18px 0 8px 0; color: #1C2B36; }
+    .pdf-root h2 { font-size: 18px; line-height: 1.35; font-weight: 600; margin: 15px 0 6px 0; color: #1C2B36; }
+    .pdf-root h3 { font-size: 16px; line-height: 1.4; font-weight: 600; margin: 14px 0 6px 0; color: #1C2B36; }
+    .pdf-root p { font-size: 13.5px; line-height: 1.65; margin: 0 0 10px 0; color: #2D3748; min-height: 16px; }
+    .pdf-root ul:not([data-type="taskList"]) { list-style: disc; padding-left: 22px; margin: 0 0 12px 0; font-size: 13.5px; line-height: 1.6; color: #2D3748; }
+    .pdf-root ol { list-style: decimal; padding-left: 22px; margin: 0 0 12px 0; font-size: 13.5px; line-height: 1.6; color: #2D3748; }
+    .pdf-root ul[data-type="taskList"] { list-style: none; padding: 0; margin: 6px 0 12px 0; }
+    .pdf-root ul[data-type="taskList"] li { display: flex; align-items: flex-start; margin-bottom: 7px; font-size: 13.5px; line-height: 1.5; color: #2D3748; }
+    .pdf-root .pdf-cb { width: 15px; height: 15px; border-radius: 50%; border: 1.5px solid #213A50; margin-right: 9px; margin-top: 2px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; box-sizing: border-box; }
     .pdf-root .pdf-cb.checked { background: #213A50; color: #FFFFFF; }
-    .pdf-root li[data-checked="true"] > div { text-decoration: line-through; color: #7A8B99; }
-    .pdf-root blockquote { border-left: 3px solid #213A50; padding-left: 14px; margin: 10px 0; font-style: italic; color: #395060; }
-    .pdf-root pre { background: #192531; color: #f8fafc; padding: 12px 14px; border-radius: 8px; font-family: ui-monospace, Menlo, monospace; font-size: 13px; margin: 10px 0; white-space: pre-wrap; }
-    .pdf-root code:not(pre code) { background: #E8F1F7; color: #213A50; padding: 2px 5px; border-radius: 4px; font-family: ui-monospace, monospace; font-size: 13px; }
-    .pdf-root mark { background: #E8F1F7; color: #213A50; padding: 1px 3px; border-radius: 3px; }
-    .pdf-root hr { border: none; border-top: 1px solid #DFD3C0; margin: 14px 0; }
+    .pdf-root li[data-checked="true"] > div { text-decoration: line-through; color: #718096; }
+    .pdf-root blockquote { border-left: 3px solid #213A50; padding: 4px 0 4px 14px; margin: 12px 0; font-style: italic; color: #4A5568; }
+    .pdf-root pre { background: #1E293B; color: #F8FAFC; padding: 12px 14px; border-radius: 6px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; margin: 12px 0; white-space: pre-wrap; word-break: break-all; }
+    .pdf-root code:not(pre code) { background: #EDF2F7; color: #1A202C; padding: 2px 5px; border-radius: 4px; font-family: ui-monospace, monospace; font-size: 12px; }
+    .pdf-root mark { background: #FEF08A; color: #1C2B36; padding: 1px 3px; border-radius: 3px; }
+    .pdf-root hr { border: none; border-top: 1px solid #E2E8F0; margin: 16px 0; }
+    .pdf-root table { border-collapse: collapse; width: 100%; margin: 14px 0; border: 1px solid #CBD5E1; border-radius: 6px; overflow: hidden; font-size: 12.5px; }
+    .pdf-root th { background: #F1F5F9; font-weight: 600; text-align: left; padding: 8px 10px; border: 1px solid #CBD5E1; color: #1E293B; }
+    .pdf-root td { padding: 7px 10px; border: 1px solid #CBD5E1; color: #334155; vertical-align: top; }
+    .pdf-root img { max-width: 100%; height: auto; border-radius: 6px; margin: 10px 0; display: block; }
   `;
   host.appendChild(styleEl);
 
-  const dateHeader = document.createElement('div');
-  dateHeader.style.textAlign = 'center';
-  dateHeader.style.fontSize = '11px';
-  dateHeader.style.fontWeight = '600';
-  dateHeader.style.color = '#6E8092';
-  dateHeader.style.marginBottom = '16px';
-  dateHeader.textContent = formatEditorDate(note.updatedAt || Date.now());
-  host.appendChild(dateHeader);
+  // Clean Header Metadata with Subtle Divider
+  const headerContainer = document.createElement('div');
+  headerContainer.style.marginBottom = '20px';
+  headerContainer.style.paddingBottom = '12px';
+  headerContainer.style.borderBottom = '1px solid #E2E8F0';
+  headerContainer.style.display = 'flex';
+  headerContainer.style.justifyContent = 'space-between';
+  headerContainer.style.alignItems = 'flex-end';
+
+  const dateLeft = document.createElement('div');
+  dateLeft.style.fontSize = '11px';
+  dateLeft.style.fontWeight = '500';
+  dateLeft.style.color = '#718096';
+  dateLeft.textContent = formatEditorDate(note.updatedAt || Date.now());
+
+  const brandingRight = document.createElement('div');
+  brandingRight.style.fontSize = '11px';
+  brandingRight.style.fontWeight = '600';
+  brandingRight.style.color = '#A0AEC0';
+  brandingRight.textContent = 'texō';
+
+  headerContainer.appendChild(dateLeft);
+  headerContainer.appendChild(brandingRight);
+  host.appendChild(headerContainer);
 
   const contentLayer = document.createElement('div');
   contentLayer.className = 'pdf-root';
@@ -541,7 +628,7 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
   document.body.appendChild(host);
 
   try {
-    const contentWidth = contentLayer.getBoundingClientRect().width || pageWidthPx - 96;
+    const contentWidth = contentLayer.getBoundingClientRect().width || pageWidthPx - 88;
     const contentHeight = Math.max(
       contentLayer.scrollHeight,
       maxStrokeY > 0 ? Math.ceil(maxStrokeY + 40) : 200
@@ -564,7 +651,6 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
       const ctx = strokeCanvas.getContext('2d');
       if (ctx) {
         ctx.scale(dpr, dpr);
-        // Scale down horizontally only if strokes were drawn on a wider desktop viewport
         const xScale = maxStrokeX > contentWidth ? contentWidth / maxStrokeX : 1;
 
         for (const stroke of parsedStrokes) {
@@ -573,7 +659,7 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
 
-          // Map bright dark-mode inks (#E8EEF3 / #FFFFFF) to Kyoto Indigo so they stand out cleanly on light paper PDF
+          // Map bright dark-mode inks to Kyoto Indigo for pristine clarity on light paper PDF
           let inkColor = stroke.color;
           const upper = (inkColor || '').toUpperCase();
           if (upper === '#FFFFFF' || upper === '#E8EEF3' || upper === '#FAF6EF') {
@@ -626,39 +712,78 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
 
     const renderedCanvas = await html2canvas(host, {
       scale: 2,
-      backgroundColor: '#FAF6EF',
+      backgroundColor: '#FFFFFF',
       useCORS: true,
       logging: false,
     });
 
     const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = pdf.internal.pageSize.getHeight();
-    const imgWidth = pdfWidth;
-    const imgHeight = (renderedCanvas.height * pdfWidth) / renderedCanvas.width;
+    const pdfWidth = pdf.internal.pageSize.getWidth(); // 210 mm
+    const pdfHeight = pdf.internal.pageSize.getHeight(); // 297 mm
+    const marginMm = 15;
+    const printWidth = pdfWidth - marginMm * 2; // 180 mm
+    const printHeight = pdfHeight - marginMm * 2; // 267 mm
 
-    const imgData = renderedCanvas.toDataURL('image/png');
-    let heightLeft = imgHeight;
-    let position = 0;
+    // Number of canvas pixels matching 1 printable page height
+    const canvasPageHeightPx = Math.floor((renderedCanvas.width * printHeight) / printWidth);
+    const totalCanvasHeight = renderedCanvas.height;
 
-    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-    heightLeft -= pdfHeight;
+    let sourceY = 0;
+    let pageIndex = 0;
+    const totalPages = Math.max(1, Math.ceil(totalCanvasHeight / canvasPageHeightPx));
 
-    while (heightLeft > 2) {
-      position -= pdfHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pdfHeight;
+    while (sourceY < totalCanvasHeight) {
+      if (pageIndex > 0) {
+        pdf.addPage();
+      }
+
+      const sliceHeightPx = Math.min(canvasPageHeightPx, totalCanvasHeight - sourceY);
+      const sliceCanvas = document.createElement('canvas');
+      sliceCanvas.width = renderedCanvas.width;
+      sliceCanvas.height = sliceHeightPx;
+      const sliceCtx = sliceCanvas.getContext('2d');
+      if (sliceCtx) {
+        sliceCtx.drawImage(
+          renderedCanvas,
+          0,
+          sourceY,
+          renderedCanvas.width,
+          sliceHeightPx,
+          0,
+          0,
+          renderedCanvas.width,
+          sliceHeightPx
+        );
+      }
+
+      const sliceImgData = sliceCanvas.toDataURL('image/png');
+      const renderedMmHeight = (sliceHeightPx * printWidth) / renderedCanvas.width;
+      pdf.addImage(sliceImgData, 'PNG', marginMm, marginMm, printWidth, renderedMmHeight);
+
+      // Centered subtle page number footer
+      pdf.setFontSize(8);
+      pdf.setTextColor(160, 174, 192);
+      pdf.text(
+        `Page ${pageIndex + 1} of ${totalPages}`,
+        pdfWidth / 2,
+        pdfHeight - 8,
+        { align: 'center' }
+      );
+
+      sourceY += sliceHeightPx;
+      pageIndex++;
     }
 
     return pdf.output('blob');
   } finally {
-    document.body.removeChild(host);
+    if (host.parentNode) {
+      document.body.removeChild(host);
+    }
   }
 }
 
 /**
- * Exports a single note directly (including PDF with drawings).
+ * Exports a single note directly (including PDF with drawings) to download or native Share sheet.
  */
 export async function exportSingleNote(
   note: Note,
@@ -667,13 +792,13 @@ export async function exportSingleNote(
   const safeBase = sanitizeFilename(note.title || 'Untitled');
   if (formatType === 'pdf') {
     const pdfBlob = await generateNotePdfBlob(note);
-    downloadBlob(pdfBlob, `${safeBase}.pdf`);
+    await saveOrShareBlob(pdfBlob, `${safeBase}.pdf`);
     return;
   }
 
   const { content, ext, mimeType } = formatNoteForExport(note, formatType);
   const blob = new Blob([content], { type: mimeType });
-  downloadBlob(blob, `${safeBase}.${ext}`);
+  await saveOrShareBlob(blob, `${safeBase}.${ext}`);
 }
 
 /**
@@ -706,7 +831,7 @@ export async function exportNotesAsZip(
 
   const zipBlob = await zip.generateAsync({ type: 'blob' });
   const dateStr = new Date().toISOString().slice(0, 10);
-  downloadBlob(zipBlob, `texo-notes-${dateStr}.zip`);
+  await saveOrShareBlob(zipBlob, `texo-notes-${dateStr}.zip`);
 }
 
 /**

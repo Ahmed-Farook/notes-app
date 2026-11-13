@@ -10,6 +10,10 @@ import Underline from '@tiptap/extension-underline';
 import Highlight from '@tiptap/extension-highlight';
 import Placeholder from '@tiptap/extension-placeholder';
 import Image from '@tiptap/extension-image';
+import Table from '@tiptap/extension-table';
+import TableRow from '@tiptap/extension-table-row';
+import TableCell from '@tiptap/extension-table-cell';
+import TableHeader from '@tiptap/extension-table-header';
 import { RotateCcw, Trash2, Search, ChevronUp, ChevronDown, X } from 'lucide-react';
 
 import { useNotes } from '../../store/NotesContext';
@@ -52,6 +56,9 @@ const CustomTaskItem = TaskItem.extend({
       const checkboxStyler = document.createElement('span');
       const checkbox = document.createElement('input');
       const content = document.createElement('div');
+      content.style.flex = '1 1 auto';
+      content.style.minWidth = '1px';
+      content.style.minHeight = '1.5rem';
 
       const updateA11Y = () => {
         checkbox.ariaLabel =
@@ -215,6 +222,86 @@ const CustomTaskItem = TaskItem.extend({
         },
       };
     };
+  },
+});
+
+/**
+ * EnforceTitleExtension:
+ * Enforces that the first line of every note is ALWAYS an h3 heading (the note title).
+ * When backspace or delete is pressed in an empty title or at pos 0, it stays an h3 heading
+ * instead of reverting to normal paragraph text.
+ */
+const EnforceTitleExtension = Extension.create({
+  name: 'enforceTitle',
+
+  addKeyboardShortcuts() {
+    return {
+      Backspace: ({ editor }) => {
+        const { state } = editor;
+        const { selection, doc } = state;
+        const { $from, empty } = selection;
+
+        // If cursor/selection is within the first document node
+        if ($from.index(0) === 0) {
+          const firstNode = doc.firstChild;
+          if (firstNode && firstNode.type.name === 'heading') {
+            // If the heading is completely empty, prevent deleting block or turning to paragraph
+            if (firstNode.textContent.length === 0) {
+              return true;
+            }
+            // If cursor is at the very beginning of the heading and selection is collapsed
+            if ($from.parentOffset === 0 && empty) {
+              return true;
+            }
+          }
+        }
+        return false;
+      },
+      Delete: ({ editor }) => {
+        const { state } = editor;
+        const { selection, doc } = state;
+        const { $from } = selection;
+
+        if ($from.index(0) === 0) {
+          const firstNode = doc.firstChild;
+          if (firstNode && firstNode.type.name === 'heading' && firstNode.textContent.length === 0) {
+            return true;
+          }
+        }
+        return false;
+      },
+    };
+  },
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        appendTransaction(transactions, oldState, newState) {
+          const docChanged = transactions.some((tr) => tr.docChanged);
+          if (!docChanged) return null;
+
+          const { doc, tr, schema } = newState;
+          const headingType = schema.nodes.heading;
+          if (!headingType) return null;
+
+          const firstNode = doc.firstChild;
+
+          // If document is completely empty, insert an h3 heading
+          if (!firstNode) {
+            tr.insert(0, headingType.create({ level: 3 }));
+            return tr;
+          }
+
+          // If first child is not an h3 heading, convert it to h3 heading
+          if (firstNode.type.name !== 'heading' || firstNode.attrs.level !== 3) {
+            tr.setNodeMarkup(0, headingType, { level: 3 });
+            return tr;
+          }
+
+          return null;
+        },
+      }),
+    ];
   },
 });
 
@@ -394,14 +481,30 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
           levels: [1, 2, 3],
         },
       }),
+      EnforceTitleExtension,
       Underline,
       Highlight.configure({ multicolor: false }),
       TaskList,
       CustomTaskItem.configure({
         nested: true,
       }),
+      Table.configure({
+        resizable: true,
+        HTMLAttributes: {
+          class: 'tiptap-table',
+        },
+      }),
+      TableRow,
+      TableHeader,
+      TableCell,
       Placeholder.configure({
-        placeholder: 'Type something...',
+        placeholder: ({ pos }) => {
+          if (pos === 0) {
+            return 'Title';
+          }
+          return 'Note...';
+        },
+        emptyNodeClass: 'is-empty-node',
         emptyEditorClass: 'is-editor-empty',
       }),
       CustomImage.configure({
@@ -814,7 +917,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
                   return;
                 }
                 if (editor && !editor.isFocused && !activeNote.isTrash) {
-                  editor.commands.focus();
+                  editor.commands.focus('end');
                 }
               }}
             />

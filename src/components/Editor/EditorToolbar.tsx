@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Editor } from '@tiptap/react';
 import {
   Keyboard,
@@ -24,10 +24,37 @@ import {
   Heading2,
   Heading3,
   Trash2,
+  Table as TableIcon,
+  ImagePlus,
+  Rows,
+  Columns,
+  Plus,
 } from 'lucide-react';
 import { triggerHaptic } from '../../utils/haptics';
 import { toggleUnifiedCodeBlock } from '../../utils/editorCommands';
 import type { DrawingToolType } from '../Drawing/InNoteCanvas';
+
+/**
+ * Dedicated Stroke Eraser icon showing an eraser erasing an ink line (never a trash can!)
+ */
+const StrokeEraserIcon: React.FC<{ size?: number; className?: string }> = ({ size = 14, className = '' }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="m6 18-3-3c-.8-.8-.8-2 0-2.8L13.5 1.7c.8-.8 2-.8 2.8 0l4.5 4.5c.8.8.8 2 0 2.8L11.3 18.5" />
+    <path d="M2 22h14" />
+    <path d="m5 12 7.3 7.3" />
+    <path d="M17 14c2-1 3-3 4-2" strokeWidth="2.5" />
+  </svg>
+);
 
 const PRESET_COLORS = [
   { name: 'Kyoto Indigo', value: '#213A50' },
@@ -91,10 +118,53 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onDrawingRedo,
   onDrawingClear,
 }) => {
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
   if (!editor || !isVisible) return null;
 
   const runCommand = (cmd: () => void) => {
     cmd();
+  };
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    triggerHaptic();
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const rawDataUrl = event.target?.result as string;
+      if (!rawDataUrl) return;
+
+      const img = new window.Image();
+      img.onload = () => {
+        let { width, height } = img;
+        const maxDim = 1400;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressed = canvas.toDataURL('image/jpeg', 0.88);
+            editor.chain().focus().setImage({ src: compressed }).run();
+            return;
+          }
+        }
+        editor.chain().focus().setImage({ src: rawDataUrl }).run();
+      };
+      img.src = rawDataUrl;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const getBtnClass = (isActive: boolean) =>
@@ -289,7 +359,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                     : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733]'
                 }`}
               >
-                <Trash2 size={13} />
+                <StrokeEraserIcon size={14} />
                 <span className="hidden sm:inline">Stroke Eraser</span>
               </button>
             </div>
@@ -559,6 +629,96 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             >
               <Minus size={15} />
             </button>
+
+            <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#223344] mx-1 shrink-0" />
+
+            {/* Photo / Image Insertion */}
+            <input
+              type="file"
+              ref={imageInputRef}
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageFileChange}
+            />
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                triggerHaptic();
+                imageInputRef.current?.click();
+              }}
+              title="Add Photo / Image"
+              className="flex items-center space-x-1 p-1.5 rounded shrink-0 text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3] transition-colors outline-none focus:outline-none"
+            >
+              <ImagePlus size={15} />
+              <span className="hidden sm:inline">Photo</span>
+            </button>
+
+            {/* Table Insertion & Management */}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                triggerHaptic();
+                if (editor.isActive('table')) {
+                  editor.chain().focus().deleteTable().run();
+                } else {
+                  editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+                }
+              }}
+              title={editor.isActive('table') ? 'Delete Table' : 'Insert Table (3x3)'}
+              className={`flex items-center space-x-1 p-1.5 rounded shrink-0 transition-colors outline-none focus:outline-none ${
+                editor.isActive('table')
+                  ? 'bg-[#E5DCCB] dark:bg-[#203448] text-[#213A50] dark:text-[#7EAAD0] font-bold shadow-xs'
+                  : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3]'
+              }`}
+            >
+              <TableIcon size={15} />
+              <span className="hidden sm:inline">Table</span>
+            </button>
+
+            {/* Contextual Table Controls when cursor is inside a table */}
+            {editor.isActive('table') && (
+              <div className="flex items-center space-x-0.5 bg-[#FAF6EF] dark:bg-[#1C2733] p-0.5 rounded-md border border-[#DFD3C0] dark:border-[#263747] shadow-xs shrink-0 animate-in fade-in duration-150">
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => runCommand(() => editor.chain().focus().addRowAfter().run())}
+                  title="Add Row Below"
+                  className="px-1.5 py-1 rounded text-[11px] font-medium text-[#213A50] dark:text-[#7EAAD0] hover:bg-[#EBE2D3] dark:hover:bg-[#263747]"
+                >
+                  + Row
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => runCommand(() => editor.chain().focus().deleteRow().run())}
+                  title="Delete Row"
+                  className="px-1.5 py-1 rounded text-[11px] font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+                >
+                  - Row
+                </button>
+                <div className="h-3 w-px bg-[#DFD3C0] dark:bg-[#263747] mx-0.5" />
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => runCommand(() => editor.chain().focus().addColumnAfter().run())}
+                  title="Add Column Right"
+                  className="px-1.5 py-1 rounded text-[11px] font-medium text-[#213A50] dark:text-[#7EAAD0] hover:bg-[#EBE2D3] dark:hover:bg-[#263747]"
+                >
+                  + Col
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => runCommand(() => editor.chain().focus().deleteColumn().run())}
+                  title="Delete Column"
+                  className="px-1.5 py-1 rounded text-[11px] font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+                >
+                  - Col
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
