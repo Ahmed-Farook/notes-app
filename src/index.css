@@ -70,7 +70,6 @@
 [contenteditable="true"] {
   outline: none !important;
   min-height: 100%;
-  padding-bottom: 240px !important; /* ~10 lines of comfortable free space at the end of every note */
   user-select: text !important;
   -webkit-user-select: text !important;
   cursor: text !important;
@@ -83,8 +82,9 @@
   -webkit-user-select: text !important;
 }
 
+/* Only show placeholder on empty title (first child) - never clutter subsequent lines with 'Note...' */
 .tiptap p.is-editor-empty:first-child::before,
-.tiptap .is-empty-node::before {
+.tiptap > *:first-child.is-empty-node::before {
   color: #a0aec0;
   content: attr(data-placeholder);
   float: left;
@@ -92,8 +92,13 @@
   pointer-events: none;
 }
 .dark .tiptap p.is-editor-empty:first-child::before,
-.dark .tiptap .is-empty-node::before {
+.dark .tiptap > *:first-child.is-empty-node::before {
   color: #5A6E82;
+}
+
+/* Hide horizontal line gapcursor below tables so normal text cursor is used */
+.ProseMirror-gapcursor {
+  display: none !important;
 }
 
 .tiptap h1 {
@@ -303,8 +308,7 @@ ul[data-type="taskList"] li[data-checked="true"] > div {
   margin: 1.25rem 0;
   table-layout: fixed;
   width: 100%;
-  overflow: hidden;
-  border-radius: 8px;
+  border-radius: 0;
   border: 1px solid #DFD3C0;
 }
 

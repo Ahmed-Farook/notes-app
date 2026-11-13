@@ -518,8 +518,8 @@ export async function saveOrShareBlob(blob: Blob, filename: string): Promise<voi
 export async function generateNotePdfBlob(note: Note): Promise<Blob> {
   const pageWidthPx = 720;
   const host = document.createElement('div');
-  host.style.position = 'absolute';
-  host.style.left = '0';
+  host.style.position = 'fixed';
+  host.style.left = '-10000px';
   host.style.top = '0';
   host.style.width = `${pageWidthPx}px`;
   host.style.backgroundColor = '#FFFFFF';
@@ -528,8 +528,8 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
   host.style.boxSizing = 'border-box';
   host.style.fontFamily =
     '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
-  host.style.zIndex = '-9999';
-  host.style.opacity = '0';
+  host.style.zIndex = '-1';
+  host.style.opacity = '1';
   host.style.pointerEvents = 'none';
 
   // Scoped typography styles matching the editor so lists, code blocks, tables & checkboxes render faithfully
@@ -551,7 +551,7 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
     .pdf-root code:not(pre code) { background: #EDF2F7; color: #1A202C; padding: 2px 5px; border-radius: 4px; font-family: ui-monospace, monospace; font-size: 12px; }
     .pdf-root mark { background: #FEF08A; color: #1C2B36; padding: 1px 3px; border-radius: 3px; }
     .pdf-root hr { border: none; border-top: 1px solid #E2E8F0; margin: 16px 0; }
-    .pdf-root table { border-collapse: collapse; width: 100%; margin: 14px 0; border: 1px solid #CBD5E1; border-radius: 6px; overflow: hidden; font-size: 12.5px; }
+    .pdf-root table { border-collapse: collapse; width: 100%; margin: 14px 0; border: 1px solid #CBD5E1; border-radius: 0; overflow: hidden; font-size: 12.5px; }
     .pdf-root th { background: #F1F5F9; font-weight: 600; text-align: left; padding: 8px 10px; border: 1px solid #CBD5E1; color: #1E293B; }
     .pdf-root td { padding: 7px 10px; border: 1px solid #CBD5E1; color: #334155; vertical-align: top; }
     .pdf-root img { max-width: 100%; height: auto; border-radius: 6px; margin: 10px 0; display: block; }

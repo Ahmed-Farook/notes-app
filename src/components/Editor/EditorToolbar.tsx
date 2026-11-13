@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Editor } from '@tiptap/react';
 import {
   Keyboard,
@@ -26,35 +26,10 @@ import {
   Trash2,
   Table as TableIcon,
   ImagePlus,
-  Rows,
-  Columns,
-  Plus,
 } from 'lucide-react';
 import { triggerHaptic } from '../../utils/haptics';
 import { toggleUnifiedCodeBlock } from '../../utils/editorCommands';
 import type { DrawingToolType } from '../Drawing/InNoteCanvas';
-
-/**
- * Dedicated Stroke Eraser icon showing an eraser erasing an ink line (never a trash can!)
- */
-const StrokeEraserIcon: React.FC<{ size?: number; className?: string }> = ({ size = 14, className = '' }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="m6 18-3-3c-.8-.8-.8-2 0-2.8L13.5 1.7c.8-.8 2-.8 2.8 0l4.5 4.5c.8.8.8 2 0 2.8L11.3 18.5" />
-    <path d="M2 22h14" />
-    <path d="m5 12 7.3 7.3" />
-    <path d="M17 14c2-1 3-3 4-2" strokeWidth="2.5" />
-  </svg>
-);
 
 const PRESET_COLORS = [
   { name: 'Kyoto Indigo', value: '#213A50' },
@@ -74,6 +49,13 @@ const STROKE_SIZES = [
   { label: 'Medium', value: 5 },
   { label: 'Bold', value: 9 },
   { label: 'Broad', value: 16 },
+];
+
+const ERASER_SIZES = [
+  { label: 'Fine', value: 4 },
+  { label: 'Medium', value: 8 },
+  { label: 'Large', value: 14 },
+  { label: 'Broad', value: 24 },
 ];
 
 export type DrawingTool = DrawingToolType;
@@ -118,7 +100,54 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onDrawingRedo,
   onDrawingClear,
 }) => {
+  const [showPenPopover, setShowPenPopover] = useState(false);
+  const [showEraserPopover, setShowEraserPopover] = useState(false);
+  const penPopoverRef = useRef<HTMLDivElement>(null);
+  const eraserPopoverRef = useRef<HTMLDivElement>(null);
+  const toolbarScrollRef = useRef<HTMLDivElement>(null);
+  const prevIsTableRef = useRef(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
+
+  // Close floating popovers when clicking outside
+  useEffect(() => {
+    if (!showPenPopover && !showEraserPopover) return;
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (
+        showPenPopover &&
+        penPopoverRef.current &&
+        !penPopoverRef.current.contains(e.target as Node)
+      ) {
+        setShowPenPopover(false);
+      }
+      if (
+        showEraserPopover &&
+        eraserPopoverRef.current &&
+        !eraserPopoverRef.current.contains(e.target as Node)
+      ) {
+        setShowEraserPopover(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [showPenPopover, showEraserPopover]);
+
+  // When cursor enters a table, smoothly scroll toolbar to end so table controls are instantly visible
+  useEffect(() => {
+    const isTable = Boolean(editor?.isActive('table'));
+    if (isTable && !prevIsTableRef.current) {
+      if (toolbarScrollRef.current) {
+        toolbarScrollRef.current.scrollTo({
+          left: toolbarScrollRef.current.scrollWidth,
+          behavior: 'smooth',
+        });
+      }
+    }
+    prevIsTableRef.current = isTable;
+  }, [editor?.isActive('table')]);
 
   if (!editor || !isVisible) return null;
 
@@ -174,554 +203,638 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3]'
     }`;
 
-  const isEraser =
+  const isEraserActive =
     activeDrawingTool === 'partial_eraser' ||
     activeDrawingTool === 'stroke_eraser' ||
     activeDrawingTool === 'eraser';
 
+  const isPenActive = activeDrawingTool === 'pen' || activeDrawingTool === 'highlighter';
+
   return (
-    <div className="h-11 md:h-10 flex flex-nowrap items-center gap-1.5 px-2.5 border-t md:border-t-0 md:border-b border-apple-border dark:border-apple-borderDark bg-[#F2ECE0]/95 dark:bg-[#151E28]/95 backdrop-blur md:sticky md:top-0 z-30 select-none text-xs shrink-0 order-last md:order-first">
-      {/* PINNED LEFT ANCHOR: Mode Switcher [Type | Draw] + [Undo] [Redo] (Always reachable on mobile!) */}
-      <div className="flex items-center space-x-1 shrink-0">
-        <div className="flex items-center bg-[#E5DCCB]/90 dark:bg-[#1A2530] border border-[#DFD3C0] dark:border-[#263747] rounded-lg p-0.5 shrink-0 shadow-xs">
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => onTogglePenMode(false)}
-            title="Type (Keyboard Text Mode)"
-            className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-semibold transition-all outline-none focus:outline-none ${
-              !isPenMode
-                ? 'bg-[#FAF6EF] dark:bg-[#25394C] text-[#213A50] dark:text-[#E8EEF3] shadow-xs'
-                : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:text-[#213A50] dark:hover:text-white'
-            }`}
-          >
-            <Keyboard size={13} />
-            <span className="hidden xs:inline sm:inline">Type</span>
-          </button>
+    <div
+      ref={toolbarScrollRef}
+      className="h-11 md:h-10 flex flex-nowrap items-center gap-1 px-2.5 border-t md:border-t-0 md:border-b border-apple-border dark:border-apple-borderDark bg-[#F2ECE0]/95 dark:bg-[#151E28]/95 backdrop-blur md:sticky md:top-0 z-30 select-none text-xs shrink-0 overflow-x-auto no-scrollbar order-last md:order-first"
+    >
+      {/* 1. Undo & Redo (Positioned simply at the start) */}
+      <button
+        type="button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => {
+          triggerHaptic();
+          if (isPenMode) onDrawingUndo();
+          else editor.chain().focus().undo().run();
+        }}
+        disabled={isPenMode ? !canDrawingUndo : !editor.can().undo()}
+        title="Undo"
+        className="p-1.5 rounded shrink-0 text-[#213A50] dark:text-[#CBD8E3] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] disabled:opacity-30 disabled:pointer-events-none transition-colors outline-none focus:outline-none"
+      >
+        <Undo2 size={15} />
+      </button>
 
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => onTogglePenMode(true)}
-            title="Draw (Samsung Notes Stylus & Pen Mode)"
-            className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-semibold transition-all outline-none focus:outline-none ${
-              isPenMode
-                ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs'
-                : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:text-[#213A50] dark:hover:text-white'
-            }`}
-          >
-            <PenTool size={13} />
-            <span className="hidden xs:inline sm:inline">Draw</span>
-          </button>
-        </div>
+      <button
+        type="button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => {
+          triggerHaptic();
+          if (isPenMode) onDrawingRedo();
+          else editor.chain().focus().redo().run();
+        }}
+        disabled={isPenMode ? !canDrawingRedo : !editor.can().redo()}
+        title="Redo"
+        className="p-1.5 rounded shrink-0 text-[#213A50] dark:text-[#CBD8E3] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] disabled:opacity-30 disabled:pointer-events-none transition-colors outline-none focus:outline-none"
+      >
+        <Redo2 size={15} />
+      </button>
 
-        {/* Left Undo / Redo (Always accessible on mobile without scrolling!) */}
-        {isPenMode ? (
-          <div className="flex items-center shrink-0">
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => onDrawingUndo()}
-              disabled={!canDrawingUndo}
-              title="Undo stroke"
-              className="p-1.5 rounded-md shrink-0 text-[#213A50] dark:text-[#CBD8E3] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] disabled:opacity-30 disabled:pointer-events-none transition-colors outline-none focus:outline-none"
-            >
-              <Undo2 size={16} />
-            </button>
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => onDrawingRedo()}
-              disabled={!canDrawingRedo}
-              title="Redo stroke"
-              className="p-1.5 rounded-md shrink-0 text-[#213A50] dark:text-[#CBD8E3] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] disabled:opacity-30 disabled:pointer-events-none transition-colors outline-none focus:outline-none"
-            >
-              <Redo2 size={16} />
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center shrink-0">
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => runCommand(() => editor.chain().focus().undo().run())}
-              disabled={!editor.can().undo()}
-              title="Undo (Cmd+Z)"
-              className="p-1.5 rounded-md shrink-0 text-[#213A50] dark:text-[#CBD8E3] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] disabled:opacity-30 disabled:pointer-events-none transition-colors outline-none focus:outline-none"
-            >
-              <Undo2 size={16} />
-            </button>
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => runCommand(() => editor.chain().focus().redo().run())}
-              disabled={!editor.can().redo()}
-              title="Redo (Cmd+Shift+Z)"
-              className="p-1.5 rounded-md shrink-0 text-[#213A50] dark:text-[#CBD8E3] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] disabled:opacity-30 disabled:pointer-events-none transition-colors outline-none focus:outline-none"
-            >
-              <Redo2 size={16} />
-            </button>
-          </div>
-        )}
+      <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#223344] shrink-0 mx-0.5" />
+
+      {/* 2. Mode Switcher: Type vs Draw */}
+      <div className="flex items-center bg-[#E5DCCB]/90 dark:bg-[#1A2530] border border-[#DFD3C0] dark:border-[#263747] rounded-lg p-0.5 shrink-0 shadow-xs">
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            triggerHaptic();
+            setShowPenPopover(false);
+            setShowEraserPopover(false);
+            onTogglePenMode(false);
+          }}
+          title="Type (Keyboard Text Mode)"
+          className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-semibold transition-all outline-none focus:outline-none ${
+            !isPenMode
+              ? 'bg-[#FAF6EF] dark:bg-[#25394C] text-[#213A50] dark:text-[#E8EEF3] shadow-xs'
+              : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:text-[#213A50] dark:hover:text-white'
+          }`}
+        >
+          <Keyboard size={13} />
+          <span className="hidden xs:inline sm:inline">Type</span>
+        </button>
+
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            triggerHaptic();
+            onTogglePenMode(true);
+          }}
+          title="Draw (Samsung Notes Stylus & Pen Mode)"
+          className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-semibold transition-all outline-none focus:outline-none ${
+            isPenMode
+              ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs'
+              : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:text-[#213A50] dark:hover:text-white'
+          }`}
+        >
+          <PenTool size={13} />
+          <span className="hidden xs:inline sm:inline">Draw</span>
+        </button>
       </div>
 
-      <div className="h-4 w-px bg-[#DFD3C0] dark:bg-[#223344] shrink-0" />
+      <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#223344] shrink-0 mx-0.5" />
 
-      {/* SCROLLABLE MIDDLE/RIGHT STRIP */}
-      <div className="flex-1 flex flex-nowrap items-center gap-1.5 overflow-x-auto no-scrollbar min-w-0">
-        {isPenMode ? (
-          <>
-            {/* Tool selector: Pen, Highlighter, Lasso, Part Eraser, Stroke Eraser */}
-            <div className="flex items-center space-x-1 shrink-0">
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onChangeDrawingTool('pen');
-                }}
-                title="Pen (Natural Ink with Stylus Pressure)"
-                className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-all outline-none focus:outline-none ${
-                  activeDrawingTool === 'pen'
-                    ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs'
-                    : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733]'
-                }`}
-              >
-                <PenTool size={14} />
-                <span className="hidden sm:inline">Pen</span>
-              </button>
-
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onChangeDrawingTool('highlighter');
-                }}
-                title="Highlighter (Translucent Chisel)"
-                className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-all outline-none focus:outline-none ${
-                  activeDrawingTool === 'highlighter'
-                    ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs'
-                    : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733]'
-                }`}
-              >
-                <Highlighter size={14} />
-                <span className="hidden sm:inline">Highlighter</span>
-              </button>
-
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onChangeDrawingTool('lasso');
-                }}
-                title="Lasso Select (Move, Resize, or Delete Portion of Drawing)"
-                className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-all outline-none focus:outline-none ${
-                  activeDrawingTool === 'lasso'
-                    ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs'
-                    : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733]'
-                }`}
-              >
-                <Lasso size={14} />
-                <span className="hidden sm:inline">Select</span>
-              </button>
-
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onChangeDrawingTool('partial_eraser');
-                }}
-                title="Part Eraser (Erases part of stroke)"
-                className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-all outline-none focus:outline-none ${
-                  activeDrawingTool === 'partial_eraser' || activeDrawingTool === 'eraser'
-                    ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs'
-                    : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733]'
-                }`}
-              >
-                <Eraser size={14} />
-                <span className="hidden sm:inline">Part Eraser</span>
-              </button>
-
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onChangeDrawingTool('stroke_eraser');
-                }}
-                title="Stroke Eraser (Erases entire stroke)"
-                className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-all outline-none focus:outline-none ${
-                  activeDrawingTool === 'stroke_eraser'
-                    ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs'
-                    : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733]'
-                }`}
-              >
-                <StrokeEraserIcon size={14} />
-                <span className="hidden sm:inline">Stroke Eraser</span>
-              </button>
-            </div>
-
-            {/* Stylus-Only / Palm Rejection Lock Toggle */}
-            <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#223344] mx-0.5 shrink-0" />
+      {/* 3. DRAWING MODE TOOLS (Samsung Notes Style with Double-Tap / 2nd-Click Popovers) */}
+      {isPenMode ? (
+        <>
+          {/* Pen Button (Click to select, click again for color & thickness options) */}
+          <div className="relative shrink-0">
             <button
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => {
                 e.preventDefault();
-                onToggleStylusOnly();
+                triggerHaptic();
+                setShowEraserPopover(false);
+                if (!isPenActive) {
+                  onChangeDrawingTool('pen');
+                } else {
+                  setShowPenPopover((prev) => !prev);
+                }
               }}
-              title={
-                stylusOnly
-                  ? 'Stylus-Only Mode ON (Hand/Finger drawing blocked — tap to allow finger drawing)'
-                  : 'Finger Drawing ON (Tap to lock to S-Pen / Apple Pencil only)'
-              }
-              className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-all shrink-0 outline-none focus:outline-none ${
-                stylusOnly
-                  ? 'bg-[#213A50] dark:bg-[#2C4A68] text-white shadow-xs'
+              title="Pen (Click to select, click again for color & thickness)"
+              className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-all outline-none focus:outline-none ${
+                isPenActive
+                  ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs'
                   : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733]'
               }`}
             >
-              <Hand size={13} className={stylusOnly ? 'opacity-60 line-through' : ''} />
-              <span className="hidden lg:inline">{stylusOnly ? 'Stylus Only' : 'Finger On'}</span>
+              {activeDrawingTool === 'highlighter' ? <Highlighter size={14} /> : <PenTool size={14} />}
+              <span className="hidden sm:inline">
+                {activeDrawingTool === 'highlighter' ? 'Highlighter' : 'Pen'}
+              </span>
+              <div
+                className="w-2.5 h-2.5 rounded-full border border-black/20 dark:border-white/20 shrink-0 ml-0.5"
+                style={{ backgroundColor: activeColor }}
+              />
             </button>
 
-            {/* Color Palette (hidden when erasing or lassoing) */}
-            {!isEraser && activeDrawingTool !== 'lasso' && (
-              <>
-                <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#223344] mx-0.5 shrink-0" />
-                <div className="flex items-center space-x-1.5 shrink-0">
-                  {PRESET_COLORS.map((col) => (
-                    <button
-                      key={col.value}
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => onChangeColor(col.value)}
-                      title={col.name}
-                      className={`w-5 h-5 rounded-full transition-transform shrink-0 outline-none focus:outline-none border border-black/10 dark:border-white/15 ${
-                        activeColor === col.value
-                          ? 'scale-115 ring-2 ring-apple-yellow dark:ring-[#7EAAD0] shadow-xs'
-                          : 'hover:scale-105 opacity-85 hover:opacity-100'
-                      }`}
-                      style={{ backgroundColor: col.value }}
-                    />
-                  ))}
-
-                  {/* Custom Color Input */}
-                  <label
-                    title="Custom Color"
-                    className="w-5 h-5 rounded-full border border-black/10 dark:border-white/15 flex items-center justify-center cursor-pointer overflow-hidden shrink-0 hover:scale-105 transition-transform outline-none focus:outline-none"
-                    style={{
-                      background:
-                        'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)',
-                    }}
-                  >
-                    <input
-                      type="color"
-                      value={activeColor}
-                      onChange={(e) => onChangeColor(e.target.value)}
-                      className="opacity-0 w-0 h-0 pointer-events-none"
-                    />
-                  </label>
+            {/* Pen Options Popover */}
+            {showPenPopover && (
+              <div
+                ref={penPopoverRef}
+                className="absolute left-0 top-full mt-2 bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0] dark:border-[#263747] rounded-xl shadow-2xl p-3 z-50 text-xs w-72 animate-in fade-in zoom-in-95 duration-100"
+              >
+                <div className="font-semibold text-[#5A6E82] dark:text-[#8AA0B4] uppercase tracking-wider text-[10px] mb-2">
+                  Drawing Tool
                 </div>
-              </>
-            )}
+                <div className="grid grid-cols-2 gap-1.5 p-0.5 bg-[#EFE8DA] dark:bg-[#151E28] rounded-lg mb-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic();
+                      onChangeDrawingTool('pen');
+                    }}
+                    className={`px-2 py-1.5 rounded-md font-medium text-xs transition-all flex items-center justify-center space-x-1.5 ${
+                      activeDrawingTool === 'pen'
+                        ? 'bg-white dark:bg-[#2C4A68] text-[#213A50] dark:text-white shadow-xs font-semibold'
+                        : 'text-[#6E8092] dark:text-[#8AA0B4]'
+                    }`}
+                  >
+                    <PenTool size={13} />
+                    <span>Pen</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic();
+                      onChangeDrawingTool('highlighter');
+                    }}
+                    className={`px-2 py-1.5 rounded-md font-medium text-xs transition-all flex items-center justify-center space-x-1.5 ${
+                      activeDrawingTool === 'highlighter'
+                        ? 'bg-white dark:bg-[#2C4A68] text-[#213A50] dark:text-white shadow-xs font-semibold'
+                        : 'text-[#6E8092] dark:text-[#8AA0B4]'
+                    }`}
+                  >
+                    <Highlighter size={13} />
+                    <span>Highlighter</span>
+                  </button>
+                </div>
 
-            {/* Stroke / Pointer Size Selector (Moved to RIGHT side as requested!) */}
-            {activeDrawingTool !== 'lasso' && (
-              <>
-                <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#223344] mx-0.5 shrink-0" />
-                <div className="flex items-center space-x-1 shrink-0 ml-auto">
+                <div className="font-semibold text-[#5A6E82] dark:text-[#8AA0B4] uppercase tracking-wider text-[10px] mb-1.5">
+                  Ink Color
+                </div>
+                <div className="grid grid-cols-5 gap-2 mb-3">
+                  {PRESET_COLORS.map((c) => (
+                    <button
+                      key={c.name}
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic();
+                        onChangeColor(c.value);
+                      }}
+                      title={c.name}
+                      className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+                        activeColor.toLowerCase() === c.value.toLowerCase()
+                          ? 'ring-2 ring-apple-yellow dark:ring-[#7EAAD0] ring-offset-2 scale-110 shadow-xs'
+                          : 'hover:scale-105'
+                      }`}
+                      style={{ backgroundColor: c.value }}
+                    >
+                      {c.value === '#FFFFFF' && (
+                        <div className="w-full h-full rounded-full border border-neutral-300 dark:border-neutral-600" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="font-semibold text-[#5A6E82] dark:text-[#8AA0B4] uppercase tracking-wider text-[10px] mb-1.5">
+                  Thickness
+                </div>
+                <div className="flex items-center justify-between gap-1">
                   {STROKE_SIZES.map((sz) => (
                     <button
                       key={sz.label}
                       type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => onChangeSize(sz.value)}
-                      title={`${sz.label} (${sz.value}px)`}
-                      className={`w-6 h-6 rounded-md flex items-center justify-center transition-all outline-none focus:outline-none ${
+                      onClick={() => {
+                        triggerHaptic();
+                        onChangeSize(sz.value);
+                      }}
+                      className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-md border text-[10px] transition-all ${
                         activeSize === sz.value
-                          ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs'
-                          : 'bg-[#E5DCCB]/60 dark:bg-[#1A2530] text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#E5DCCB] dark:hover:bg-[#223344]'
+                          ? 'border-apple-yellow dark:border-[#7EAAD0] bg-apple-yellow/10 dark:bg-[#2C4A68]/30 font-bold text-[#213A50] dark:text-white'
+                          : 'border-[#DFD3C0] dark:border-[#263747] text-[#6E8092] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1E2D3B]'
                       }`}
                     >
                       <div
-                        className="rounded-full bg-current"
+                        className="rounded-full bg-current mb-1"
                         style={{
-                          width: `${Math.min(12, sz.value + 1.5)}px`,
-                          height: `${Math.min(12, sz.value + 1.5)}px`,
+                          width: `${Math.min(14, sz.value + 2)}px`,
+                          height: `${Math.min(14, sz.value + 2)}px`,
                         }}
                       />
+                      <span>{sz.label}</span>
                     </button>
                   ))}
                 </div>
-              </>
+              </div>
             )}
+          </div>
 
-            <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#223344] mx-0.5 shrink-0" />
-
-            {/* Clear All */}
+          {/* Eraser Button (Classic Eraser Icon; click to select, click again for Area vs Stroke & size) */}
+          <div className="relative shrink-0">
             <button
               type="button"
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
+              onClick={(e) => {
+                e.preventDefault();
                 triggerHaptic();
-                onDrawingClear();
-              }}
-              disabled={!canDrawingUndo}
-              title="Clear all annotations on this note"
-              className="p-1.5 rounded shrink-0 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-30 disabled:pointer-events-none transition-colors outline-none focus:outline-none"
-            >
-              <Trash2 size={15} />
-            </button>
-          </>
-        ) : (
-          /* When in Type Mode: Standard rich text formatting tools */
-          <>
-            {/* Headings */}
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => runCommand(() => editor.chain().focus().toggleHeading({ level: 1 }).run())}
-              title="Title (H1)"
-              className={getBtnClass(editor.isActive('heading', { level: 1 }))}
-            >
-              <Heading1 size={15} />
-            </button>
-
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => runCommand(() => editor.chain().focus().toggleHeading({ level: 2 }).run())}
-              title="Heading (H2)"
-              className={getBtnClass(editor.isActive('heading', { level: 2 }))}
-            >
-              <Heading2 size={15} />
-            </button>
-
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => runCommand(() => editor.chain().focus().toggleHeading({ level: 3 }).run())}
-              title="Subheading (H3)"
-              className={getBtnClass(editor.isActive('heading', { level: 3 }))}
-            >
-              <Heading3 size={15} />
-            </button>
-
-            <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#223344] mx-1 shrink-0" />
-
-            {/* Basic Formatting */}
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => runCommand(() => editor.chain().focus().toggleBold().run())}
-              title="Bold (Cmd+B)"
-              className={getBtnClass(editor.isActive('bold'))}
-            >
-              <Bold size={15} />
-            </button>
-
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => runCommand(() => editor.chain().focus().toggleItalic().run())}
-              title="Italic (Cmd+I)"
-              className={getBtnClass(editor.isActive('italic'))}
-            >
-              <Italic size={15} />
-            </button>
-
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => runCommand(() => editor.chain().focus().toggleUnderline().run())}
-              title="Underline (Cmd+U)"
-              className={getBtnClass(editor.isActive('underline'))}
-            >
-              <UnderlineIcon size={15} />
-            </button>
-
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => runCommand(() => editor.chain().focus().toggleStrike().run())}
-              title="Strikethrough"
-              className={getBtnClass(editor.isActive('strike'))}
-            >
-              <Strikethrough size={15} />
-            </button>
-
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => runCommand(() => editor.chain().focus().toggleHighlight().run())}
-              title="Highlight Text"
-              className={getBtnClass(editor.isActive('highlight'))}
-            >
-              <TextHighlightIcon size={15} />
-            </button>
-
-            <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#223344] mx-1 shrink-0" />
-
-            {/* Lists */}
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => runCommand(() => editor.chain().focus().toggleTaskList().run())}
-              title="Checklist"
-              className={getBtnClass(editor.isActive('taskList'))}
-            >
-              <CheckSquare size={15} />
-            </button>
-
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => runCommand(() => editor.chain().focus().toggleBulletList().run())}
-              title="Bullet List"
-              className={getBtnClass(editor.isActive('bulletList'))}
-            >
-              <List size={15} />
-            </button>
-
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => runCommand(() => editor.chain().focus().toggleOrderedList().run())}
-              title="Numbered List"
-              className={getBtnClass(editor.isActive('orderedList'))}
-            >
-              <ListOrdered size={15} />
-            </button>
-
-            <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#223344] mx-1 shrink-0" />
-
-            {/* Quotes & Code */}
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => runCommand(() => editor.chain().focus().toggleBlockquote().run())}
-              title="Blockquote"
-              className={getBtnClass(editor.isActive('blockquote'))}
-            >
-              <Quote size={15} />
-            </button>
-
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => runCommand(() => toggleUnifiedCodeBlock(editor))}
-              title="Code Block"
-              className={getBtnClass(editor.isActive('codeBlock'))}
-            >
-              <Code size={15} />
-            </button>
-
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => runCommand(() => editor.chain().focus().setHorizontalRule().run())}
-              title="Horizontal Divider"
-              className="p-1.5 rounded shrink-0 text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3] transition-colors outline-none focus:outline-none"
-            >
-              <Minus size={15} />
-            </button>
-
-            <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#223344] mx-1 shrink-0" />
-
-            {/* Photo / Image Insertion */}
-            <input
-              type="file"
-              ref={imageInputRef}
-              accept="image/*"
-              className="hidden"
-              onChange={handleImageFileChange}
-            />
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                triggerHaptic();
-                imageInputRef.current?.click();
-              }}
-              title="Add Photo / Image"
-              className="flex items-center space-x-1 p-1.5 rounded shrink-0 text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3] transition-colors outline-none focus:outline-none"
-            >
-              <ImagePlus size={15} />
-              <span className="hidden sm:inline">Photo</span>
-            </button>
-
-            {/* Table Insertion & Management */}
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                triggerHaptic();
-                if (editor.isActive('table')) {
-                  editor.chain().focus().deleteTable().run();
+                setShowPenPopover(false);
+                if (!isEraserActive) {
+                  onChangeDrawingTool('partial_eraser');
                 } else {
-                  editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+                  setShowEraserPopover((prev) => !prev);
                 }
               }}
-              title={editor.isActive('table') ? 'Delete Table' : 'Insert Table (3x3)'}
-              className={`flex items-center space-x-1 p-1.5 rounded shrink-0 transition-colors outline-none focus:outline-none ${
-                editor.isActive('table')
-                  ? 'bg-[#E5DCCB] dark:bg-[#203448] text-[#213A50] dark:text-[#7EAAD0] font-bold shadow-xs'
-                  : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3]'
+              title="Eraser (Click to select, click again for Area vs Stroke & size)"
+              className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-all outline-none focus:outline-none ${
+                isEraserActive
+                  ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs'
+                  : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733]'
               }`}
             >
-              <TableIcon size={15} />
-              <span className="hidden sm:inline">Table</span>
+              <Eraser size={14} />
+              <span className="hidden sm:inline">
+                {activeDrawingTool === 'stroke_eraser' ? 'Stroke Eraser' : 'Eraser'}
+              </span>
             </button>
 
-            {/* Contextual Table Controls when cursor is inside a table */}
-            {editor.isActive('table') && (
-              <div className="flex items-center space-x-0.5 bg-[#FAF6EF] dark:bg-[#1C2733] p-0.5 rounded-md border border-[#DFD3C0] dark:border-[#263747] shadow-xs shrink-0 animate-in fade-in duration-150">
+            {/* Eraser Options Popover */}
+            {showEraserPopover && (
+              <div
+                ref={eraserPopoverRef}
+                className="absolute left-0 top-full mt-2 bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0] dark:border-[#263747] rounded-xl shadow-2xl p-3 z-50 text-xs w-64 animate-in fade-in zoom-in-95 duration-100"
+              >
+                <div className="font-semibold text-[#5A6E82] dark:text-[#8AA0B4] uppercase tracking-wider text-[10px] mb-2">
+                  Eraser Type
+                </div>
+                <div className="grid grid-cols-2 gap-1.5 p-0.5 bg-[#EFE8DA] dark:bg-[#151E28] rounded-lg mb-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic();
+                      onChangeDrawingTool('partial_eraser');
+                    }}
+                    className={`px-2 py-1.5 rounded-md font-medium text-xs transition-all ${
+                      activeDrawingTool === 'partial_eraser' || activeDrawingTool === 'eraser'
+                        ? 'bg-white dark:bg-[#2C4A68] text-[#213A50] dark:text-white shadow-xs font-semibold'
+                        : 'text-[#6E8092] dark:text-[#8AA0B4]'
+                    }`}
+                  >
+                    Area Eraser
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic();
+                      onChangeDrawingTool('stroke_eraser');
+                    }}
+                    className={`px-2 py-1.5 rounded-md font-medium text-xs transition-all ${
+                      activeDrawingTool === 'stroke_eraser'
+                        ? 'bg-white dark:bg-[#2C4A68] text-[#213A50] dark:text-white shadow-xs font-semibold'
+                        : 'text-[#6E8092] dark:text-[#8AA0B4]'
+                    }`}
+                  >
+                    Stroke Eraser
+                  </button>
+                </div>
+
+                <div className="font-semibold text-[#5A6E82] dark:text-[#8AA0B4] uppercase tracking-wider text-[10px] mb-1.5">
+                  Eraser Size
+                </div>
+                <div className="flex items-center justify-between gap-1 mb-3">
+                  {ERASER_SIZES.map((sz) => (
+                    <button
+                      key={sz.label}
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic();
+                        onChangeSize(sz.value);
+                      }}
+                      className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-md border text-[10px] transition-all ${
+                        activeSize === sz.value
+                          ? 'border-apple-yellow dark:border-[#7EAAD0] bg-apple-yellow/10 dark:bg-[#2C4A68]/30 font-bold text-[#213A50] dark:text-white'
+                          : 'border-[#DFD3C0] dark:border-[#263747] text-[#6E8092] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1E2D3B]'
+                      }`}
+                    >
+                      <div
+                        className="rounded-full bg-current mb-1"
+                        style={{
+                          width: `${Math.min(14, sz.value + 4)}px`,
+                          height: `${Math.min(14, sz.value + 4)}px`,
+                        }}
+                      />
+                      <span>{sz.label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="h-px bg-[#DFD3C0] dark:bg-[#263747] my-2" />
+
                 <button
                   type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => runCommand(() => editor.chain().focus().addRowAfter().run())}
-                  title="Add Row Below"
-                  className="px-1.5 py-1 rounded text-[11px] font-medium text-[#213A50] dark:text-[#7EAAD0] hover:bg-[#EBE2D3] dark:hover:bg-[#263747]"
+                  onClick={() => {
+                    triggerHaptic();
+                    onDrawingClear();
+                    setShowEraserPopover(false);
+                  }}
+                  disabled={!canDrawingUndo}
+                  className="w-full flex items-center justify-center space-x-1.5 py-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-30 disabled:pointer-events-none font-medium transition-colors"
                 >
-                  + Row
-                </button>
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => runCommand(() => editor.chain().focus().deleteRow().run())}
-                  title="Delete Row"
-                  className="px-1.5 py-1 rounded text-[11px] font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
-                >
-                  - Row
-                </button>
-                <div className="h-3 w-px bg-[#DFD3C0] dark:bg-[#263747] mx-0.5" />
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => runCommand(() => editor.chain().focus().addColumnAfter().run())}
-                  title="Add Column Right"
-                  className="px-1.5 py-1 rounded text-[11px] font-medium text-[#213A50] dark:text-[#7EAAD0] hover:bg-[#EBE2D3] dark:hover:bg-[#263747]"
-                >
-                  + Col
-                </button>
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => runCommand(() => editor.chain().focus().deleteColumn().run())}
-                  title="Delete Column"
-                  className="px-1.5 py-1 rounded text-[11px] font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
-                >
-                  - Col
+                  <Trash2 size={13} />
+                  <span>Clear All Drawings</span>
                 </button>
               </div>
             )}
-          </>
-        )}
-      </div>
+          </div>
+
+          {/* Lasso / Selection Tool */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.preventDefault();
+              triggerHaptic();
+              setShowPenPopover(false);
+              setShowEraserPopover(false);
+              onChangeDrawingTool('lasso');
+            }}
+            title="Lasso Select (Move, Resize, or Delete Portion of Drawing)"
+            className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-all shrink-0 outline-none focus:outline-none ${
+              activeDrawingTool === 'lasso'
+                ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs'
+                : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733]'
+            }`}
+          >
+            <Lasso size={14} />
+            <span className="hidden sm:inline">Select</span>
+          </button>
+
+          {/* Stylus-Only / Palm Rejection Lock Toggle */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.preventDefault();
+              triggerHaptic();
+              onToggleStylusOnly();
+            }}
+            title={
+              stylusOnly
+                ? 'Stylus-Only Mode ON (Hand drawing blocked)'
+                : 'Finger Drawing ON (Tap to lock to S-Pen / Apple Pencil only)'
+            }
+            className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-all shrink-0 outline-none focus:outline-none ${
+              stylusOnly
+                ? 'bg-[#213A50] dark:bg-[#2C4A68] text-white shadow-xs'
+                : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733]'
+            }`}
+          >
+            <Hand size={14} />
+            <span className="hidden sm:inline">Stylus Only</span>
+          </button>
+        </>
+      ) : (
+        /* 4. TYPE MODE RICH TEXT TOOLS */
+        <>
+          {/* Headings */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => runCommand(() => editor.chain().focus().toggleHeading({ level: 1 }).run())}
+            title="Title (H1)"
+            className={getBtnClass(editor.isActive('heading', { level: 1 }))}
+          >
+            <Heading1 size={15} />
+          </button>
+
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => runCommand(() => editor.chain().focus().toggleHeading({ level: 2 }).run())}
+            title="Heading (H2)"
+            className={getBtnClass(editor.isActive('heading', { level: 2 }))}
+          >
+            <Heading2 size={15} />
+          </button>
+
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => runCommand(() => editor.chain().focus().toggleHeading({ level: 3 }).run())}
+            title="Subheading (H3)"
+            className={getBtnClass(editor.isActive('heading', { level: 3 }))}
+          >
+            <Heading3 size={15} />
+          </button>
+
+          <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#223344] mx-0.5 shrink-0" />
+
+          {/* Basic Formatting */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => runCommand(() => editor.chain().focus().toggleBold().run())}
+            title="Bold"
+            className={getBtnClass(editor.isActive('bold'))}
+          >
+            <Bold size={15} />
+          </button>
+
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => runCommand(() => editor.chain().focus().toggleItalic().run())}
+            title="Italic"
+            className={getBtnClass(editor.isActive('italic'))}
+          >
+            <Italic size={15} />
+          </button>
+
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => runCommand(() => editor.chain().focus().toggleUnderline().run())}
+            title="Underline"
+            className={getBtnClass(editor.isActive('underline'))}
+          >
+            <UnderlineIcon size={15} />
+          </button>
+
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => runCommand(() => editor.chain().focus().toggleStrike().run())}
+            title="Strikethrough"
+            className={getBtnClass(editor.isActive('strike'))}
+          >
+            <Strikethrough size={15} />
+          </button>
+
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => runCommand(() => editor.chain().focus().toggleHighlight().run())}
+            title="Highlight Text"
+            className={getBtnClass(editor.isActive('highlight'))}
+          >
+            <TextHighlightIcon size={15} />
+          </button>
+
+          <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#223344] mx-0.5 shrink-0" />
+
+          {/* Lists */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => runCommand(() => editor.chain().focus().toggleTaskList().run())}
+            title="Checklist"
+            className={getBtnClass(editor.isActive('taskList'))}
+          >
+            <CheckSquare size={15} />
+          </button>
+
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => runCommand(() => editor.chain().focus().toggleBulletList().run())}
+            title="Bullet List"
+            className={getBtnClass(editor.isActive('bulletList'))}
+          >
+            <List size={15} />
+          </button>
+
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => runCommand(() => editor.chain().focus().toggleOrderedList().run())}
+            title="Numbered List"
+            className={getBtnClass(editor.isActive('orderedList'))}
+          >
+            <ListOrdered size={15} />
+          </button>
+
+          <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#223344] mx-0.5 shrink-0" />
+
+          {/* Quotes & Code & Divider */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => runCommand(() => editor.chain().focus().toggleBlockquote().run())}
+            title="Blockquote"
+            className={getBtnClass(editor.isActive('blockquote'))}
+          >
+            <Quote size={15} />
+          </button>
+
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => runCommand(() => toggleUnifiedCodeBlock(editor))}
+            title="Code Block"
+            className={getBtnClass(editor.isActive('codeBlock'))}
+          >
+            <Code size={15} />
+          </button>
+
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => runCommand(() => editor.chain().focus().setHorizontalRule().run())}
+            title="Horizontal Divider"
+            className="p-1.5 rounded shrink-0 text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3] transition-colors outline-none focus:outline-none"
+          >
+            <Minus size={15} />
+          </button>
+
+          <div className="h-3.5 w-px bg-[#DFD3C0] dark:bg-[#223344] mx-0.5 shrink-0" />
+
+          {/* Photo / Image Insertion */}
+          <input
+            type="file"
+            ref={imageInputRef}
+            accept="image/*"
+            className="hidden"
+            onChange={handleImageFileChange}
+          />
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              triggerHaptic();
+              imageInputRef.current?.click();
+            }}
+            title="Add Photo / Image"
+            className="flex items-center space-x-1 p-1.5 rounded shrink-0 text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3] transition-colors outline-none focus:outline-none"
+          >
+            <ImagePlus size={15} />
+            <span className="hidden sm:inline">Photo</span>
+          </button>
+
+          {/* Table Insertion & Management */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              triggerHaptic();
+              if (editor.isActive('table')) {
+                editor.chain().focus().deleteTable().run();
+              } else {
+                editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+              }
+            }}
+            title={editor.isActive('table') ? 'Delete Table' : 'Insert Table (3x3)'}
+            className={`flex items-center space-x-1 p-1.5 rounded shrink-0 transition-colors outline-none focus:outline-none ${
+              editor.isActive('table')
+                ? 'bg-[#E5DCCB] dark:bg-[#203448] text-[#213A50] dark:text-[#7EAAD0] font-bold shadow-xs'
+                : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3]'
+            }`}
+          >
+            <TableIcon size={15} />
+            <span className="hidden sm:inline">Table</span>
+          </button>
+
+          {/* Contextual Table Controls (visible whenever cursor is inside a table) */}
+          {editor.isActive('table') && (
+            <div className="flex items-center space-x-1 bg-[#FAF6EF] dark:bg-[#1C2733] p-0.5 rounded-md border border-[#DFD3C0] dark:border-[#263747] shadow-xs shrink-0 animate-in fade-in duration-150">
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => runCommand(() => editor.chain().focus().addRowAfter().run())}
+                title="Add Row Below"
+                className="px-2 py-1 rounded text-[11px] font-semibold text-[#213A50] dark:text-[#7EAAD0] hover:bg-[#EBE2D3] dark:hover:bg-[#263747]"
+              >
+                + Row
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => runCommand(() => editor.chain().focus().deleteRow().run())}
+                title="Delete Row"
+                className="px-2 py-1 rounded text-[11px] font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+              >
+                - Row
+              </button>
+              <div className="h-3 w-px bg-[#DFD3C0] dark:bg-[#263747] mx-0.5" />
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => runCommand(() => editor.chain().focus().addColumnAfter().run())}
+                title="Add Column Right"
+                className="px-2 py-1 rounded text-[11px] font-semibold text-[#213A50] dark:text-[#7EAAD0] hover:bg-[#EBE2D3] dark:hover:bg-[#263747]"
+              >
+                + Col
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => runCommand(() => editor.chain().focus().deleteColumn().run())}
+                title="Delete Column"
+                className="px-2 py-1 rounded text-[11px] font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+              >
+                - Col
+              </button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };

@@ -14,7 +14,7 @@ import Table from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableCell from '@tiptap/extension-table-cell';
 import TableHeader from '@tiptap/extension-table-header';
-import { RotateCcw, Trash2, Search, ChevronUp, ChevronDown, X } from 'lucide-react';
+import { RotateCcw, Trash2, Search, ChevronUp, ChevronDown, X, Plus } from 'lucide-react';
 
 import { useNotes } from '../../store/NotesContext';
 import { formatEditorDate } from '../../utils/dateUtils';
@@ -255,6 +255,15 @@ const EnforceTitleExtension = Extension.create({
             }
           }
         }
+
+        // When deleting at the start of a checklist item (taskItem), unwrap directly to start of line with 0 indentation
+        const parentNode = $from.node(-1);
+        if (parentNode && parentNode.type.name === 'taskItem') {
+          if ($from.parentOffset === 0) {
+            return editor.chain().focus().liftListItem('taskItem').clearNodes().run();
+          }
+        }
+
         return false;
       },
       Delete: ({ editor }) => {
@@ -296,6 +305,16 @@ const EnforceTitleExtension = Extension.create({
           if (firstNode.type.name !== 'heading' || firstNode.attrs.level !== 3) {
             tr.setNodeMarkup(0, headingType, { level: 3 });
             return tr;
+          }
+
+          // If the document ends with a table, automatically append an empty paragraph after it
+          // so the user always has a standard text caret and typing line below the table!
+          if (doc.lastChild && doc.lastChild.type.name === 'table') {
+            const paragraphType = schema.nodes.paragraph;
+            if (paragraphType) {
+              tr.insert(doc.content.size, paragraphType.create());
+              return tr;
+            }
           }
 
           return null;
@@ -419,6 +438,78 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
   const [drawingRedoTrigger, setDrawingRedoTrigger] = useState(0);
   const [drawingClearTrigger, setDrawingClearTrigger] = useState(0);
 
+  // Editor scroll container ref to reset scroll position on note change
+  const editorScrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Long-press / context menu state for Images and Tables
+  const [contextMenu, setContextMenu] = useState<{
+    type: 'image' | 'table';
+    targetEl: HTMLElement;
+  } | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Reset scroll position to top whenever switching notes
+  useEffect(() => {
+    if (editorScrollContainerRef.current) {
+      editorScrollContainerRef.current.scrollTop = 0;
+    }
+  }, [activeNote?.id]);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1 || isPenMode) return;
+    const touch = e.touches[0];
+    const target = e.target as HTMLElement;
+    const img = target.closest('img') || (target.tagName === 'IMG' ? target : null);
+    const table = target.closest('table');
+    if (!img && !table) return;
+
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = window.setTimeout(() => {
+      triggerHaptic();
+      setContextMenu({
+        type: img ? 'image' : 'table',
+        targetEl: (img || table) as HTMLElement,
+      });
+    }, 450);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartPosRef.current || e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
+    const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
+    if (dx > 10 || dy > 10) {
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    touchStartPosRef.current = null;
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    if (isPenMode) return;
+    const target = e.target as HTMLElement;
+    const img = target.closest('img') || (target.tagName === 'IMG' ? target : null);
+    const table = target.closest('table');
+    if (img || table) {
+      e.preventDefault();
+      triggerHaptic();
+      setContextMenu({
+        type: img ? 'image' : 'table',
+        targetEl: (img || table) as HTMLElement,
+      });
+    }
+  };
+
   const handleToggleStylusOnly = () => {
     setStylusOnly((prev) => {
       const next = !prev;
@@ -502,7 +593,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
           if (pos === 0) {
             return 'Title';
           }
-          return 'Note...';
+          return '';
         },
         emptyNodeClass: 'is-empty-node',
         emptyEditorClass: 'is-editor-empty',
@@ -873,6 +964,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
 
       {/* Editor Content Body (Scrollable container - date moves away on scroll) */}
       <div
+        ref={editorScrollContainerRef}
         className="flex-1 overflow-y-auto px-5 md:px-14 py-3 pb-24 md:pb-8 cursor-text select-text"
         onClick={(e) => {
           if (editor && !activeNote.isTrash && !isPenMode) {
@@ -905,6 +997,10 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
             <EditorContent
               editor={editor}
               className="prose prose-neutral dark:prose-invert focus:outline-none min-h-[60vh] select-text cursor-text"
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              onContextMenu={handleContextMenu}
               onClick={(e) => {
                 if (isPenMode) return;
                 const target = e.target as HTMLElement;
@@ -921,6 +1017,9 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
                 }
               }}
             />
+
+            {/* 5 lines of non-editable bottom visual padding so text never touches bottom */}
+            <div className="h-28 pointer-events-none select-none" aria-hidden="true" />
 
             {/* Seamless In-Note Drawing Canvas Overlay */}
             <InNoteCanvas
@@ -960,6 +1059,97 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
           </div>
         </div>
       </div>
+
+      {/* Long-Press / Right-Click Floating Action Modal for Images and Tables */}
+      {contextMenu && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-[1px] animate-in fade-in duration-150"
+          onClick={() => setContextMenu(null)}
+        >
+          <div
+            className="bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0] dark:border-[#263747] rounded-xl shadow-2xl p-2.5 min-w-[210px] max-w-[280px] text-xs animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-3 py-1 font-semibold text-[#5A6E82] dark:text-[#8AA0B4] uppercase tracking-wider text-[10px]">
+              {contextMenu.type === 'image' ? 'Image Options' : 'Table Options'}
+            </div>
+
+            {contextMenu.type === 'image' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic();
+                  if (editor && contextMenu.targetEl) {
+                    try {
+                      const pos = editor.view.posAtDOM(contextMenu.targetEl, 0);
+                      if (typeof pos === 'number' && pos >= 0) {
+                        editor.chain().focus().deleteRange({ from: pos, to: pos + 1 }).run();
+                      } else {
+                        contextMenu.targetEl.remove();
+                      }
+                    } catch (_) {
+                      contextMenu.targetEl.remove();
+                    }
+                  }
+                  setContextMenu(null);
+                }}
+                className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 font-medium transition-colors"
+              >
+                <Trash2 size={14} />
+                <span>Delete Image</span>
+              </button>
+            ) : (
+              <div className="space-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic();
+                    editor?.chain().focus().deleteTable().run();
+                    setContextMenu(null);
+                  }}
+                  className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 font-medium transition-colors"
+                >
+                  <Trash2 size={14} />
+                  <span>Delete Table</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic();
+                    editor?.chain().focus().addRowAfter().run();
+                    setContextMenu(null);
+                  }}
+                  className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-[#213A50] dark:text-[#E8EEF3] hover:bg-[#EBE2D3] dark:hover:bg-[#263747] transition-colors"
+                >
+                  <Plus size={14} />
+                  <span>Add Row Below</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic();
+                    editor?.chain().focus().addColumnAfter().run();
+                    setContextMenu(null);
+                  }}
+                  className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-[#213A50] dark:text-[#E8EEF3] hover:bg-[#EBE2D3] dark:hover:bg-[#263747] transition-colors"
+                >
+                  <Plus size={14} />
+                  <span>Add Column Right</span>
+                </button>
+              </div>
+            )}
+
+            <div className="h-px bg-[#DFD3C0] dark:bg-[#263747] my-1.5" />
+            <button
+              type="button"
+              onClick={() => setContextMenu(null)}
+              className="w-full text-center px-3 py-1.5 rounded-lg text-[#6E8092] dark:text-[#8AA0B4] hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
