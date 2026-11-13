@@ -17,7 +17,7 @@ export const INITIAL_NOTES: Note[] = [
   {
     id: 'note-welcome',
     title: 'Welcome to notes-app',
-    content: `<h3>Welcome to notes-app 👋</h3><p>We're so glad you're here! This is your clean, distraction-free space for capturing quick thoughts, daily to-dos, and big ideas.</p><p>Everything you write is saved automatically to your device with <strong>0ms local speed</strong>, works completely offline, and can be synced across all your devices with <strong>Zero-Knowledge End-to-End Encryption</strong>.</p><h3>✨ A few things to try:</h3><ul data-type="taskList"><li data-checked="true" data-type="taskItem"><label><input type="checkbox" checked="checked"><span></span></label><div><p>Check off items on your to-do lists</p></div></li><li data-checked="false" data-type="taskItem"><label><input type="checkbox"><span></span></label><div><p>Create a fresh note with <strong>New Note</strong> (or press <code>Cmd+N</code> / <code>Ctrl+N</code>)</p></div></li><li data-checked="false" data-type="taskItem"><label><input type="checkbox"><span></span></label><div><p>Organize your ideas into custom folders in the sidebar</p></div></li><li data-checked="false" data-type="taskItem"><label><input type="checkbox"><span></span></label><div><p>Sign in to sync seamlessly between macOS, Windows, Android, and Web</p></div></li></ul><p></p><blockquote><p>“Simplicity is the ultimate sophistication.” — Make yourself at home and happy writing! 💛</p></blockquote>`,
+    content: `<h1>Welcome to notes-app 👋</h1><p>We're so glad you're here! This is your clean, distraction-free space for capturing quick thoughts, daily to-dos, and big ideas.</p><p>Everything you write is saved automatically to your device with <strong>0ms local speed</strong>, works completely offline, and can be synced across all your devices with <strong>Zero-Knowledge End-to-End Encryption</strong>.</p><h3>✨ A few things to try:</h3><ul data-type="taskList"><li data-checked="true" data-type="taskItem"><label><input type="checkbox" checked="checked"><span></span></label><div><p>Check off items on your to-do lists</p></div></li><li data-checked="false" data-type="taskItem"><label><input type="checkbox"><span></span></label><div><p>Create a fresh note with <strong>New Note</strong> (or press <code>Cmd+N</code> / <code>Ctrl+N</code>)</p></div></li><li data-checked="false" data-type="taskItem"><label><input type="checkbox"><span></span></label><div><p>Organize your ideas into custom folders in the sidebar</p></div></li><li data-checked="false" data-type="taskItem"><label><input type="checkbox"><span></span></label><div><p>Sign in to sync seamlessly between macOS, Windows, Android, and Web</p></div></li></ul><p></p><blockquote><p>“Simplicity is the ultimate sophistication.” — Make yourself at home and happy writing! 💛</p></blockquote>`,
     plainTextPreview: "We're so glad you're here! This is your clean, distraction-free space for capturing quick thoughts, daily to-dos, and big ideas...",
     folderId: 'default',
     isPinned: true,
@@ -43,22 +43,30 @@ export const loadStoredNotes = (): Note[] => {
       return INITIAL_NOTES;
     }
 
-    // Migrate legacy notes with 'quick' or 'all' folderId to 'default', and ensure trashed notes are unpinned
-    let hasFolderMigration = false;
+    // Migrate legacy notes with 'quick' or 'all' folderId to 'default', ensure trashed notes are unpinned, and convert legacy <h3> title to <h1>
+    let hasMigration = false;
     const migratedNotes = parsed.map((n: Note) => {
       let updated = n;
       if (n.folderId === 'quick' || n.folderId === 'all' || !n.folderId) {
-        hasFolderMigration = true;
+        hasMigration = true;
         updated = { ...updated, folderId: 'default' };
       }
       if (updated.isTrash && updated.isPinned) {
-        hasFolderMigration = true;
+        hasMigration = true;
         updated = { ...updated, isPinned: false };
+      }
+      // Migrate older notes where title was saved as <h3> to <h1>
+      if (typeof updated.content === 'string' && /^\s*<h3>([\s\S]*?)<\/h3>/i.test(updated.content)) {
+        hasMigration = true;
+        updated = {
+          ...updated,
+          content: updated.content.replace(/^\s*<h3>([\s\S]*?)<\/h3>/i, '<h1>$1</h1>'),
+        };
       }
       return updated;
     });
 
-    if (hasFolderMigration) {
+    if (hasMigration) {
       saveStoredNotes(migratedNotes);
       return migratedNotes;
     }

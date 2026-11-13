@@ -681,15 +681,22 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
 
     editor.setEditable(!activeNote.isTrash);
 
+    let contentToLoad = activeNote.content || '<p></p>';
+    // Migrate legacy notes where title was saved as <h3> to <h1>
+    if (/^\s*<h3>([\s\S]*?)<\/h3>/i.test(contentToLoad)) {
+      contentToLoad = contentToLoad.replace(/^\s*<h3>([\s\S]*?)<\/h3>/i, '<h1>$1</h1>');
+      updateNote(activeNote.id, { content: contentToLoad });
+    }
+
     const currentHTML = editor.getHTML();
-    if (currentHTML !== activeNote.content) {
+    if (currentHTML !== contentToLoad) {
       isUpdatingRef.current = true;
 
       // Preserve cursor selection if editor is focused on this device
       const isFocused = editor.isFocused;
       const { from, to } = editor.state.selection;
 
-      editor.commands.setContent(activeNote.content, false);
+      editor.commands.setContent(contentToLoad, false);
 
       if (isFocused) {
         try {

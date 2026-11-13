@@ -525,11 +525,11 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
   host.style.top = '0';
   host.style.width = `${pageWidthPx}px`;
   host.style.backgroundColor = '#FFFFFF';
-  host.style.color = '#1A202C';
-  host.style.padding = '36px 44px 44px 44px';
+  host.style.color = '#111827';
+  host.style.padding = '0';
   host.style.boxSizing = 'border-box';
   host.style.fontFamily =
-    '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+    '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
   host.style.zIndex = '-99999';
   host.style.opacity = '1';
   host.style.pointerEvents = 'none';
@@ -538,40 +538,101 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
   const styleEl = document.createElement('style');
   styleEl.textContent = `
     .pdf-root {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       font-size: 13.5px;
       line-height: 1.6;
-      color: #2D3748;
-      letter-spacing: 0.05px;
-      word-spacing: 1px;
+      color: #1F2937;
+      letter-spacing: normal;
+      word-spacing: normal;
+      padding: 0;
+      margin: 0;
     }
     .pdf-root * {
       box-sizing: border-box;
-      letter-spacing: 0.05px;
+      letter-spacing: normal;
+      word-spacing: normal;
       overflow-wrap: break-word;
     }
-    .pdf-root h1 { font-size: 24px; line-height: 1.3; font-weight: 700; margin: 14px 0 8px 0; color: #1C2B36; white-space: pre-wrap; word-break: break-word; }
-    .pdf-root h2 { font-size: 18px; line-height: 1.35; font-weight: 600; margin: 12px 0 6px 0; color: #1C2B36; white-space: pre-wrap; word-break: break-word; }
-    .pdf-root h3 { font-size: 16px; line-height: 1.4; font-weight: 600; margin: 12px 0 6px 0; color: #1C2B36; white-space: pre-wrap; word-break: break-word; }
-    .pdf-root p { font-size: 13.5px; line-height: 1.65; margin: 0 0 10px 0; color: #2D3748; min-height: 16px; white-space: pre-wrap; word-break: break-word; }
-    .pdf-root ul:not([data-type="taskList"]) { list-style: disc; padding-left: 22px; margin: 0 0 12px 0; font-size: 13.5px; line-height: 1.6; color: #2D3748; }
-    .pdf-root ol { list-style: decimal; padding-left: 22px; margin: 0 0 12px 0; font-size: 13.5px; line-height: 1.6; color: #2D3748; }
-    .pdf-root ul[data-type="taskList"] { list-style: none; padding: 0; margin: 6px 0 12px 0; }
+    .pdf-root h1 {
+      font-size: 26px;
+      line-height: 1.25;
+      font-weight: 700;
+      margin: 0 0 16px 0;
+      color: #111827;
+      letter-spacing: -0.02em;
+      word-break: break-word;
+    }
+    .pdf-root h2 {
+      font-size: 19px;
+      line-height: 1.35;
+      font-weight: 700;
+      margin: 22px 0 8px 0;
+      color: #111827;
+      letter-spacing: -0.015em;
+      word-break: break-word;
+    }
+    .pdf-root h3 {
+      font-size: 16px;
+      line-height: 1.4;
+      font-weight: 600;
+      margin: 16px 0 6px 0;
+      color: #1F2937;
+      word-break: break-word;
+    }
+    .pdf-root p {
+      font-size: 13.5px;
+      line-height: 1.6;
+      margin: 0 0 10px 0;
+      color: #2D3748;
+      min-height: 16px;
+      word-break: break-word;
+    }
+    .pdf-root ul:not([data-type="taskList"]) {
+      list-style: disc;
+      padding-left: 22px;
+      margin: 0 0 12px 0;
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: #2D3748;
+    }
+    .pdf-root ol {
+      list-style: decimal;
+      padding-left: 22px;
+      margin: 0 0 12px 0;
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: #2D3748;
+    }
+    .pdf-root ul[data-type="taskList"] {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0 14px 0;
+    }
     .pdf-root ul[data-type="taskList"] li {
       position: relative;
-      padding-left: 26px;
-      margin-bottom: 8px;
+      padding-left: 24px;
+      margin: 0 0 7px 0;
       font-size: 13.5px;
       line-height: 1.5;
-      color: #2D3748;
-      min-height: 20px;
-      white-space: pre-wrap;
+      color: #1F2937;
+      min-height: 19px;
       word-break: break-word;
+    }
+    .pdf-root ul[data-type="taskList"] li > div {
+      margin: 0;
+      padding: 0;
+    }
+    .pdf-root ul[data-type="taskList"] li > div > p {
+      margin: 0 !important;
+      padding: 0 !important;
+      font-size: 13.5px !important;
+      line-height: 1.5 !important;
+      color: inherit;
     }
     .pdf-root .pdf-cb {
       position: absolute;
       left: 0;
-      top: 3px;
+      top: 2px;
       width: 15px;
       height: 15px;
       max-width: 15px;
@@ -589,17 +650,85 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
       background: #213A50;
       border-color: #213A50;
     }
-    .pdf-root li[data-checked="true"] > div { text-decoration: line-through; color: #718096; }
-    .pdf-root blockquote { border-left: 3px solid #213A50; padding: 4px 0 4px 14px; margin: 12px 0; font-style: italic; color: #4A5568; white-space: pre-wrap; }
-    .pdf-root pre { background: #1E293B; color: #F8FAFC; padding: 12px 14px; border-radius: 6px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; margin: 12px 0; white-space: pre-wrap; word-break: break-all; }
-    .pdf-root code:not(pre code) { background: #EDF2F7; color: #1A202C; padding: 2px 5px; border-radius: 4px; font-family: ui-monospace, monospace; font-size: 12px; }
-    .pdf-root mark { background: #FEF08A; color: #1C2B36; padding: 1px 3px; border-radius: 3px; }
-    .pdf-root hr { border: none; border-top: 1px solid #E2E8F0; margin: 16px 0; }
-    .pdf-root table { border-collapse: collapse; width: 100%; margin: 14px 0; border: 1px solid #CBD5E1; border-radius: 0; overflow: hidden; font-size: 12.5px; }
-    .pdf-root th { background: #F1F5F9; font-weight: 600; text-align: left; padding: 8px 10px; border: 1px solid #CBD5E1; color: #1E293B; }
-    .pdf-root td { padding: 7px 10px; border: 1px solid #CBD5E1; color: #334155; vertical-align: top; }
-    .pdf-root img { max-width: 100%; height: auto; border-radius: 6px; margin: 10px 0; display: block; }
-    .pdf-root .katex-math-block { margin: 14px 0; padding: 8px 12px; text-align: center; overflow-x: auto; background: #F8FAFC; border-radius: 6px; border: 1px solid #E2E8F0; }
+    .pdf-root li[data-checked="true"] > div {
+      text-decoration: line-through;
+      color: #64748B;
+    }
+    .pdf-root blockquote {
+      border-left: 3px solid #213A50;
+      padding: 4px 0 4px 14px;
+      margin: 12px 0;
+      font-style: italic;
+      color: #4A5568;
+    }
+    .pdf-root pre {
+      background: #1E293B;
+      color: #F8FAFC;
+      padding: 12px 14px;
+      border-radius: 6px;
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 12px;
+      margin: 12px 0;
+      word-break: break-all;
+    }
+    .pdf-root code:not(pre code) {
+      background: #EDF2F7;
+      color: #1A202C;
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-family: ui-monospace, monospace;
+      font-size: 12px;
+    }
+    .pdf-root mark {
+      background: #FEF08A;
+      color: #1C2B36;
+      padding: 1px 3px;
+      border-radius: 3px;
+    }
+    .pdf-root hr {
+      border: none;
+      border-top: 1px solid #E2E8F0;
+      margin: 16px 0;
+    }
+    .pdf-root table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 14px 0;
+      border: 1px solid #CBD5E1;
+      border-radius: 0;
+      overflow: hidden;
+      font-size: 12.5px;
+    }
+    .pdf-root th {
+      background: #F1F5F9;
+      font-weight: 600;
+      text-align: left;
+      padding: 8px 10px;
+      border: 1px solid #CBD5E1;
+      color: #1E293B;
+    }
+    .pdf-root td {
+      padding: 7px 10px;
+      border: 1px solid #CBD5E1;
+      color: #334155;
+      vertical-align: top;
+    }
+    .pdf-root img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 6px;
+      margin: 10px 0;
+      display: block;
+    }
+    .pdf-root .katex-math-block {
+      margin: 14px 0;
+      padding: 8px 12px;
+      text-align: center;
+      overflow-x: auto;
+      background: #F8FAFC;
+      border-radius: 6px;
+      border: 1px solid #E2E8F0;
+    }
   `;
   host.appendChild(styleEl);
 
@@ -609,6 +738,14 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
 
   const proseLayer = document.createElement('div');
   proseLayer.innerHTML = note.content || '<p></p>';
+
+  // Ensure note title (first element child) is always an <h1> with commanding styling
+  const firstEl = proseLayer.firstElementChild;
+  if (firstEl && firstEl.tagName !== 'H1') {
+    const h1 = document.createElement('h1');
+    h1.innerHTML = firstEl.innerHTML;
+    firstEl.replaceWith(h1);
+  }
 
   // Render any MathBlock elements or raw $$...$$ formulas with KaTeX
   proseLayer.querySelectorAll('[data-type="math-block"]').forEach((el) => {
@@ -647,8 +784,7 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
     }
   });
 
-  // Ensure spaces between words are never collapsed by macOS/WebKit/html2canvas Range bounds bug
-  // by converting regular spaces in text nodes into non-breaking spaces + zero-width spaces (\u00A0\u200B)
+  // Ensure spaces between words are never collapsed by converting regular spaces in text nodes to standard non-breaking spaces
   const walker = document.createTreeWalker(proseLayer, NodeFilter.SHOW_TEXT, {
     acceptNode: (node) => {
       let parent = node.parentElement;
@@ -675,11 +811,13 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
 
   for (const textNode of textNodes) {
     if (textNode.nodeValue) {
-      textNode.nodeValue = textNode.nodeValue.replace(/ /g, '\u00A0\u200B');
+      textNode.nodeValue = textNode.nodeValue.replace(/ /g, '\u00A0');
     }
   }
 
   contentLayer.appendChild(proseLayer);
+  host.appendChild(contentLayer);
+  document.body.appendChild(host);
 
   // Parse drawing strokes if present
   let parsedStrokes: InNoteStroke[] = [];
@@ -700,10 +838,8 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
     } catch (_) {}
   }
 
-  document.body.appendChild(host);
-
   try {
-    const contentWidth = contentLayer.getBoundingClientRect().width || pageWidthPx - 88;
+    const contentWidth = contentLayer.getBoundingClientRect().width || pageWidthPx;
     const contentHeight = Math.max(
       contentLayer.scrollHeight,
       maxStrokeY > 0 ? Math.ceil(maxStrokeY + 40) : 200
@@ -782,8 +918,6 @@ export async function generateNotePdfBlob(note: Note): Promise<Blob> {
 
       contentLayer.appendChild(strokeCanvas);
     }
-
-    host.appendChild(contentLayer);
 
     // Ensure all web fonts (including KaTeX math glyphs) are fully loaded
     await (document as any).fonts?.ready;

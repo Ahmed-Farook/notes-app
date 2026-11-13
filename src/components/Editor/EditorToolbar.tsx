@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Editor } from '@tiptap/react';
 import {
   Keyboard,
@@ -113,7 +114,37 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const prevIsTableRef = useRef(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
-  const togglePenPopover = () => {
+  const updatePenPosition = () => {
+    const rect = penButtonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const isBottomToolbar = rect.top > window.innerHeight / 2;
+    const popoverWidth = 288;
+    const left = Math.max(10, Math.min(rect.left, window.innerWidth - popoverWidth - 10));
+    if (isBottomToolbar) {
+      setPenPos({ bottom: Math.max(8, window.innerHeight - rect.top + 8), left });
+    } else {
+      setPenPos({ top: Math.max(8, rect.bottom + 8), left });
+    }
+  };
+
+  const updateEraserPosition = () => {
+    const rect = eraserButtonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const isBottomToolbar = rect.top > window.innerHeight / 2;
+    const popoverWidth = 256;
+    const left = Math.max(10, Math.min(rect.left, window.innerWidth - popoverWidth - 10));
+    if (isBottomToolbar) {
+      setEraserPos({ bottom: Math.max(8, window.innerHeight - rect.top + 8), left });
+    } else {
+      setEraserPos({ top: Math.max(8, rect.bottom + 8), left });
+    }
+  };
+
+  const togglePenPopover = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     triggerHaptic();
     setShowEraserPopover(false);
     if (!isPenActive) {
@@ -124,22 +155,16 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
     if (showPenPopover) {
       setShowPenPopover(false);
     } else {
-      const rect = penButtonRef.current?.getBoundingClientRect();
-      if (rect) {
-        const isBottomToolbar = rect.top > window.innerHeight / 2;
-        const popoverWidth = 288;
-        const left = Math.max(8, Math.min(rect.left, window.innerWidth - popoverWidth - 8));
-        if (isBottomToolbar) {
-          setPenPos({ bottom: window.innerHeight - rect.top + 8, left });
-        } else {
-          setPenPos({ top: rect.bottom + 8, left });
-        }
-        setShowPenPopover(true);
-      }
+      updatePenPosition();
+      setShowPenPopover(true);
     }
   };
 
-  const toggleEraserPopover = () => {
+  const toggleEraserPopover = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     triggerHaptic();
     setShowPenPopover(false);
     if (!isEraserActive) {
@@ -150,24 +175,15 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
     if (showEraserPopover) {
       setShowEraserPopover(false);
     } else {
-      const rect = eraserButtonRef.current?.getBoundingClientRect();
-      if (rect) {
-        const isBottomToolbar = rect.top > window.innerHeight / 2;
-        const popoverWidth = 256;
-        const left = Math.max(8, Math.min(rect.left, window.innerWidth - popoverWidth - 8));
-        if (isBottomToolbar) {
-          setEraserPos({ bottom: window.innerHeight - rect.top + 8, left });
-        } else {
-          setEraserPos({ top: rect.bottom + 8, left });
-        }
-        setShowEraserPopover(true);
-      }
+      updateEraserPosition();
+      setShowEraserPopover(true);
     }
   };
 
-  // Close floating popovers when clicking outside
+  // Close floating popovers when clicking outside or scrolling
   useEffect(() => {
     if (!showPenPopover && !showEraserPopover) return;
+
     const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       const target = e.target as Node;
       if (
@@ -187,11 +203,29 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         setShowEraserPopover(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('touchstart', handleClickOutside);
+
+    const handleScrollOrResize = (e: Event) => {
+      const target = e.target as Node;
+      if (
+        (penPopoverRef.current && penPopoverRef.current.contains(target)) ||
+        (eraserPopoverRef.current && eraserPopoverRef.current.contains(target))
+      ) {
+        return;
+      }
+      setShowPenPopover(false);
+      setShowEraserPopover(false);
+    };
+
+    document.addEventListener('mousedown', handleClickOutside, true);
+    document.addEventListener('touchstart', handleClickOutside, true);
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
+      document.removeEventListener('mousedown', handleClickOutside, true);
+      document.removeEventListener('touchstart', handleClickOutside, true);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
     };
   }, [showPenPopover, showEraserPopover]);
 
@@ -378,16 +412,20 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             </button>
 
             {/* Pen Options Popover */}
-            {showPenPopover && penPos && (
+            {showPenPopover && penPos && typeof document !== 'undefined' && createPortal(
               <div
                 ref={penPopoverRef}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
                 style={{
                   position: 'fixed',
                   ...(penPos.bottom !== undefined ? { bottom: `${penPos.bottom}px` } : { top: `${penPos.top}px` }),
                   left: `${penPos.left}px`,
-                  zIndex: 99999,
+                  zIndex: 9999999,
+                  pointerEvents: 'auto',
                 }}
-                className="bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0] dark:border-[#263747] rounded-xl shadow-2xl p-3 text-xs w-72 animate-in fade-in zoom-in-95 duration-100"
+                className="bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0] dark:border-[#263747] rounded-xl shadow-2xl p-3 text-xs w-72 animate-in fade-in zoom-in-95 duration-100 select-none"
               >
                 <div className="font-semibold text-[#5A6E82] dark:text-[#8AA0B4] uppercase tracking-wider text-[10px] mb-2">
                   Drawing Tool
@@ -481,7 +519,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                     </button>
                   ))}
                 </div>
-              </div>
+              </div>,
+              document.body
             )}
           </div>
 
@@ -505,16 +544,20 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             </button>
 
             {/* Eraser Options Popover */}
-            {showEraserPopover && eraserPos && (
+            {showEraserPopover && eraserPos && typeof document !== 'undefined' && createPortal(
               <div
                 ref={eraserPopoverRef}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
                 style={{
                   position: 'fixed',
                   ...(eraserPos.bottom !== undefined ? { bottom: `${eraserPos.bottom}px` } : { top: `${eraserPos.top}px` }),
                   left: `${eraserPos.left}px`,
-                  zIndex: 99999,
+                  zIndex: 9999999,
+                  pointerEvents: 'auto',
                 }}
-                className="bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0] dark:border-[#263747] rounded-xl shadow-2xl p-3 text-xs w-64 animate-in fade-in zoom-in-95 duration-100"
+                className="bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0] dark:border-[#263747] rounded-xl shadow-2xl p-3 text-xs w-64 animate-in fade-in zoom-in-95 duration-100 select-none"
               >
                 <div className="font-semibold text-[#5A6E82] dark:text-[#8AA0B4] uppercase tracking-wider text-[10px] mb-2">
                   Eraser Type
@@ -595,7 +638,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                   <Trash2 size={13} />
                   <span>Clear All Drawings</span>
                 </button>
-              </div>
+              </div>,
+              document.body
             )}
           </div>
 
