@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import { Extension } from '@tiptap/core';
 import { Plugin, PluginKey, Selection } from '@tiptap/pm/state';
@@ -320,9 +320,10 @@ const EnforceTitleExtension = Extension.create({
             return tr;
           }
 
-          // If the document ends with a table, automatically append an empty paragraph after it
-          // so the user always has a standard text caret and typing line below the table!
-          if (doc.lastChild && doc.lastChild.type.name === 'table') {
+          // If the document ends with a table, image, or mathBlock, automatically append an empty paragraph after it
+          // so the user always has a standard text caret and typing line below it!
+          const last = doc.lastChild;
+          if (last && (last.type.name === 'table' || last.type.name === 'image' || last.type.name === 'mathBlock')) {
             const paragraphType = schema.nodes.paragraph;
             if (paragraphType) {
               tr.insert(doc.content.size, paragraphType.create());
@@ -870,6 +871,31 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [searchQuery, totalMatches, currentMatchIndex]);
 
+  // Focuses or creates a clean typing line below existing content (picture, table, text, checklist)
+  const handleFocusOrCreateLineBelow = useCallback(() => {
+    if (!editor || activeNote?.isTrash || isPenMode) return;
+
+    const { state, view } = editor;
+    const { doc, schema, tr } = state;
+    const paragraphType = schema.nodes.paragraph;
+    if (!paragraphType) return;
+
+    const lastChild = doc.lastChild;
+
+    // If the last child is already an empty paragraph, focus it directly
+    if (lastChild && lastChild.type.name === 'paragraph' && lastChild.content.size === 0) {
+      editor.chain().focus('end').run();
+      return;
+    }
+
+    // If the document ends with content (text, table, image, math, checklist),
+    // append an empty paragraph 1-2 lines below and place the cursor there!
+    const endPos = doc.content.size;
+    const newTr = tr.insert(endPos, paragraphType.create());
+    view.dispatch(newTr);
+    editor.chain().focus('end').run();
+  }, [editor, activeNote?.isTrash, isPenMode]);
+
   if (!activeNote) {
     return (
       <div className="flex-1 apple-paper-bg flex flex-col items-center justify-center text-[#6E7E8E] dark:text-[#8AA0B4] select-none p-6 text-center">
@@ -1002,13 +1028,15 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
               target.closest('label') ||
               target.tagName === 'INPUT' ||
               target.closest('select') ||
-              target.closest('button')
+              target.closest('button') ||
+              target.closest('.tiptap-table-controls') ||
+              target.closest('.katex-math-block')
             ) {
               return;
             }
-            // If clicked on empty space around or below the text, focus the editor at the end
+            // If clicked on empty space around or below the text, bring cursor up 1-2 lines below content
             if (!target.closest('.ProseMirror')) {
-              editor.commands.focus('end');
+              handleFocusOrCreateLineBelow();
             }
           }
         }}
@@ -1036,18 +1064,27 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
                 if (
                   target.tagName === 'INPUT' ||
                   target.closest('label') ||
-                  target.closest('[data-type="taskItem"] > label')
+                  target.closest('[data-type="taskItem"] > label') ||
+                  target.closest('.tiptap-table-controls') ||
+                  target.closest('.katex-math-block')
                 ) {
                   return;
                 }
-                if (editor && !editor.isFocused && !activeNote.isTrash) {
-                  editor.commands.focus('end');
+                const proseMirror = target.closest('.ProseMirror') as HTMLElement | null;
+                if (proseMirror && e.clientY > proseMirror.getBoundingClientRect().bottom - 40) {
+                  handleFocusOrCreateLineBelow();
+                } else if (editor && !editor.isFocused && !activeNote.isTrash) {
+                  editor.commands.focus();
                 }
               }}
             />
 
-            {/* 5 lines of non-editable bottom visual padding so text never touches bottom */}
-            <div className="h-16 pointer-events-none select-none" aria-hidden="true" />
+            {/* 5 lines of visual padding (~112px) where clicking brings the cursor up to the line below, and typing preserves this buffer underneath */}
+            <div
+              className="h-28 w-full cursor-text select-none"
+              onClick={handleFocusOrCreateLineBelow}
+              aria-hidden="true"
+            />
 
             {/* Seamless In-Note Drawing Canvas Overlay */}
             <InNoteCanvas

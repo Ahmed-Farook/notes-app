@@ -307,7 +307,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   return (
     <div
       ref={toolbarScrollRef}
-      className="h-11 md:h-10 flex flex-nowrap items-center gap-1 px-2.5 border-t md:border-t-0 md:border-b border-apple-border dark:border-apple-borderDark bg-[#F2ECE0]/95 dark:bg-[#151E28]/95 backdrop-blur md:sticky md:top-0 z-30 select-none text-xs shrink-0 overflow-x-auto no-scrollbar order-last md:order-first"
+      className="h-11 md:h-10 flex flex-nowrap items-center gap-1 px-2.5 border-t md:border-t-0 md:border-b border-apple-border dark:border-apple-borderDark bg-[#F2ECE0] dark:bg-[#151E28] md:sticky md:top-0 z-30 select-none text-xs shrink-0 overflow-x-auto no-scrollbar order-last md:order-first"
     >
       {/* 1. Mode Switcher: Type vs Draw */}
       <div className="flex items-center bg-[#E5DCCB]/90 dark:bg-[#1A2530] border border-[#DFD3C0] dark:border-[#263747] rounded-lg p-0.5 shrink-0 shadow-xs">
@@ -406,7 +406,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 {activeDrawingTool === 'highlighter' ? 'Highlighter' : 'Pen'}
               </span>
               <div
-                className="w-2.5 h-2.5 rounded-full border border-black/20 dark:border-white/20 shrink-0 ml-0.5"
+                className="w-3.5 h-3.5 rounded-full border-2 border-white dark:border-[#2C4A68] shadow-xs shrink-0 ml-0.5"
                 style={{ backgroundColor: activeColor }}
               />
             </button>
@@ -425,7 +425,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                   zIndex: 9999999,
                   pointerEvents: 'auto',
                 }}
-                className="bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0] dark:border-[#263747] rounded-xl shadow-2xl p-3 text-xs w-72 animate-in fade-in zoom-in-95 duration-100 select-none"
+                className="bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0] dark:border-[#263747] rounded-xl shadow-2xl p-3 text-xs w-72 select-none"
               >
                 <div className="font-semibold text-[#5A6E82] dark:text-[#8AA0B4] uppercase tracking-wider text-[10px] mb-2">
                   Drawing Tool
@@ -437,7 +437,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                       triggerHaptic();
                       onChangeDrawingTool('pen');
                     }}
-                    className={`px-2 py-1.5 rounded-md font-medium text-xs transition-all flex items-center justify-center space-x-1.5 ${
+                    className={`px-2 py-1.5 rounded-md font-medium text-xs transition-colors duration-75 flex items-center justify-center space-x-1.5 outline-none focus:outline-none ${
                       activeDrawingTool === 'pen'
                         ? 'bg-white dark:bg-[#2C4A68] text-[#213A50] dark:text-white shadow-xs font-semibold'
                         : 'text-[#6E8092] dark:text-[#8AA0B4]'
@@ -452,7 +452,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                       triggerHaptic();
                       onChangeDrawingTool('highlighter');
                     }}
-                    className={`px-2 py-1.5 rounded-md font-medium text-xs transition-all flex items-center justify-center space-x-1.5 ${
+                    className={`px-2 py-1.5 rounded-md font-medium text-xs transition-colors duration-75 flex items-center justify-center space-x-1.5 outline-none focus:outline-none ${
                       activeDrawingTool === 'highlighter'
                         ? 'bg-white dark:bg-[#2C4A68] text-[#213A50] dark:text-white shadow-xs font-semibold'
                         : 'text-[#6E8092] dark:text-[#8AA0B4]'
@@ -467,27 +467,35 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                   Ink Color
                 </div>
                 <div className="grid grid-cols-5 gap-2 mb-3">
-                  {PRESET_COLORS.map((c) => (
-                    <button
-                      key={c.name}
-                      type="button"
-                      onClick={() => {
-                        triggerHaptic();
-                        onChangeColor(c.value);
-                      }}
-                      title={c.name}
-                      className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
-                        activeColor.toLowerCase() === c.value.toLowerCase()
-                          ? 'ring-2 ring-apple-yellow dark:ring-[#7EAAD0] ring-offset-2 scale-110 shadow-xs'
-                          : 'hover:scale-105'
-                      }`}
-                      style={{ backgroundColor: c.value }}
-                    >
-                      {c.value === '#FFFFFF' && (
-                        <div className="w-full h-full rounded-full border border-neutral-300 dark:border-neutral-600" />
-                      )}
-                    </button>
-                  ))}
+                  {PRESET_COLORS.map((c) => {
+                    const isSelected = activeColor.toLowerCase() === c.value.toLowerCase();
+                    const isLight = c.value === '#FFFFFF' || c.value === '#FACC15' || c.value === '#F472B6';
+                    return (
+                      <button
+                        key={c.name}
+                        type="button"
+                        onClick={() => {
+                          triggerHaptic();
+                          onChangeColor(c.value);
+                        }}
+                        title={c.name}
+                        className={`w-7 h-7 rounded-full flex items-center justify-center relative select-none border border-black/20 dark:border-white/30 outline-none focus:outline-none transition-transform duration-75 ${
+                          isSelected
+                            ? 'ring-2 ring-apple-yellow dark:ring-[#7EAAD0] ring-offset-2 ring-offset-[#FAF6EF] dark:ring-offset-[#1C2733] scale-105 shadow-sm'
+                            : 'hover:scale-105'
+                        }`}
+                        style={{ backgroundColor: c.value }}
+                      >
+                        {isSelected && (
+                          <div
+                            className={`w-2 h-2 rounded-full shadow-xs ${
+                              isLight ? 'bg-[#1C2B36]' : 'bg-white'
+                            }`}
+                          />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <div className="font-semibold text-[#5A6E82] dark:text-[#8AA0B4] uppercase tracking-wider text-[10px] mb-1.5">
@@ -502,9 +510,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                         triggerHaptic();
                         onChangeSize(sz.value);
                       }}
-                      className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-md border text-[10px] transition-all ${
+                      className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-md border text-[10px] outline-none focus:outline-none transition-colors duration-75 ${
                         activeSize === sz.value
-                          ? 'border-apple-yellow dark:border-[#7EAAD0] bg-apple-yellow/10 dark:bg-[#2C4A68]/30 font-bold text-[#213A50] dark:text-white'
+                          ? 'border-apple-yellow dark:border-[#7EAAD0] bg-apple-yellow/15 dark:bg-[#2C4A68]/40 font-bold text-[#213A50] dark:text-white'
                           : 'border-[#DFD3C0] dark:border-[#263747] text-[#6E8092] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1E2D3B]'
                       }`}
                     >
@@ -557,7 +565,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                   zIndex: 9999999,
                   pointerEvents: 'auto',
                 }}
-                className="bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0] dark:border-[#263747] rounded-xl shadow-2xl p-3 text-xs w-64 animate-in fade-in zoom-in-95 duration-100 select-none"
+                className="bg-[#FAF6EF] dark:bg-[#1C2733] border border-[#DFD3C0] dark:border-[#263747] rounded-xl shadow-2xl p-3 text-xs w-64 select-none"
               >
                 <div className="font-semibold text-[#5A6E82] dark:text-[#8AA0B4] uppercase tracking-wider text-[10px] mb-2">
                   Eraser Type
@@ -569,7 +577,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                       triggerHaptic();
                       onChangeDrawingTool('partial_eraser');
                     }}
-                    className={`px-2 py-1.5 rounded-md font-medium text-xs transition-all ${
+                    className={`px-2 py-1.5 rounded-md font-medium text-xs transition-colors duration-75 outline-none focus:outline-none ${
                       activeDrawingTool === 'partial_eraser' || activeDrawingTool === 'eraser'
                         ? 'bg-white dark:bg-[#2C4A68] text-[#213A50] dark:text-white shadow-xs font-semibold'
                         : 'text-[#6E8092] dark:text-[#8AA0B4]'
@@ -583,7 +591,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                       triggerHaptic();
                       onChangeDrawingTool('stroke_eraser');
                     }}
-                    className={`px-2 py-1.5 rounded-md font-medium text-xs transition-all ${
+                    className={`px-2 py-1.5 rounded-md font-medium text-xs transition-colors duration-75 outline-none focus:outline-none ${
                       activeDrawingTool === 'stroke_eraser'
                         ? 'bg-white dark:bg-[#2C4A68] text-[#213A50] dark:text-white shadow-xs font-semibold'
                         : 'text-[#6E8092] dark:text-[#8AA0B4]'
@@ -605,9 +613,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                         triggerHaptic();
                         onChangeSize(sz.value);
                       }}
-                      className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-md border text-[10px] transition-all ${
+                      className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-md border text-[10px] outline-none focus:outline-none transition-colors duration-75 ${
                         activeSize === sz.value
-                          ? 'border-apple-yellow dark:border-[#7EAAD0] bg-apple-yellow/10 dark:bg-[#2C4A68]/30 font-bold text-[#213A50] dark:text-white'
+                          ? 'border-apple-yellow dark:border-[#7EAAD0] bg-apple-yellow/15 dark:bg-[#2C4A68]/40 font-bold text-[#213A50] dark:text-white'
                           : 'border-[#DFD3C0] dark:border-[#263747] text-[#6E8092] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1E2D3B]'
                       }`}
                     >
@@ -895,17 +903,14 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
               triggerHaptic();
-              editor
-                .chain()
-                .focus()
-                .insertContent({
-                  type: 'mathBlock',
-                  attrs: {
-                    latex:
-                      '\\frac{\\partial L}{\\partial w_3} = \\delta_2 \\times x_1 = (-0.00435)(1) = \\mathbf{-0.00435}',
-                  },
-                })
-                .run();
+              if (!editor) return;
+              const { from, to, empty } = editor.state.selection;
+              if (!empty) {
+                const selectedText = editor.state.doc.textBetween(from, to);
+                editor.chain().focus().insertContent(`$$${selectedText}$$`).run();
+              } else {
+                editor.chain().focus().insertContent('$$  $$').setTextSelection(from + 2).run();
+              }
             }}
             title="Insert Math Equation ($$...$$)"
             className={`flex items-center space-x-1 p-1.5 rounded shrink-0 transition-colors outline-none focus:outline-none ${

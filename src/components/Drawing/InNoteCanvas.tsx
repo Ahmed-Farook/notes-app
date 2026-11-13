@@ -61,11 +61,14 @@ function getHighlighterCursor(theme?: 'light' | 'dark') {
   return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26' fill='none'%3E%3Cpath d='M4 17 L16 5 L22 11 L10 23 Z' fill='${fill}' stroke='${stroke}' stroke-width='2.2' stroke-linejoin='round'/%3E%3Cpath d='M4 17 L2 24 L7 22 L10 23 Z' fill='${chiselColor}' stroke='${stroke}' stroke-width='2' stroke-linejoin='round'/%3E%3Cline x1='4' y1='17' x2='10' y2='23' stroke='${stroke}' stroke-width='2'/%3E%3C/svg%3E") 2 24, crosshair`;
 }
 
-function getEraserCursor(theme?: 'light' | 'dark') {
+function getEraserCursor(theme?: 'light' | 'dark', radius: number = 16) {
   const isDark = theme === 'dark';
   const stroke = isDark ? '%23FFFFFF' : '%231C2B36';
-  const fill = isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.08)';
-  return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26' fill='none'%3E%3Ccircle cx='13' cy='13' r='10' stroke='${stroke}' stroke-width='2' stroke-dasharray='3 2' fill='${fill}'/%3E%3Ccircle cx='13' cy='13' r='1.5' fill='${stroke}'/%3E%3C/svg%3E") 13 13, crosshair`;
+  const fill = isDark ? 'rgba(255,255,255,0.22)' : 'rgba(33,58,80,0.12)';
+  const pad = 4;
+  const size = Math.ceil((radius + pad) * 2);
+  const center = Math.round(size / 2);
+  return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 ${size} ${size}' fill='none'%3E%3Ccircle cx='${center}' cy='${center}' r='${radius}' stroke='${stroke}' stroke-width='2' stroke-dasharray='4 3' fill='${fill}'/%3E%3Ccircle cx='${center}' cy='${center}' r='1.5' fill='${stroke}'/%3E%3C/svg%3E") ${center} ${center}, crosshair`;
 }
 
 function isPointInPolygon(px: number, py: number, poly: { x: number; y: number }[]): boolean {
@@ -865,7 +868,12 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
 
   const isEraserTool =
     activeTool === 'partial_eraser' || activeTool === 'stroke_eraser' || activeTool === 'eraser';
-  const getEraserRadius = () => Math.max(16, activeSize * 2.5);
+  const getEraserRadius = useCallback(() => {
+    if (activeSize <= 4) return 8;
+    if (activeSize <= 8) return 16;
+    if (activeSize <= 14) return 28;
+    return 44;
+  }, [activeSize]);
 
   /**
    * Hardware Palm Rejection Helper:
@@ -981,15 +989,23 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
       onStylusDetected?.();
     }
 
-    if (!isDrawingRef.current) return;
-    if (e.pointerType === 'touch' && (stylusOnly || isStylusActiveRef.current)) return;
-
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+
+    if (!isDrawingRef.current) {
+      if (isEraserTool) {
+        const r = getEraserRadius();
+        eraserPreviewRef.current = { x, y, radius: r };
+        redrawCanvas();
+      }
+      return;
+    }
+    if (e.pointerType === 'touch' && (stylusOnly || isStylusActiveRef.current)) return;
+
     const isPen = e.pointerType === 'pen';
     const pressure = isPen && e.pressure > 0 ? e.pressure : 0.5;
 
@@ -1229,10 +1245,17 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     }
   };
 
+  const handlePointerLeave = () => {
+    if (eraserPreviewRef.current) {
+      eraserPreviewRef.current = null;
+      redrawCanvas();
+    }
+  };
+
   const getCursorStyle = () => {
     if (!isPenMode) return 'default';
     if (activeTool === 'lasso') return 'crosshair';
-    if (isEraserTool) return getEraserCursor(theme);
+    if (isEraserTool) return getEraserCursor(theme, getEraserRadius());
     if (activeTool === 'highlighter') return getHighlighterCursor(theme);
     return getPenCursor(theme);
   };
@@ -1245,6 +1268,7 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
+        onPointerLeave={handlePointerLeave}
         className={`absolute top-0 left-0 w-full ${
           isPenMode ? 'z-20 pointer-events-auto' : 'z-10 pointer-events-none'
         }`}

@@ -28,7 +28,7 @@ export const MathBlock = Node.create<MathBlockOptions>({
   addAttributes() {
     return {
       latex: {
-        default: '\\frac{\\partial L}{\\partial w_3} = \\delta_2 \\times x_1',
+        default: '',
       },
     };
   },
@@ -46,7 +46,7 @@ export const MathBlock = Node.create<MathBlockOptions>({
         tag: 'p',
         getAttrs: (dom) => {
           const text = (dom as HTMLElement).textContent?.trim() || '';
-          const match = text.match(/^\$\$([\s\S]+?)\$\$$/);
+          const match = text.match(/^\$\$([\s\S]+?)\$\$$/) || text.match(/^\\\[([\s\S]+?)\\\]$/);
           if (match) {
             return { latex: match[1].trim() };
           }
@@ -59,13 +59,15 @@ export const MathBlock = Node.create<MathBlockOptions>({
   renderHTML({ HTMLAttributes, node }) {
     const latex = node.attrs.latex || '';
     let rendered = '';
-    try {
-      rendered = katex.renderToString(latex, {
-        displayMode: true,
-        throwOnError: false,
-      });
-    } catch (_) {
-      rendered = `<span class="katex-error">${latex}</span>`;
+    if (latex) {
+      try {
+        rendered = katex.renderToString(latex, {
+          displayMode: true,
+          throwOnError: false,
+        });
+      } catch (_) {
+        rendered = `<span class="katex-error">${latex}</span>`;
+      }
     }
 
     return [
@@ -87,7 +89,7 @@ export const MathBlock = Node.create<MathBlockOptions>({
           return commands.insertContent({
             type: this.name,
             attrs: {
-              latex: latex ?? '\\frac{\\partial L}{\\partial w_3} = \\delta_2 \\times x_1',
+              latex: latex ?? '',
             },
           });
         },
@@ -103,6 +105,13 @@ export const MathBlock = Node.create<MathBlockOptions>({
           latex: match[1].trim(),
         }),
       }),
+      nodeInputRule({
+        find: /^\\\[([\s\S]+?)\\\]$/,
+        type: this.type,
+        getAttributes: (match) => ({
+          latex: match[1].trim(),
+        }),
+      }),
     ];
   },
 
@@ -110,6 +119,13 @@ export const MathBlock = Node.create<MathBlockOptions>({
     return [
       nodePasteRule({
         find: /\$\$([\s\S]+?)\$\$/g,
+        type: this.type,
+        getAttributes: (match) => ({
+          latex: match[1].trim(),
+        }),
+      }),
+      nodePasteRule({
+        find: /\\\[([\s\S]+?)\\\]/g,
         type: this.type,
         getAttributes: (match) => ({
           latex: match[1].trim(),
@@ -134,45 +150,19 @@ export const MathBlock = Node.create<MathBlockOptions>({
 
         if (isEditing) {
           const editWrapper = document.createElement('div');
-          editWrapper.className = 'flex flex-col gap-2 p-1 text-left';
+          editWrapper.className = 'flex items-center gap-2 p-1 text-left';
 
-          const header = document.createElement('div');
-          header.className =
-            'flex items-center justify-between text-[11px] font-semibold text-[#6E8092] dark:text-[#8AA0B4] select-none';
-          header.innerHTML =
-            '<span>LaTeX Math Formula</span><span class="text-[10px] opacity-75">Esc to finish</span>';
-
-          const textarea = document.createElement('textarea');
-          textarea.className =
-            'w-full p-2.5 font-mono text-xs rounded-lg border border-[#DFD3C0] dark:border-[#2C4054] bg-white dark:bg-[#121A22] text-[#1C2B36] dark:text-[#E8EEF3] outline-none focus:ring-1 focus:ring-apple-yellow dark:focus:ring-[#7EAAD0] resize-y min-h-[60px]';
-          textarea.value = currentLatex;
-          textarea.placeholder = 'e.g. \\frac{\\partial L}{\\partial w_3} = \\delta_2 \\times x_1';
-
-          const livePreview = document.createElement('div');
-          livePreview.className =
-            'p-3 bg-white/60 dark:bg-[#121A22]/60 rounded-lg border border-black/5 dark:border-white/5 min-h-[44px] flex items-center justify-center overflow-x-auto text-[#1C2B36] dark:text-[#E8EEF3]';
-
-          const updateLive = (val: string) => {
-            currentLatex = val;
-            dom.setAttribute('data-latex', val);
-            try {
-              livePreview.innerHTML = katex.renderToString(val || '\\text{Formula...}', {
-                displayMode: true,
-                throwOnError: false,
-              });
-            } catch (err) {
-              livePreview.innerHTML = `<span class="text-xs text-red-500 font-mono">${(err as any)?.message}</span>`;
-            }
-          };
-
-          updateLive(currentLatex);
-
-          textarea.addEventListener('input', () => {
-            updateLive(textarea.value);
-          });
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.className =
+            'flex-1 px-3 py-1.5 font-mono text-xs rounded-lg border border-[#DFD3C0] dark:border-[#2C4054] bg-white dark:bg-[#121A22] text-[#1C2B36] dark:text-[#E8EEF3] outline-none focus:ring-1 focus:ring-apple-yellow dark:focus:ring-[#7EAAD0]';
+          input.value = currentLatex;
+          input.placeholder = 'Type LaTeX formula (e.g. \\frac{a}{b} = c)...';
 
           const finishEditing = () => {
             isEditing = false;
+            currentLatex = input.value.trim();
+            dom.setAttribute('data-latex', currentLatex);
             if (typeof getPos === 'function') {
               editor.commands.command(({ tr }) => {
                 const pos = getPos();
@@ -185,65 +175,51 @@ export const MathBlock = Node.create<MathBlockOptions>({
             renderView();
           };
 
-          textarea.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' || (e.key === 'Enter' && (e.ctrlKey || e.metaKey))) {
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === 'Escape') {
               e.preventDefault();
               finishEditing();
             }
           });
 
-          const buttonRow = document.createElement('div');
-          buttonRow.className = 'flex items-center justify-between mt-1 pt-1 border-t border-black/5 dark:border-white/5';
-
-          const deleteBtn = document.createElement('button');
-          deleteBtn.type = 'button';
-          deleteBtn.className =
-            'px-2.5 py-1 text-xs rounded-md text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors font-medium';
-          deleteBtn.textContent = 'Delete Formula';
-          deleteBtn.onclick = (e) => {
-            e.stopPropagation();
-            if (typeof getPos === 'function') {
-              const pos = getPos();
-              if (typeof pos === 'number') {
-                editor.commands.deleteRange({ from: pos, to: pos + 1 });
-              }
-            }
-          };
+          input.addEventListener('blur', () => {
+            finishEditing();
+          });
 
           const doneBtn = document.createElement('button');
           doneBtn.type = 'button';
           doneBtn.className =
-            'px-3.5 py-1 text-xs font-semibold rounded-md bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs hover:opacity-90 transition-opacity';
+            'px-3 py-1.5 text-xs font-semibold rounded-md bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs hover:opacity-90 transition-opacity';
           doneBtn.textContent = 'Done';
+          doneBtn.onmousedown = (e) => e.preventDefault();
           doneBtn.onclick = (e) => {
             e.stopPropagation();
             finishEditing();
           };
 
-          buttonRow.appendChild(deleteBtn);
-          buttonRow.appendChild(doneBtn);
-
-          editWrapper.appendChild(header);
-          editWrapper.appendChild(textarea);
-          editWrapper.appendChild(livePreview);
-          editWrapper.appendChild(buttonRow);
+          editWrapper.appendChild(input);
+          editWrapper.appendChild(doneBtn);
           dom.appendChild(editWrapper);
 
           setTimeout(() => {
-            textarea.focus();
-            textarea.select();
+            input.focus();
+            input.select();
           }, 20);
         } else {
           const mathContainer = document.createElement('div');
           mathContainer.className =
             'katex-formula py-1 px-2 overflow-x-auto text-base text-[#1C2B36] dark:text-[#E8EEF3]';
-          try {
-            mathContainer.innerHTML = katex.renderToString(currentLatex || '\\text{Empty formula}', {
-              displayMode: true,
-              throwOnError: false,
-            });
-          } catch (err) {
-            mathContainer.innerHTML = `<span class="text-xs text-red-500 font-mono">${currentLatex}</span>`;
+          if (!currentLatex) {
+            mathContainer.innerHTML = '<span class="text-xs text-[#8AA0B4] italic font-sans select-none">$$ Type or paste math formula $$</span>';
+          } else {
+            try {
+              mathContainer.innerHTML = katex.renderToString(currentLatex, {
+                displayMode: true,
+                throwOnError: false,
+              });
+            } catch (err) {
+              mathContainer.innerHTML = `<span class="text-xs text-red-500 font-mono">${currentLatex}</span>`;
+            }
           }
 
           const badge = document.createElement('span');
