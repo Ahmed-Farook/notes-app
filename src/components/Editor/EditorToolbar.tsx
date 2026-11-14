@@ -70,10 +70,16 @@ interface EditorToolbarProps {
   onTogglePenMode: (penMode: boolean) => void;
   activeDrawingTool: DrawingTool;
   onChangeDrawingTool: (tool: DrawingTool) => void;
-  activeColor: string;
-  onChangeColor: (color: string) => void;
-  activeSize: number;
-  onChangeSize: (size: number) => void;
+  penColor: string;
+  onChangePenColor: (color: string) => void;
+  penSize: number;
+  onChangePenSize: (size: number) => void;
+  highlighterColor: string;
+  onChangeHighlighterColor: (color: string) => void;
+  highlighterSize: number;
+  onChangeHighlighterSize: (size: number) => void;
+  eraserSize: number;
+  onChangeEraserSize: (size: number) => void;
   stylusOnly: boolean;
   onToggleStylusOnly: () => void;
   canDrawingUndo: boolean;
@@ -90,10 +96,16 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onTogglePenMode,
   activeDrawingTool,
   onChangeDrawingTool,
-  activeColor,
-  onChangeColor,
-  activeSize,
-  onChangeSize,
+  penColor,
+  onChangePenColor,
+  penSize,
+  onChangePenSize,
+  highlighterColor,
+  onChangeHighlighterColor,
+  highlighterSize,
+  onChangeHighlighterSize,
+  eraserSize,
+  onChangeEraserSize,
   stylusOnly,
   onToggleStylusOnly,
   canDrawingUndo,
@@ -304,13 +316,21 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
   const isPenActive = activeDrawingTool === 'pen' || activeDrawingTool === 'highlighter';
 
+  const currentToolColor = activeDrawingTool === 'highlighter' ? highlighterColor : penColor;
+  const currentToolSize =
+    activeDrawingTool === 'highlighter'
+      ? highlighterSize
+      : activeDrawingTool === 'pen'
+      ? penSize
+      : eraserSize;
+
   return (
     <div
       ref={toolbarScrollRef}
       className="h-11 md:h-10 flex flex-nowrap items-center gap-1 px-2.5 border-t md:border-t-0 md:border-b border-apple-border dark:border-apple-borderDark bg-[#F2ECE0] dark:bg-[#151E28] md:sticky md:top-0 z-30 select-none text-xs shrink-0 overflow-x-auto no-scrollbar order-last md:order-first"
     >
       {/* 1. Mode Switcher: Type vs Draw */}
-      <div className="flex items-center bg-[#E5DCCB]/90 dark:bg-[#1A2530] border border-[#DFD3C0] dark:border-[#263747] rounded-lg p-0.5 shrink-0 shadow-xs">
+      <div className="flex items-center bg-[#E5DCCB]/90 dark:bg-[#1A2530] border border-[#DFD3C0] dark:border-[#263747] rounded-lg p-0.5 shrink-0">
         <button
           type="button"
           onMouseDown={(e) => e.preventDefault()}
@@ -321,9 +341,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             onTogglePenMode(false);
           }}
           title="Type (Keyboard Text Mode)"
-          className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-semibold transition-all outline-none focus:outline-none ${
+          className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-semibold transition-colors duration-75 outline-none ${
             !isPenMode
-              ? 'bg-[#FAF6EF] dark:bg-[#25394C] text-[#213A50] dark:text-[#E8EEF3] shadow-xs'
+              ? 'bg-[#FAF6EF] dark:bg-[#25394C] text-[#213A50] dark:text-[#E8EEF3]'
               : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:text-[#213A50] dark:hover:text-white'
           }`}
         >
@@ -339,9 +359,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             onTogglePenMode(true);
           }}
           title="Draw (Samsung Notes Stylus & Pen Mode)"
-          className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-semibold transition-all outline-none focus:outline-none ${
+          className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-semibold transition-colors duration-75 outline-none ${
             isPenMode
-              ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs'
+              ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white'
               : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:text-[#213A50] dark:hover:text-white'
           }`}
         >
@@ -395,9 +415,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               type="button"
               onClick={togglePenPopover}
               title="Pen (Click to select, click again for color & thickness)"
-              className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-all outline-none focus:outline-none ${
+              className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-colors duration-75 outline-none focus:outline-none ${
                 isPenActive
-                  ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs'
+                  ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white'
                   : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733]'
               }`}
             >
@@ -406,8 +426,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 {activeDrawingTool === 'highlighter' ? 'Highlighter' : 'Pen'}
               </span>
               <div
-                className="w-3.5 h-3.5 rounded-full border-2 border-white dark:border-[#2C4A68] shadow-xs shrink-0 ml-0.5"
-                style={{ backgroundColor: activeColor }}
+                className="w-3.5 h-3.5 rounded-full border border-black/20 dark:border-white/40 shadow-xs shrink-0 ml-0.5"
+                style={{ backgroundColor: currentToolColor }}
               />
             </button>
 
@@ -468,7 +488,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 </div>
                 <div className="grid grid-cols-5 gap-2 mb-3">
                   {PRESET_COLORS.map((c) => {
-                    const isSelected = activeColor.toLowerCase() === c.value.toLowerCase();
+                    const isSelected = currentToolColor.toLowerCase() === c.value.toLowerCase();
                     const isLight = c.value === '#FFFFFF' || c.value === '#FACC15' || c.value === '#F472B6';
                     return (
                       <button
@@ -476,19 +496,23 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                         type="button"
                         onClick={() => {
                           triggerHaptic();
-                          onChangeColor(c.value);
+                          if (activeDrawingTool === 'highlighter') {
+                            onChangeHighlighterColor(c.value);
+                          } else {
+                            onChangePenColor(c.value);
+                          }
                         }}
                         title={c.name}
                         className={`w-7 h-7 rounded-full flex items-center justify-center relative select-none border border-black/20 dark:border-white/30 outline-none focus:outline-none transition-transform duration-75 ${
                           isSelected
-                            ? 'ring-2 ring-apple-yellow dark:ring-[#7EAAD0] ring-offset-2 ring-offset-[#FAF6EF] dark:ring-offset-[#1C2733] scale-105 shadow-sm'
+                            ? 'ring-2 ring-[#213A50] dark:ring-white ring-offset-2 ring-offset-[#FAF6EF] dark:ring-offset-[#1C2733] scale-110 shadow-md'
                             : 'hover:scale-105'
                         }`}
                         style={{ backgroundColor: c.value }}
                       >
                         {isSelected && (
                           <div
-                            className={`w-2 h-2 rounded-full shadow-xs ${
+                            className={`w-2.5 h-2.5 rounded-full ring-1 ring-black/20 dark:ring-white/40 shadow-xs ${
                               isLight ? 'bg-[#1C2B36]' : 'bg-white'
                             }`}
                           />
@@ -502,30 +526,37 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                   Thickness
                 </div>
                 <div className="flex items-center justify-between gap-1">
-                  {STROKE_SIZES.map((sz) => (
-                    <button
-                      key={sz.label}
-                      type="button"
-                      onClick={() => {
-                        triggerHaptic();
-                        onChangeSize(sz.value);
-                      }}
-                      className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-md border text-[10px] outline-none focus:outline-none transition-colors duration-75 ${
-                        activeSize === sz.value
-                          ? 'border-apple-yellow dark:border-[#7EAAD0] bg-apple-yellow/15 dark:bg-[#2C4A68]/40 font-bold text-[#213A50] dark:text-white'
-                          : 'border-[#DFD3C0] dark:border-[#263747] text-[#6E8092] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1E2D3B]'
-                      }`}
-                    >
-                      <div
-                        className="rounded-full bg-current mb-1"
-                        style={{
-                          width: `${Math.min(14, sz.value + 2)}px`,
-                          height: `${Math.min(14, sz.value + 2)}px`,
+                  {STROKE_SIZES.map((sz) => {
+                    const isSelected = Math.abs(currentToolSize - sz.value) < 0.8;
+                    return (
+                      <button
+                        key={sz.label}
+                        type="button"
+                        onClick={() => {
+                          triggerHaptic();
+                          if (activeDrawingTool === 'highlighter') {
+                            onChangeHighlighterSize(sz.value);
+                          } else {
+                            onChangePenSize(sz.value);
+                          }
                         }}
-                      />
-                      <span>{sz.label}</span>
-                    </button>
-                  ))}
+                        className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-md text-[10px] outline-none focus:outline-none transition-colors duration-75 ${
+                          isSelected
+                            ? 'border-2 border-[#213A50] dark:border-[#7EAAD0] bg-[#FAF6EF] dark:bg-[#203448] font-bold text-[#213A50] dark:text-[#E8EEF3] shadow-xs'
+                            : 'border border-[#DFD3C0] dark:border-[#263747] text-[#6E8092] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1E2D3B]'
+                        }`}
+                      >
+                        <div
+                          className="rounded-full bg-current mb-1"
+                          style={{
+                            width: `${Math.min(14, sz.value + 2)}px`,
+                            height: `${Math.min(14, sz.value + 2)}px`,
+                          }}
+                        />
+                        <span>{sz.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>,
               document.body
@@ -539,9 +570,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               type="button"
               onClick={toggleEraserPopover}
               title="Eraser (Click to select, click again for Area vs Stroke & size)"
-              className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-all outline-none focus:outline-none ${
+              className={`flex items-center space-x-1 px-2 py-1 rounded-md font-medium transition-colors duration-75 outline-none focus:outline-none ${
                 isEraserActive
-                  ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white shadow-xs'
+                  ? 'bg-apple-yellow dark:bg-[#2C4A68] text-white'
                   : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733]'
               }`}
             >
@@ -605,30 +636,33 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                   Eraser Size
                 </div>
                 <div className="flex items-center justify-between gap-1 mb-3">
-                  {ERASER_SIZES.map((sz) => (
-                    <button
-                      key={sz.label}
-                      type="button"
-                      onClick={() => {
-                        triggerHaptic();
-                        onChangeSize(sz.value);
-                      }}
-                      className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-md border text-[10px] outline-none focus:outline-none transition-colors duration-75 ${
-                        activeSize === sz.value
-                          ? 'border-apple-yellow dark:border-[#7EAAD0] bg-apple-yellow/15 dark:bg-[#2C4A68]/40 font-bold text-[#213A50] dark:text-white'
-                          : 'border-[#DFD3C0] dark:border-[#263747] text-[#6E8092] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1E2D3B]'
-                      }`}
-                    >
-                      <div
-                        className="rounded-full bg-current mb-1"
-                        style={{
-                          width: `${Math.min(14, sz.value + 4)}px`,
-                          height: `${Math.min(14, sz.value + 4)}px`,
+                  {ERASER_SIZES.map((sz) => {
+                    const isSelected = Math.abs(eraserSize - sz.value) < 0.8;
+                    return (
+                      <button
+                        key={sz.label}
+                        type="button"
+                        onClick={() => {
+                          triggerHaptic();
+                          onChangeEraserSize(sz.value);
                         }}
-                      />
-                      <span>{sz.label}</span>
-                    </button>
-                  ))}
+                        className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-md text-[10px] outline-none focus:outline-none transition-colors duration-75 ${
+                          isSelected
+                            ? 'border-2 border-[#213A50] dark:border-[#7EAAD0] bg-[#FAF6EF] dark:bg-[#203448] font-bold text-[#213A50] dark:text-[#E8EEF3] shadow-xs'
+                            : 'border border-[#DFD3C0] dark:border-[#263747] text-[#6E8092] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1E2D3B]'
+                        }`}
+                      >
+                        <div
+                          className="rounded-full bg-current mb-1"
+                          style={{
+                            width: `${Math.min(14, sz.value + 4)}px`,
+                            height: `${Math.min(14, sz.value + 4)}px`,
+                          }}
+                        />
+                        <span>{sz.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <div className="h-px bg-[#DFD3C0] dark:bg-[#263747] my-2" />

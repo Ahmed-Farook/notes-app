@@ -38,6 +38,56 @@ export const Layout: React.FC = () => {
   const checklistActionRef = useRef<(() => void) | null>(null);
   const updater = useAppUpdater();
 
+  // Desktop Resizable Notes List Width (persisted to localStorage)
+  const [notesListWidth, setNotesListWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('texo_notes_list_width');
+      if (saved) {
+        const val = parseInt(saved, 10);
+        if (val >= 220 && val <= 520) return val;
+      }
+    } catch (_) {}
+    return 288;
+  });
+
+  const isResizingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(288);
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizingRef.current = true;
+    startXRef.current = e.clientX;
+    startWidthRef.current = notesListWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isResizingRef.current) return;
+      const deltaX = moveEvent.clientX - startXRef.current;
+      const newWidth = Math.min(520, Math.max(220, startWidthRef.current + deltaX));
+      setNotesListWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      if (!isResizingRef.current) return;
+      isResizingRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      setNotesListWidth((currentWidth) => {
+        try {
+          localStorage.setItem('texo_notes_list_width', String(currentWidth));
+        } catch (_) {}
+        return currentWidth;
+      });
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
   // State refs for hardware back button handler
   const mobileViewRef = useRef(mobileView);
   mobileViewRef.current = mobileView;
@@ -216,10 +266,20 @@ export const Layout: React.FC = () => {
 
           {/* Pane 2: Notes List & Search */}
           <NotesList
+            width={notesListWidth}
             onCheckUpdates={updater.openModal}
             hasUpdate={Boolean(updater.updateInfo?.hasUpdate)}
             updateInfo={updater.updateInfo}
           />
+
+          {/* Draggable Divider Splitter Bar with Col-Resize Cursor */}
+          <div
+            onMouseDown={handleResizeStart}
+            className="w-1.5 hover:w-2 -ml-1 hover:-ml-1.5 z-20 cursor-col-resize select-none transition-all flex items-center justify-center group hover:bg-apple-yellow/40 dark:hover:bg-[#7EAAD0]/40"
+            title="Drag to resize notes list"
+          >
+            <div className="w-0.5 h-8 rounded-full bg-black/10 dark:bg-white/10 group-hover:bg-apple-yellow dark:group-hover:bg-[#7EAAD0] transition-colors" />
+          </div>
 
           {/* Pane 3: Rich Text Editor */}
           <Editor

@@ -107,6 +107,22 @@ interface NotesContextType {
   deleteFolders: (ids: string[]) => void;
   exportCurrentNote: (formatType: 'markdown' | 'txt' | 'html' | 'pdf', noteToExport?: Note) => Promise<void> | void;
   importNotes: (files: FileList | File[]) => Promise<number>;
+
+  // Note Password Protection & Locking
+  unlockedNoteIds: Set<string>;
+  unlockNote: (noteId: string, password: string) => Promise<boolean>;
+  lockNoteWithPassword: (noteId: string, password: string, hint?: string) => Promise<void>;
+  removeNotePassword: (noteId: string, password: string) => Promise<boolean>;
+  relockNote: (noteId: string) => void;
+}
+
+export async function hashNotePassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 const NotesContext = createContext<NotesContextType | undefined>(undefined);
@@ -128,6 +144,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [isFolderPickerOpen, setIsFolderPickerOpen] = useState<boolean>(false);
   const [isSelectionMode, setIsSelectionMode] = useState<boolean>(false);
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
+  const [unlockedNoteIds, setUnlockedNoteIds] = useState<Set<string>>(new Set());
   const [pendingTrashDelete, setPendingTrashDelete] = useState<PendingTrashDelete>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
@@ -755,6 +772,70 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     [selectedFolderId, user, setActiveNoteId]
   );
 
+  // Note Password Protection & Unlocking Callbacks
+  const unlockNote = useCallback(async (noteId: string, password: string): Promise<boolean> => {
+    const note = notesRef.current.find((n) => n.id === noteId);
+    if (!note || !note.passwordHash) return false;
+    const hash = await hashNotePassword(password);
+    if (hash === note.passwordHash) {
+      setUnlockedNoteIds((prev) => new Set(prev).add(noteId));
+      triggerHaptic();
+      return true;
+    }
+    return false;
+  }, []);
+
+  const lockNoteWithPassword = useCallback(
+    async (noteId: string, password: string, hint?: string): Promise<void> => {
+      const hash = await hashNotePassword(password);
+      updateNote(noteId, {
+        isLocked: true,
+        passwordHash: hash,
+        passwordHint: hint ? hint.trim() : undefined,
+      });
+      setUnlockedNoteIds((prev) => {
+        const next = new Set(prev);
+        next.delete(noteId);
+        return next;
+      });
+      triggerHaptic();
+    },
+    [updateNote]
+  );
+
+  const removeNotePassword = useCallback(
+    async (noteId: string, password: string): Promise<boolean> => {
+      const note = notesRef.current.find((n) => n.id === noteId);
+      if (!note || !note.passwordHash) return false;
+      const hash = await hashNotePassword(password);
+      if (hash === note.passwordHash) {
+        updateNote(noteId, {
+          isLocked: false,
+          passwordHash: undefined,
+          passwordHint: undefined,
+        });
+        setUnlockedNoteIds((prev) => {
+          const next = new Set(prev);
+          next.delete(noteId);
+          return next;
+        });
+        triggerHaptic();
+        return true;
+      }
+      return false;
+    },
+    [updateNote]
+  );
+
+  const relockNote = useCallback((noteId: string): void => {
+    setUnlockedNoteIds((prev) => {
+      const next = new Set(prev);
+      next.delete(noteId);
+      return next;
+    });
+    triggerHaptic();
+  }, []);
+
   // Auto-exit selection mode if active folder changes
   useEffect(() => {
     setIsSelectionMode(false);
@@ -983,6 +1064,11 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         deleteFolders,
         exportCurrentNote,
         importNotes,
+        unlockedNoteIds,
+        unlockNote,
+        lockNoteWithPassword,
+        removeNotePassword,
+        relockNote,
       }}
     >
       {children}

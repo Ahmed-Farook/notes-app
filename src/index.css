@@ -27,8 +27,8 @@
   input:focus-visible,
   textarea:focus,
   textarea:focus-visible {
-    outline: 2px solid transparent !important;
-    outline-offset: 2px !important;
+    outline: none !important;
+    outline-offset: 0 !important;
     box-shadow: none !important;
   }
 

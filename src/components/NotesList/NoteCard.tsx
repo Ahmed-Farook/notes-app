@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Pin, Trash2, RotateCcw, Check } from 'lucide-react';
+import { Pin, Trash2, RotateCcw, Check, Lock } from 'lucide-react';
 import { Note, ViewMode } from '../../types/note';
 import { formatListDate } from '../../utils/dateUtils';
 import { useNotes } from '../../store/NotesContext';
@@ -21,6 +21,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
     selectedNoteIds,
     toggleSelectNote,
     enterSelectionMode,
+    unlockedNoteIds,
   } = useNotes();
 
   const isChecked = selectedNoteIds.includes(note.id);
@@ -367,13 +368,25 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-0.5">
-          <h4
-            className={`font-semibold text-xs truncate pr-2 ${
-              !isSelectionMode && isSelected ? 'text-white' : 'text-[#1C2B36] dark:text-[#E8EEF3]'
-            }`}
-          >
-            {note.title || 'New Note'}
-          </h4>
+          <div className="flex items-center space-x-1.5 min-w-0 pr-2">
+            {note.isLocked && (
+              <Lock
+                size={12}
+                className={`shrink-0 ${
+                  !isSelectionMode && isSelected
+                    ? 'text-white'
+                    : 'text-amber-600 dark:text-amber-400'
+                }`}
+              />
+            )}
+            <h4
+              className={`font-semibold text-xs truncate ${
+                !isSelectionMode && isSelected ? 'text-white' : 'text-[#1C2B36] dark:text-[#E8EEF3]'
+              }`}
+            >
+              {note.title || 'New Note'}
+            </h4>
+          </div>
           <div className="flex items-center space-x-1 shrink-0">
             {/* Desktop-only hover actions (hidden on mobile to prevent misclicks) */}
             <div
@@ -447,9 +460,11 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
               !isSelectionMode && isSelected
                 ? 'text-white/75'
                 : 'text-[#485B6D] dark:text-[#A0B5C8]'
-            }`}
+            } ${note.isLocked && !unlockedNoteIds.has(note.id) ? 'italic opacity-85' : ''}`}
           >
-            {note.plainTextPreview || 'No additional text'}
+            {note.isLocked && !unlockedNoteIds.has(note.id)
+              ? 'Locked Note'
+              : note.plainTextPreview || 'No additional text'}
           </span>
         </div>
       </div>

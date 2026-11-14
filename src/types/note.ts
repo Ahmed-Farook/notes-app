@@ -8,6 +8,9 @@ export interface Note {
   isPinned: boolean;
   isTrash?: boolean;
   deletedAt?: number; // timestamp when moved to Recently Deleted for 7-day auto-purge
+  isLocked?: boolean; // whether this note is password protected
+  passwordHash?: string; // SHA-256 hash of note password
+  passwordHint?: string; // optional hint for the password
   createdAt: number;
   updatedAt: number;
 }

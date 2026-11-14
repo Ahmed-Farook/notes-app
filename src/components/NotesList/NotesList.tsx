@@ -26,12 +26,14 @@ import type { Folder as FolderType } from '../../types/note';
 import { DeleteFolderModal } from '../common/DeleteFolderModal';
 
 interface NotesListProps {
+  width?: number;
   onCheckUpdates?: () => void;
   hasUpdate?: boolean;
   updateInfo?: UpdateInfo | null;
 }
 
 export const NotesList: React.FC<NotesListProps> = ({
+  width,
   onCheckUpdates,
   hasUpdate,
   updateInfo,
@@ -257,7 +259,10 @@ export const NotesList: React.FC<NotesListProps> = ({
   const allSelected = filteredNotes.length > 0 && selectedNoteIds.length === filteredNotes.length;
 
   return (
-    <section className="w-full md:w-72 bg-[#F6EFE4] dark:bg-[#16202A] md:border-r border-apple-border dark:border-apple-borderDark h-full flex flex-col select-none shrink-0 relative animate-list-enter md:animate-none">
+    <section
+      style={width ? { width: `${width}px` } : undefined}
+      className={`w-full ${width ? '' : 'md:w-72'} bg-[#F6EFE4] dark:bg-[#16202A] md:border-r border-apple-border dark:border-apple-borderDark h-full flex flex-col select-none shrink-0 relative animate-list-enter md:animate-none`}
+    >
       {/* Top Header: Selection Header vs Normal Folder Selector Pill */}
       {isSelectionMode ? (
         <div className="h-10 px-3.5 flex items-center justify-between border-b border-apple-border dark:border-apple-borderDark bg-[#EFE7D8]/95 dark:bg-[#131B24]/95 backdrop-blur-md shrink-0">

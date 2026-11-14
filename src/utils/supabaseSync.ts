@@ -28,13 +28,22 @@ export interface DbFolder {
  * Encrypts and formats a Note for PostgreSQL storage.
  */
 export async function noteToDb(note: Note, userId: string, key: CryptoKey | null): Promise<DbNote> {
-  // Bundle handwritten drawing strokes and trash deletion timestamp securely with content
-  const needsBundle = Boolean(note.drawingStrokes || note.deletedAt);
+  // Bundle handwritten drawing strokes, trash deletion timestamp, and lock metadata securely with content
+  const needsBundle = Boolean(
+    note.drawingStrokes ||
+    note.deletedAt ||
+    note.isLocked ||
+    note.passwordHash ||
+    note.passwordHint
+  );
   const rawContent = needsBundle
     ? JSON.stringify({
         html: note.content || '',
         ...(note.drawingStrokes ? { strokes: note.drawingStrokes } : {}),
         ...(note.deletedAt ? { deletedAt: note.deletedAt } : {}),
+        ...(note.isLocked ? { isLocked: note.isLocked } : {}),
+        ...(note.passwordHash ? { passwordHash: note.passwordHash } : {}),
+        ...(note.passwordHint ? { passwordHint: note.passwordHint } : {}),
       })
     : note.content || '';
 
@@ -71,8 +80,11 @@ export async function dbToNote(db: DbNote, key: CryptoKey | null): Promise<Note>
   let content = decryptedContent;
   let drawingStrokes: string | undefined = undefined;
   let deletedAt: number | undefined = undefined;
+  let isLocked: boolean | undefined = undefined;
+  let passwordHash: string | undefined = undefined;
+  let passwordHint: string | undefined = undefined;
 
-  // Unpack bundled drawing strokes / deletedAt if present
+  // Unpack bundled drawing strokes / deletedAt / lock metadata if present
   if (decryptedContent.startsWith('{"html":')) {
     try {
       const parsed = JSON.parse(decryptedContent);
@@ -80,6 +92,15 @@ export async function dbToNote(db: DbNote, key: CryptoKey | null): Promise<Note>
       drawingStrokes = parsed.strokes;
       if (typeof parsed.deletedAt === 'number') {
         deletedAt = parsed.deletedAt;
+      }
+      if (typeof parsed.isLocked === 'boolean') {
+        isLocked = parsed.isLocked;
+      }
+      if (typeof parsed.passwordHash === 'string') {
+        passwordHash = parsed.passwordHash;
+      }
+      if (typeof parsed.passwordHint === 'string') {
+        passwordHint = parsed.passwordHint;
       }
     } catch (_) {}
   }
@@ -94,6 +115,9 @@ export async function dbToNote(db: DbNote, key: CryptoKey | null): Promise<Note>
     isPinned: db.is_pinned,
     isTrash: db.is_trash,
     deletedAt,
+    isLocked,
+    passwordHash,
+    passwordHint,
     createdAt: Number(db.created_at),
     updatedAt: Number(db.updated_at),
   };

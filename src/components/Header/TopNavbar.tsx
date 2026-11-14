@@ -14,11 +14,15 @@ import {
   Trash2,
   Folder,
   ChevronDown,
+  Lock,
+  LockKeyholeOpen,
+  KeyRound,
 } from 'lucide-react';
 import { useNotes } from '../../store/NotesContext';
 import { useAuth } from '../../store/AuthContext';
 import { triggerHaptic } from '../../utils/haptics';
 import { TexoMark } from '../common/TexoMark';
+import { LockNoteModal } from '../common/LockNoteModal';
 
 interface TopNavbarProps {
   onToggleChecklist?: () => void;
@@ -49,10 +53,19 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     currentFolder,
     selectedFolderId,
     setIsFolderPickerOpen,
+    unlockedNoteIds,
+    lockNoteWithPassword,
+    unlockNote,
+    removeNotePassword,
+    relockNote,
   } = useNotes();
   const { user, openAuthModal, syncStatus } = useAuth();
 
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showLockMenu, setShowLockMenu] = useState(false);
+  const [isLockModalOpen, setIsLockModalOpen] = useState(false);
+  const [lockModalMode, setLockModalMode] = useState<'lock' | 'unlock' | 'remove'>('lock');
+
   const [isMacApp, setIsMacApp] = useState(() => {
     if (typeof window === 'undefined') return false;
     return (
@@ -61,6 +74,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     );
   });
   const exportRef = useRef<HTMLDivElement>(null);
+  const lockMenuRef = useRef<HTMLDivElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -69,13 +83,16 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     }
   }, []);
 
-  // Close export dropdown when clicking or tapping outside
+  // Close export dropdown and lock menu when clicking or tapping outside
   useEffect(() => {
-    if (!showExportMenu) return;
+    if (!showExportMenu && !showLockMenu) return;
 
     const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
         setShowExportMenu(false);
+      }
+      if (lockMenuRef.current && !lockMenuRef.current.contains(e.target as Node)) {
+        setShowLockMenu(false);
       }
     };
 
@@ -85,7 +102,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
     };
-  }, [showExportMenu]);
+  }, [showExportMenu, showLockMenu]);
 
   const noteToExport = activeNote;
 
@@ -272,6 +289,79 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           )}
         </div>
 
+        {/* Lock Note with Password */}
+        {activeNote && !activeNote.isTrash && (
+          <div className="relative" ref={lockMenuRef}>
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic();
+                if (!activeNote.isLocked) {
+                  setLockModalMode('lock');
+                  setIsLockModalOpen(true);
+                } else if (unlockedNoteIds.has(activeNote.id)) {
+                  setShowLockMenu((prev) => !prev);
+                } else {
+                  setLockModalMode('unlock');
+                  setIsLockModalOpen(true);
+                }
+              }}
+              title={
+                !activeNote.isLocked
+                  ? 'Lock note with password'
+                  : unlockedNoteIds.has(activeNote.id)
+                  ? 'Note is unlocked (Click to lock or manage password)'
+                  : 'Note is locked (Click to unlock)'
+              }
+              className={`p-1.5 rounded-md transition-colors active:scale-95 ${
+                activeNote.isLocked
+                  ? 'text-apple-yellow dark:text-[#7EAAD0] bg-apple-yellow/10 dark:bg-[#2C4A68]/30'
+                  : 'hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300'
+              }`}
+            >
+              {activeNote.isLocked ? (
+                unlockedNoteIds.has(activeNote.id) ? (
+                  <LockKeyholeOpen size={17} />
+                ) : (
+                  <Lock size={17} />
+                )
+              ) : (
+                <Lock size={17} />
+              )}
+            </button>
+
+            {showLockMenu && activeNote.isLocked && unlockedNoteIds.has(activeNote.id) && (
+              <div className="absolute right-0 top-full mt-1.5 w-44 bg-[#FAF6EF] dark:bg-[#1C2733] rounded-xl shadow-2xl border border-apple-border dark:border-apple-borderDark py-1.5 z-50 text-xs backdrop-blur-md animate-in fade-in zoom-in-95 duration-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic();
+                    setShowLockMenu(false);
+                    relockNote(activeNote.id);
+                  }}
+                  className="w-full text-left px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-700 dark:text-neutral-200 font-medium transition-colors flex items-center space-x-2"
+                >
+                  <Lock size={14} />
+                  <span>Lock Note Now</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic();
+                    setShowLockMenu(false);
+                    setLockModalMode('remove');
+                    setIsLockModalOpen(true);
+                  }}
+                  className="w-full text-left px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-red-600 dark:text-red-400 font-medium transition-colors flex items-center space-x-2"
+                >
+                  <KeyRound size={14} />
+                  <span>Remove Lock</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Update notification button (Desktop only, if available) */}
         {hasUpdate && (
           <button
@@ -378,6 +468,26 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           <span>New Note</span>
         </button>
       </div>
+
+      {/* Lock / Unlock / Remove Password Modal */}
+      <LockNoteModal
+        isOpen={isLockModalOpen}
+        onClose={() => setIsLockModalOpen(false)}
+        note={activeNote}
+        mode={lockModalMode}
+        onLockWithPassword={async (pwd, hint) => {
+          if (!activeNote) return;
+          await lockNoteWithPassword(activeNote.id, pwd, hint);
+        }}
+        onUnlockWithPassword={async (pwd) => {
+          if (!activeNote) return false;
+          return await unlockNote(activeNote.id, pwd);
+        }}
+        onRemovePassword={async (pwd) => {
+          if (!activeNote) return false;
+          return await removeNotePassword(activeNote.id, pwd);
+        }}
+      />
     </header>
   );
 };

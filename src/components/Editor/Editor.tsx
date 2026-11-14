@@ -14,7 +14,7 @@ import Table from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableCell from '@tiptap/extension-table-cell';
 import TableHeader from '@tiptap/extension-table-header';
-import { RotateCcw, Trash2, Search, ChevronUp, ChevronDown, X, Plus, Edit3 } from 'lucide-react';
+import { RotateCcw, Trash2, Search, ChevronUp, ChevronDown, X, Plus, Edit3, Lock, Eye, EyeOff } from 'lucide-react';
 
 import { useNotes } from '../../store/NotesContext';
 import { formatEditorDate } from '../../utils/dateUtils';
@@ -257,18 +257,26 @@ const EnforceTitleExtension = Extension.create({
           }
         }
 
-        // When deleting at the start of a checklist item (taskItem), unwrap directly to start of line with 0 indentation
-        const parentNode = $from.node(-1);
-        if (parentNode && parentNode.type.name === 'taskItem') {
-          if ($from.parentOffset === 0) {
-            return editor.chain().focus().liftListItem('taskItem').clearNodes().run();
+        // When deleting at the start of a list item (bulletList / orderedList) or checklist item (taskItem),
+        // lift it cleanly to remove bullet, number, or checkbox
+        if (empty && $from.parentOffset === 0) {
+          for (let d = $from.depth; d > 0; d--) {
+            const node = $from.node(d);
+            if (node.type.name === 'listItem') {
+              return editor.chain().focus().liftListItem('listItem').run();
+            }
+            if (node.type.name === 'taskItem') {
+              return editor.chain().focus().liftListItem('taskItem').clearNodes().run();
+            }
           }
         }
 
         // When pressing backspace on an empty textblock (like an empty paragraph after a checklist or table),
         // cleanly delete the empty paragraph and place cursor at the end of the previous block
         // instead of allowing ProseMirror joinBackward to convert it into a taskItem/checkbox!
-        if (empty && $from.parent.isTextblock && $from.parent.content.size === 0 && $from.pos > 1) {
+        // NOTE: Guard with !isInsideList so empty list items are handled by liftListItem above.
+        const isInsideList = editor.isActive('bulletList') || editor.isActive('orderedList') || editor.isActive('taskList');
+        if (!isInsideList && empty && $from.parent.isTextblock && $from.parent.content.size === 0 && $from.pos > 1) {
           const beforePos = $from.before();
           const tr = state.tr.delete(beforePos, $from.after());
           const targetPos = Math.max(1, beforePos - 1);
@@ -428,16 +436,130 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     searchQuery,
     setSearchQuery,
     theme,
+    unlockedNoteIds,
+    unlockNote,
   } = useNotes();
+
+  const isNoteLocked = Boolean(activeNote?.isLocked && !unlockedNoteIds.has(activeNote.id));
 
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const [totalMatches, setTotalMatches] = useState(0);
 
-  // Samsung Notes Seamless In-Note Stylus Drawing State
+  // Note in-editor unlock state
+  const [unlockPasswordInput, setUnlockPasswordInput] = useState('');
+  const [showUnlockPassword, setShowUnlockPassword] = useState(false);
+  const [unlockError, setUnlockError] = useState('');
+  const [isUnlocking, setIsUnlocking] = useState(false);
+
+  useEffect(() => {
+    setUnlockPasswordInput('');
+    setUnlockError('');
+    setShowUnlockPassword(false);
+  }, [activeNote?.id]);
+
+  const handleUnlockSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeNote || !unlockPasswordInput) return;
+    setUnlockError('');
+    setIsUnlocking(true);
+    try {
+      const ok = await unlockNote(activeNote.id, unlockPasswordInput);
+      if (ok) {
+        setUnlockPasswordInput('');
+      } else {
+        setUnlockError('Incorrect password. Please try again.');
+      }
+    } catch (_) {
+      setUnlockError('Failed to unlock note');
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
+
+  // Samsung Notes Seamless In-Note Stylus Drawing State with Independent Persistent Sizes/Colors
   const [isPenMode, setIsPenMode] = useState(false);
   const [activeDrawingTool, setActiveDrawingTool] = useState<DrawingToolType>('pen');
-  const [activeDrawingColor, setActiveDrawingColor] = useState(theme === 'dark' ? '#E8EEF3' : '#213A50');
-  const [activeDrawingSize, setActiveDrawingSize] = useState(5);
+
+  const [penSize, setPenSize] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('texo_pen_size');
+      return saved ? parseFloat(saved) : 2.5;
+    } catch (_) {
+      return 2.5;
+    }
+  });
+
+  const [penColor, setPenColor] = useState<string>(() => {
+    try {
+      return localStorage.getItem('texo_pen_color') || (theme === 'dark' ? '#E8EEF3' : '#213A50');
+    } catch (_) {
+      return theme === 'dark' ? '#E8EEF3' : '#213A50';
+    }
+  });
+
+  const [highlighterSize, setHighlighterSize] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('texo_highlighter_size');
+      return saved ? parseFloat(saved) : 16;
+    } catch (_) {
+      return 16;
+    }
+  });
+
+  const [highlighterColor, setHighlighterColor] = useState<string>(() => {
+    try {
+      return localStorage.getItem('texo_highlighter_color') || '#FACC15';
+    } catch (_) {
+      return '#FACC15';
+    }
+  });
+
+  const [eraserSize, setEraserSize] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('texo_eraser_size');
+      return saved ? parseFloat(saved) : 8;
+    } catch (_) {
+      return 8;
+    }
+  });
+
+  const handlePenSizeChange = (sz: number) => {
+    setPenSize(sz);
+    try { localStorage.setItem('texo_pen_size', String(sz)); } catch (_) {}
+  };
+
+  const handlePenColorChange = (col: string) => {
+    setPenColor(col);
+    try { localStorage.setItem('texo_pen_color', col); } catch (_) {}
+  };
+
+  const handleHighlighterSizeChange = (sz: number) => {
+    setHighlighterSize(sz);
+    try { localStorage.setItem('texo_highlighter_size', String(sz)); } catch (_) {}
+  };
+
+  const handleHighlighterColorChange = (col: string) => {
+    setHighlighterColor(col);
+    try { localStorage.setItem('texo_highlighter_color', col); } catch (_) {}
+  };
+
+  const handleEraserSizeChange = (sz: number) => {
+    setEraserSize(sz);
+    try { localStorage.setItem('texo_eraser_size', String(sz)); } catch (_) {}
+  };
+
+  const currentDrawingSize =
+    activeDrawingTool === 'highlighter'
+      ? highlighterSize
+      : activeDrawingTool === 'partial_eraser' ||
+        activeDrawingTool === 'stroke_eraser' ||
+        activeDrawingTool === 'eraser'
+      ? eraserSize
+      : penSize;
+
+  const currentDrawingColor =
+    activeDrawingTool === 'highlighter' ? highlighterColor : penColor;
+
   const [stylusOnly, setStylusOnly] = useState<boolean>(() => {
     try {
       return localStorage.getItem('texo_stylus_only') === 'true';
@@ -556,10 +678,10 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
 
   // Keep drawing color contrasting with theme changes if user hasn't customized it
   useEffect(() => {
-    if (theme === 'dark' && activeDrawingColor === '#213A50') {
-      setActiveDrawingColor('#E8EEF3');
-    } else if (theme === 'light' && activeDrawingColor === '#E8EEF3') {
-      setActiveDrawingColor('#213A50');
+    if (theme === 'dark' && penColor === '#213A50') {
+      setPenColor('#E8EEF3');
+    } else if (theme === 'light' && penColor === '#E8EEF3') {
+      setPenColor('#213A50');
     }
   }, [theme]);
 
@@ -921,7 +1043,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
       {/* Samsung Notes Toolbar */}
       <EditorToolbar
         editor={editor}
-        isVisible={showToolbar}
+        isVisible={showToolbar && !isNoteLocked}
         isPenMode={isPenMode}
         onTogglePenMode={(mode) => {
           setIsPenMode(mode);
@@ -934,10 +1056,16 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
         }}
         activeDrawingTool={activeDrawingTool}
         onChangeDrawingTool={setActiveDrawingTool}
-        activeColor={activeDrawingColor}
-        onChangeColor={setActiveDrawingColor}
-        activeSize={activeDrawingSize}
-        onChangeSize={setActiveDrawingSize}
+        penColor={penColor}
+        onChangePenColor={handlePenColorChange}
+        penSize={penSize}
+        onChangePenSize={handlePenSizeChange}
+        highlighterColor={highlighterColor}
+        onChangeHighlighterColor={handleHighlighterColorChange}
+        highlighterSize={highlighterSize}
+        onChangeHighlighterSize={handleHighlighterSizeChange}
+        eraserSize={eraserSize}
+        onChangeEraserSize={handleEraserSizeChange}
         stylusOnly={stylusOnly}
         onToggleStylusOnly={handleToggleStylusOnly}
         canDrawingUndo={canDrawingUndo}
@@ -1022,114 +1150,171 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
         </div>
       )}
 
-      {/* Editor Content Body (Scrollable container - date moves away on scroll) */}
-      <div
-        ref={editorScrollContainerRef}
-        className="flex-1 overflow-y-auto px-5 md:px-14 py-3 pb-24 md:pb-8 cursor-text select-text"
-        onClick={(e) => {
-          if (editor && !activeNote.isTrash && !isPenMode) {
-            const target = e.target as HTMLElement;
-            // Ignore if clicked on checkbox, label, select, or button
-            if (
-              target.closest('label') ||
-              target.tagName === 'INPUT' ||
-              target.closest('select') ||
-              target.closest('button') ||
-              target.closest('.tiptap-table-controls') ||
-              target.closest('.katex-math-block')
-            ) {
-              return;
-            }
-            // If clicked on empty space around or below the text, bring cursor up 1-2 lines below content
-            if (!target.closest('.ProseMirror')) {
-              handleFocusOrCreateLineBelow();
-            }
-          }
-        }}
-      >
-        <div className="max-w-3xl mx-auto">
-          {/* Note Date Header: scrolls away with note content */}
-          <div className="pt-2 pb-3 flex items-center justify-center text-[11px] text-[#6E8092] dark:text-[#8AA0B4] select-none">
-            <span className="font-semibold text-center">
-              {formatEditorDate(activeNote.updatedAt)}
-            </span>
+      {/* Editor Content Body or In-Editor Lock Screen */}
+      {isNoteLocked ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in zoom-in-95 duration-150">
+          <div className="w-16 h-16 rounded-2xl bg-[#E5DCCB] dark:bg-[#1C2733] flex items-center justify-center mb-4 text-[#213A50] dark:text-[#7EAAD0] shadow-sm">
+            <Lock size={32} className="stroke-[2.2]" />
           </div>
+          <h2 className="text-xl font-bold text-[#1C2B36] dark:text-[#E8EEF3] mb-1">
+            This note is locked
+          </h2>
+          <p className="text-xs text-[#5A6E82] dark:text-[#8AA0B4] max-w-xs mb-5">
+            Enter your password to view and edit this note.
+          </p>
 
-          <div className="relative" style={{ minHeight: containerMinHeight > 0 ? `${containerMinHeight}px` : undefined }}>
-            <EditorContent
-              editor={editor}
-              className="prose prose-neutral dark:prose-invert focus:outline-none min-h-[140px] select-text cursor-text"
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
-              onContextMenu={handleContextMenu}
-              onClick={(e) => {
-                if (isPenMode) return;
-                const target = e.target as HTMLElement;
-                // If click was on a checkbox or its label, do NOT trigger focus or open keyboard
-                if (
-                  target.tagName === 'INPUT' ||
-                  target.closest('label') ||
-                  target.closest('[data-type="taskItem"] > label') ||
-                  target.closest('.tiptap-table-controls') ||
-                  target.closest('.katex-math-block')
-                ) {
-                  return;
-                }
-                const proseMirror = target.closest('.ProseMirror') as HTMLElement | null;
-                if (proseMirror && e.clientY > proseMirror.getBoundingClientRect().bottom - 40) {
-                  handleFocusOrCreateLineBelow();
-                } else if (editor && !editor.isFocused && !activeNote.isTrash) {
-                  editor.commands.focus();
-                }
-              }}
-            />
+          <form onSubmit={handleUnlockSubmit} className="w-full max-w-xs space-y-3">
+            <div className="relative">
+              <input
+                type={showUnlockPassword ? 'text' : 'password'}
+                value={unlockPasswordInput}
+                onChange={(e) => {
+                  setUnlockPasswordInput(e.target.value);
+                  setUnlockError('');
+                }}
+                placeholder="Password"
+                autoFocus
+                className="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-[#DFD3C0] dark:border-[#263747] bg-[#FAF6EF] dark:bg-[#16202A] text-sm text-[#1C2B36] dark:text-[#E8EEF3] placeholder-[#8AA0B4] focus:border-apple-yellow dark:focus:border-[#7EAAD0] focus:ring-1 focus:ring-apple-yellow dark:focus:ring-[#7EAAD0] outline-none transition-all shadow-xs"
+              />
+              <button
+                type="button"
+                onClick={() => setShowUnlockPassword(!showUnlockPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8AA0B4] hover:text-[#213A50] dark:hover:text-[#E8EEF3] p-1"
+              >
+                {showUnlockPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
 
-            {/* 5 lines of visual padding (~112px) where clicking brings the cursor up to the line below, and typing preserves this buffer underneath */}
-            <div
-              className="h-28 w-full cursor-text select-none"
-              onClick={handleFocusOrCreateLineBelow}
-              aria-hidden="true"
-            />
+            {activeNote.passwordHint && (
+              <div className="text-[11px] text-[#6E8092] dark:text-[#8AA0B4] text-left px-1">
+                <span className="font-semibold">Hint:</span> {activeNote.passwordHint}
+              </div>
+            )}
 
-            {/* Seamless In-Note Drawing Canvas Overlay */}
-            <InNoteCanvas
-              noteId={activeNote.id}
-              theme={theme}
-              initialStrokesJson={activeNote.drawingStrokes}
-              isPenMode={isPenMode}
-              activeTool={activeDrawingTool}
-              activeColor={activeDrawingColor}
-              activeSize={activeDrawingSize}
-              stylusOnly={stylusOnly}
-              onStylusDetected={handleStylusDetected}
-              onStrokesUpdate={(strokesJson) => {
-                const currentNote = activeNoteRef.current;
-                if (!currentNote) return;
+            {unlockError && (
+              <div className="text-xs text-red-500 font-medium text-left px-1">
+                {unlockError}
+              </div>
+            )}
 
-                const updates: any = {
-                  drawingStrokes: strokesJson,
-                };
+            <button
+              type="submit"
+              disabled={isUnlocking}
+              className="w-full py-2.5 px-4 rounded-xl font-semibold text-sm bg-apple-yellow hover:bg-apple-yellowHover dark:bg-[#345A7D] dark:hover:bg-[#3D6A94] text-white shadow-sm transition-all active:scale-[0.98] disabled:opacity-50"
+            >
+              {isUnlocking ? 'Unlocking...' : 'Unlock Note'}
+            </button>
+          </form>
+        </div>
+      ) : (
+        <div
+          ref={editorScrollContainerRef}
+          className="flex-1 overflow-y-auto px-5 md:px-14 py-3 pb-24 md:pb-8 cursor-text select-text"
+          onClick={(e) => {
+            if (editor && !activeNote.isTrash && !isPenMode) {
+              const target = e.target as HTMLElement;
+              // Ignore if clicked on checkbox, label, select, or button
+              if (
+                target.closest('label') ||
+                target.tagName === 'INPUT' ||
+                target.closest('select') ||
+                target.closest('button') ||
+                target.closest('.tiptap-table-controls') ||
+                target.closest('.katex-math-block')
+              ) {
+                return;
+              }
+              // If clicked on empty space around or below the text, bring cursor up 1-2 lines below content
+              if (!target.closest('.ProseMirror')) {
+                handleFocusOrCreateLineBelow();
+              }
+            }
+          }}
+        >
+          <div className="max-w-3xl mx-auto">
+            {/* Note Date Header: scrolls away with note content */}
+            <div className="pt-2 pb-3 flex items-center justify-center text-[11px] text-[#6E8092] dark:text-[#8AA0B4] select-none">
+              <span className="font-semibold text-center">
+                {formatEditorDate(activeNote.updatedAt)}
+              </span>
+            </div>
 
-                // If note has no custom title or is 'New Note', and user drew something
-                if ((!currentNote.title || currentNote.title === 'New Note') && strokesJson !== '[]') {
-                  updates.title = 'Handwritten Note';
-                  updates.plainTextPreview = '[Handwritten Drawing / Annotation]';
-                }
+            <div className="relative" style={{ minHeight: containerMinHeight > 0 ? `${containerMinHeight}px` : undefined }}>
+              <EditorContent
+                editor={editor}
+                className="prose prose-neutral dark:prose-invert focus:outline-none min-h-[140px] select-text cursor-text"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onContextMenu={handleContextMenu}
+                onClick={(e) => {
+                  if (isPenMode) return;
+                  const target = e.target as HTMLElement;
+                  // If click was on a checkbox or its label, do NOT trigger focus or open keyboard
+                  if (
+                    target.tagName === 'INPUT' ||
+                    target.closest('label') ||
+                    target.closest('[data-type="taskItem"] > label') ||
+                    target.closest('.tiptap-table-controls') ||
+                    target.closest('.katex-math-block')
+                  ) {
+                    return;
+                  }
+                  const proseMirror = target.closest('.ProseMirror') as HTMLElement | null;
+                  if (proseMirror && e.clientY > proseMirror.getBoundingClientRect().bottom - 40) {
+                    handleFocusOrCreateLineBelow();
+                  } else if (editor && !editor.isFocused && !activeNote.isTrash) {
+                    editor.commands.focus();
+                  }
+                }}
+              />
 
-                updateNote(currentNote.id, updates);
-              }}
-              onHistoryChange={(canUndo, canRedo) => {
-                setCanDrawingUndo(canUndo);
-                setCanDrawingRedo(canRedo);
-              }}
-              undoTrigger={drawingUndoTrigger}
-              redoTrigger={drawingRedoTrigger}
-              clearTrigger={drawingClearTrigger}
-            />
+              {/* 5 lines of visual padding (~112px) where clicking brings the cursor up to the line below, and typing preserves this buffer underneath */}
+              <div
+                className="h-28 w-full cursor-text select-none"
+                onClick={handleFocusOrCreateLineBelow}
+                aria-hidden="true"
+              />
+
+              {/* Seamless In-Note Drawing Canvas Overlay */}
+              <InNoteCanvas
+                noteId={activeNote.id}
+                theme={theme}
+                initialStrokesJson={activeNote.drawingStrokes}
+                isPenMode={isPenMode}
+                activeTool={activeDrawingTool}
+                activeColor={currentDrawingColor}
+                activeSize={currentDrawingSize}
+                stylusOnly={stylusOnly}
+                onStylusDetected={handleStylusDetected}
+                onStrokesUpdate={(strokesJson) => {
+                  const currentNote = activeNoteRef.current;
+                  if (!currentNote) return;
+
+                  const updates: any = {
+                    drawingStrokes: strokesJson,
+                  };
+
+                  // If note has no custom title or is 'New Note', and user drew something
+                  if ((!currentNote.title || currentNote.title === 'New Note') && strokesJson !== '[]') {
+                    updates.title = 'Handwritten Note';
+                    updates.plainTextPreview = '[Handwritten Drawing / Annotation]';
+                  }
+
+                  updateNote(currentNote.id, updates);
+                }}
+                onHistoryChange={(canUndo, canRedo) => {
+                  setCanDrawingUndo(canUndo);
+                  setCanDrawingRedo(canRedo);
+                }}
+                undoTrigger={drawingUndoTrigger}
+                redoTrigger={drawingRedoTrigger}
+                clearTrigger={drawingClearTrigger}
+              />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Long-Press / Right-Click Floating Action Modal for Images, Tables and Math Formulas */}
       {contextMenu && (
