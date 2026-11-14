@@ -1242,6 +1242,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
             <div className="relative" style={{ minHeight: containerMinHeight > 0 ? `${containerMinHeight}px` : undefined }}>
               <EditorContent
                 editor={editor}
+                data-pdf-note-id={activeNote.id}
                 className="prose prose-neutral dark:prose-invert focus:outline-none min-h-[140px] select-text cursor-text"
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}

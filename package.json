@@ -1,6 +1,6 @@
 {
   "name": "apple-notes-crossplatform",
-  "version": "0.2.44",
+  "version": "0.2.45",
   "description": "texō cross-platform note taking application",
   "author": "Ahmed Farook",
   "license": "MIT",
@@ -82,6 +82,7 @@
     "@tiptap/react": "^2.11.5",
     "@tiptap/starter-kit": "^2.11.5",
     "date-fns": "^4.1.0",
+    "html-to-image": "1.11.13",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "jszip": "^3.10.2",
