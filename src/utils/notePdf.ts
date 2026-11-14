@@ -317,6 +317,159 @@ function keepTogetherRanges(content: HTMLElement, pageHeight: number, origin: nu
   return ranges;
 }
 
+interface SelectableTextItem {
+  text: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  fontSize: number;
+  isBold?: boolean;
+  isItalic?: boolean;
+}
+
+function extractSelectableTextItems(
+  content: HTMLElement,
+  originTop: number,
+  originLeft: number
+): SelectableTextItem[] {
+  const items: SelectableTextItem[] = [];
+
+  // 1. Math formulas: preserve formula expression for search & copy
+  content.querySelectorAll<HTMLElement>('[data-type="math-block"], .katex-math-block').forEach((mathEl) => {
+    const latex = mathEl.getAttribute('data-latex');
+    if (latex && latex.trim()) {
+      const rect = mathEl.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        items.push({
+          text: latex.trim(),
+          left: rect.left - originLeft,
+          top: rect.top - originTop,
+          width: rect.width,
+          height: rect.height,
+          fontSize: 13,
+          isItalic: true,
+        });
+      }
+    }
+  });
+
+  // 2. Checkbox states: preserve [x] or [ ]
+  content.querySelectorAll<HTMLElement>('[data-type="taskItem"]').forEach((taskItem) => {
+    const checkbox = taskItem.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    if (checkbox) {
+      const rect = checkbox.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        items.push({
+          text: checkbox.checked ? '[x]' : '[ ]',
+          left: rect.left - originLeft,
+          top: rect.top - originTop,
+          width: rect.width,
+          height: rect.height,
+          fontSize: 12,
+        });
+      }
+    }
+  });
+
+  // 3. Regular text content
+  const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+  let textNode: Node | null;
+  const range = document.createRange();
+
+  while ((textNode = walker.nextNode())) {
+    const rawText = textNode.textContent;
+    if (!rawText || !rawText.trim()) continue;
+
+    const parent = textNode.parentElement;
+    if (!parent || parent.closest('.katex') || parent.closest('.tiptap-table-controls')) continue;
+
+    const computed = getComputedStyle(parent);
+    const fontSize = parseFloat(computed.fontSize) || 16;
+    const isBold = parseInt(computed.fontWeight, 10) >= 600 || computed.fontWeight === 'bold';
+    const isItalic = computed.fontStyle === 'italic';
+
+    range.selectNodeContents(textNode);
+    const rects = Array.from(range.getClientRects());
+    if (rects.length <= 1) {
+      const r = rects[0] || range.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) {
+        items.push({
+          text: rawText,
+          left: r.left - originLeft,
+          top: r.top - originTop,
+          width: r.width,
+          height: r.height,
+          fontSize,
+          isBold,
+          isItalic,
+        });
+      }
+    } else {
+      const tokens = rawText.split(/(\s+)/);
+      let charOffset = 0;
+      let currentLineWords: string[] = [];
+      let lineRect: { left: number; top: number; right: number; bottom: number } | null = null;
+
+      for (const token of tokens) {
+        if (!token) continue;
+        const start = charOffset;
+        const end = charOffset + token.length;
+        charOffset = end;
+
+        if (!token.trim()) {
+          if (lineRect) {
+            currentLineWords.push(token);
+          }
+          continue;
+        }
+
+        range.setStart(textNode, start);
+        range.setEnd(textNode, end);
+        const wr = range.getBoundingClientRect();
+        if (!wr.width || !wr.height) continue;
+
+        if (!lineRect) {
+          lineRect = { left: wr.left, top: wr.top, right: wr.right, bottom: wr.bottom };
+          currentLineWords = [token];
+        } else if (Math.abs(wr.top - lineRect.top) < fontSize * 0.8) {
+          lineRect.right = Math.max(lineRect.right, wr.right);
+          lineRect.bottom = Math.max(lineRect.bottom, wr.bottom);
+          currentLineWords.push(token);
+        } else {
+          items.push({
+            text: currentLineWords.join(''),
+            left: lineRect.left - originLeft,
+            top: lineRect.top - originTop,
+            width: lineRect.right - lineRect.left,
+            height: lineRect.bottom - lineRect.top,
+            fontSize,
+            isBold,
+            isItalic,
+          });
+          lineRect = { left: wr.left, top: wr.top, right: wr.right, bottom: wr.bottom };
+          currentLineWords = [token];
+        }
+      }
+
+      if (lineRect && currentLineWords.length > 0) {
+        items.push({
+          text: currentLineWords.join(''),
+          left: lineRect.left - originLeft,
+          top: lineRect.top - originTop,
+          width: lineRect.right - lineRect.left,
+          height: lineRect.bottom - lineRect.top,
+          fontSize,
+          isBold,
+          isItalic,
+        });
+      }
+    }
+  }
+
+  return items;
+}
+
 /** Render one bounded canvas per page; retain the Blob API for download/Share/ZIP. */
 export async function generateNotePdfBlob(note: Note, options: PdfExportOptions = {}): Promise<Blob> {
   const snapshot = await prepareNoteForPdf(note, options);
@@ -327,8 +480,13 @@ export async function generateNotePdfBlob(note: Note, options: PdfExportOptions 
     const margin = 15;
     const printWidth = pageWidth - 2 * margin;
     const pageHeightPx = snapshot.width * (pageHeight - 2 * margin) / printWidth;
+    const originTop = snapshot.viewport.getBoundingClientRect().top;
+    const originLeft = snapshot.viewport.getBoundingClientRect().left;
     const pages = getPdfPageSlices(snapshot.height, pageHeightPx,
-      keepTogetherRanges(snapshot.content, pageHeightPx, snapshot.viewport.getBoundingClientRect().top));
+      keepTogetherRanges(snapshot.content, pageHeightPx, originTop));
+    const textItems = extractSelectableTextItems(snapshot.content, originTop, originLeft);
+    const scaleMmPerPx = printWidth / snapshot.width;
+
     // Embed KaTeX fonts once and reuse them on all pages.
     const fontEmbedCSS = (await getFontEmbedCSS(snapshot.viewport, { preferredFontFormat: 'woff2' })) + '\n' + snapshot.fontSizeCSS;
     pdf.setProperties({ title: note.title || 'Untitled', creator: 'texō' });
@@ -358,6 +516,34 @@ export async function generateNotePdfBlob(note: Note, options: PdfExportOptions 
       // A long note must not keep a full-height, high-DPI canvas alive.
       canvas.width = 0;
       canvas.height = 0;
+
+      // Overlay invisible selectable text on top of the page canvas image
+      const pageTextItems = textItems.filter(item => item.top >= start && item.top < end);
+      for (const item of pageTextItems) {
+        try {
+          const fontStyle = item.isBold ? (item.isItalic ? 'bolditalic' : 'bold') : (item.isItalic ? 'italic' : 'normal');
+          pdf.setFont('helvetica', fontStyle);
+          let fontSizePt = item.fontSize * scaleMmPerPx * (72 / 25.4);
+          pdf.setFontSize(Math.max(4, fontSizePt));
+
+          const targetWidthMm = item.width * scaleMmPerPx;
+          const currentWidthMm = pdf.getTextWidth(item.text);
+          if (currentWidthMm > 0 && targetWidthMm > 0 && currentWidthMm > targetWidthMm) {
+            fontSizePt = Math.max(4, fontSizePt * (targetWidthMm / currentWidthMm));
+            pdf.setFontSize(fontSizePt);
+          }
+
+          const xMm = margin + (item.left * scaleMmPerPx);
+          const yMm = margin + ((item.top - start) * scaleMmPerPx);
+
+          pdf.text(item.text, xMm, yMm, {
+            baseline: 'top',
+            renderingMode: 'invisible',
+          });
+        } catch (_) {
+          // Gracefully continue on any single string formatting edge case
+        }
+      }
     }
     return pdf.output('blob');
   } finally {
