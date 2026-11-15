@@ -1,4 +1,28 @@
-const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
+const electron = require('electron');
+
+// When spawned from environments (like VS Code, IDE terminals, etc.) where ELECTRON_RUN_AS_NODE=1 is inherited,
+// Electron runs in pure Node CLI mode where require('electron') returns a string path to the Electron binary
+// instead of the Electron API object. Detect this and re-spawn Electron cleanly with ELECTRON_RUN_AS_NODE unset.
+if (typeof electron === 'string') {
+  const { spawn } = require('child_process');
+  const cleanEnv = { ...process.env };
+  delete cleanEnv.ELECTRON_RUN_AS_NODE;
+
+  const child = spawn(electron, [__filename, ...process.argv.slice(2)], {
+    env: cleanEnv,
+    stdio: 'inherit',
+  });
+  child.on('exit', (code, signal) => {
+    if (signal) {
+      process.kill(process.pid, signal);
+    } else {
+      process.exit(code || 0);
+    }
+  });
+  return;
+}
+
+const { app, BrowserWindow, Menu, ipcMain, shell } = electron;
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -39,6 +63,10 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+  });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {

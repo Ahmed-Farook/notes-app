@@ -100,13 +100,6 @@ Desktop packages are written to `release/`.
 
 <br>
 
-## Code Signing Policy
-
-Free code signing provided by [SignPath.io](https://signpath.io/), using a certificate by [SignPath Foundation](https://signpath.org/).
-
-- **Committers & Reviewers:** [Ahmed Farook](https://github.com/Ahmed-Farook)
-- **Approvers:** [Ahmed Farook](https://github.com/Ahmed-Farook)
-
 ## License
 
 This project is open source and licensed under the [MIT License](LICENSE).
