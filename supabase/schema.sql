@@ -51,3 +51,35 @@ create policy "Users can manage their own notes"
 alter publication supabase_realtime add table public.folders;
 alter publication supabase_realtime add table public.notes;
 
+-- 6. Function to allow authenticated users to permanently delete their own account from auth.users
+-- This allows user self-deletion from the app without exposing service_role keys.
+create or replace function public.delete_user()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  curr_user_id uuid;
+begin
+  -- Get the ID of the calling authenticated user
+  curr_user_id := auth.uid();
+
+  if curr_user_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  -- 1. Explicitly delete user notes and folders
+  delete from public.notes where user_id = curr_user_id;
+  delete from public.folders where user_id = curr_user_id;
+
+  -- 2. Delete the user record from auth.users
+  delete from auth.users where id = curr_user_id;
+end;
+$$;
+
+-- Grant execution to authenticated users only
+revoke all on function public.delete_user() from public;
+grant execute on function public.delete_user() to authenticated;
+
+

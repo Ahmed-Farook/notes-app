@@ -125,9 +125,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const signUp = useCallback(async (email: string, password: string) => {
     setSyncStatus('syncing');
+
+    // Verification landing page hosted on GitHub Pages or current domain
+    const emailRedirectTo =
+      typeof window !== 'undefined' &&
+      window.location.protocol.startsWith('http') &&
+      !window.location.hostname.includes('localhost')
+        ? `${window.location.origin}/verified.html`
+        : 'https://ahmed-farook.github.io/notes-app/verified.html';
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo,
+      },
     });
     if (error) {
       setSyncStatus('error');
@@ -221,20 +233,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setSyncStatus('syncing');
 
     try {
-      // 1. Delete all user notes from cloud
-      await supabase.from('notes').delete().eq('user_id', user.id);
-      // 2. Delete all user custom folders from cloud
-      await supabase.from('folders').delete().eq('user_id', user.id);
+      // 1. Delete user notes from cloud via RLS
+      const { error: notesErr } = await supabase.from('notes').delete().eq('user_id', user.id);
+      if (notesErr) console.warn('Failed deleting notes table:', notesErr);
 
-      // 3. Attempt to delete user via RPC if configured
-      try {
-        await supabase.rpc('delete_user');
-      } catch (_) {}
+      // 2. Delete user custom folders from cloud via RLS
+      const { error: foldersErr } = await supabase.from('folders').delete().eq('user_id', user.id);
+      if (foldersErr) console.warn('Failed deleting folders table:', foldersErr);
 
-      // 4. Remove local E2EE key
+      // 3. Delete user account from Supabase auth.users via delete_user RPC
+      const { error: rpcError } = await supabase.rpc('delete_user');
+      if (rpcError) {
+        console.error('RPC delete_user failed:', rpcError);
+        setSyncStatus('error');
+        const isNotFound = rpcError.message?.includes('Could not find') || rpcError.code === 'PGRST202';
+        return {
+          error: new Error(
+            isNotFound
+              ? 'Could not remove user from auth.users: The delete_user() function is not installed in your Supabase project. Please run supabase/schema.sql in your Supabase SQL Editor.'
+              : `Failed to remove user from database: ${rpcError.message}`
+          ),
+        };
+      }
+
+      // 4. Remove local Zero-Knowledge E2EE key
       localStorage.removeItem(`apple_notes_e2ee_${user.id}`);
 
-      // 5. Sign out and clear session
+      // 5. Sign out and clear local session state
       await supabase.auth.signOut();
       setSession(null);
       setUser(null);
