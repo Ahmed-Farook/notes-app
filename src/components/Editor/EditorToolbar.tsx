@@ -27,7 +27,6 @@ import {
   Trash2,
   Table as TableIcon,
   ImagePlus,
-  Sigma,
 } from 'lucide-react';
 import { triggerHaptic } from '../../utils/haptics';
 import { toggleUnifiedCodeBlock } from '../../utils/editorCommands';
@@ -929,48 +928,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           >
             <TableIcon size={15} />
             <span className="hidden sm:inline">Table</span>
-          </button>
-
-          {/* Math Formula Insertion */}
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => {
-              triggerHaptic();
-              if (!editor) return;
-              const { from, to, empty } = editor.state.selection;
-              if (!empty) {
-                const selectedText = editor.state.doc.textBetween(from, to).trim();
-                const clean = selectedText.replace(/^(\$\$|\\\[|\\\()|(\$\$|\\\]|\\\))$/g, '').trim();
-                editor
-                  .chain()
-                  .focus()
-                  .deleteRange({ from, to })
-                  .insertContent({
-                    type: 'mathBlock',
-                    attrs: { latex: clean },
-                  })
-                  .run();
-              } else {
-                editor
-                  .chain()
-                  .focus()
-                  .insertContent({
-                    type: 'mathBlock',
-                    attrs: { latex: '' },
-                  })
-                  .run();
-              }
-            }}
-            title="Insert Math Equation"
-            className={`flex items-center space-x-1 p-1.5 rounded shrink-0 transition-colors outline-none focus:outline-none ${
-              editor.isActive('mathBlock')
-                ? 'bg-[#E5DCCB] dark:bg-[#203448] text-[#213A50] dark:text-[#7EAAD0] font-bold shadow-xs'
-                : 'text-[#5A6D7E] dark:text-[#8AA0B4] hover:bg-[#EBE2D3] dark:hover:bg-[#1C2733] hover:text-[#213A50] dark:hover:text-[#E8EEF3]'
-            }`}
-          >
-            <Sigma size={15} />
-            <span className="hidden sm:inline">Math</span>
           </button>
 
           {/* Contextual Table Controls (visible whenever cursor is inside a table) */}
