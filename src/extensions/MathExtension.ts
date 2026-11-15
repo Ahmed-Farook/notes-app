@@ -1,6 +1,45 @@
 import { Node, mergeAttributes, nodeInputRule, nodePasteRule } from '@tiptap/core';
 import katex from 'katex';
 
+export function isLatexFormula(text: string): boolean {
+  if (!text) return false;
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.length > 2500) return false;
+
+  // Wrapped in $$...$$, \[...\], or \(...\)
+  if (
+    (/^\$\$[\s\S]+?\$\$$/.test(trimmed) && trimmed.length > 4) ||
+    (/^\\\[[\s\S]+?\\\]$/.test(trimmed) && trimmed.length > 4) ||
+    (/^\\\([\s\S]+?\\\)$/.test(trimmed) && trimmed.length > 4)
+  ) {
+    return true;
+  }
+
+  // Check for common LaTeX commands
+  const latexCommandRegex =
+    /\\(frac|sqrt|pm|mp|sum|prod|int|oint|partial|nabla|infty|alpha|beta|gamma|delta|epsilon|zeta|eta|theta|iota|kappa|lambda|mu|nu|xi|pi|rho|sigma|tau|upsilon|phi|chi|psi|omega|Gamma|Delta|Theta|Lambda|Xi|Pi|Sigma|Upsilon|Phi|Psi|Omega|cdot|times|div|le|ge|leq|geq|neq|approx|equiv|subset|supset|subseteq|supseteq|in|notin|cap|cup|vee|wedge|to|rightarrow|leftarrow|Rightarrow|Leftarrow|iff|implies|forall|exists|circ|bullet|degree|angle|perp|lim|sin|cos|tan|cot|sec|csc|log|ln|exp|det|dim|ker|hom|vec|mathbf|mathit|mathrm|mathbb|mathcal|text|tilde|hat|bar|overline|underline|begin|end)\b/;
+
+  const mathExprRegex = /^[a-zA-Z0-9\s()+\-*\/=^_{}.,\\]+$/;
+  const hasSubOrSuper = /[\^_]\{?[0-9a-zA-Z+-]+}?/.test(trimmed);
+  const hasEqualsOrOperator = /[=+\-*/\\]/.test(trimmed);
+
+  const hasLatexCommand = latexCommandRegex.test(trimmed);
+  const isLikelyMathExpr =
+    (hasSubOrSuper && hasEqualsOrOperator && mathExprRegex.test(trimmed)) || hasLatexCommand;
+
+  if (isLikelyMathExpr) {
+    const clean = trimmed.replace(/^(\$\$|\\\[|\\\()|(\$\$|\\\]|\\\))$/g, '').trim();
+    try {
+      katex.renderToString(clean, { throwOnError: true });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+}
+
 export interface MathBlockOptions {
   HTMLAttributes: Record<string, any>;
 }
@@ -41,7 +80,7 @@ export const MathBlock = Node.create<MathBlockOptions>({
           latex: (dom as HTMLElement).getAttribute('data-latex') || '',
         }),
       },
-      // Automatically detect and convert raw $$...$$ inside paragraphs
+      // Automatically detect and convert raw $$...$$, \[...\], or raw LaTeX formulas inside paragraphs
       {
         tag: 'p',
         getAttrs: (dom) => {
@@ -49,6 +88,10 @@ export const MathBlock = Node.create<MathBlockOptions>({
           const match = text.match(/^\$\$([\s\S]+?)\$\$$/) || text.match(/^\\\[([\s\S]+?)\\\]$/);
           if (match) {
             return { latex: match[1].trim() };
+          }
+          if (isLatexFormula(text)) {
+            const clean = text.replace(/^(\$\$|\\\[|\\\()|(\$\$|\\\]|\\\))$/g, '').trim();
+            return { latex: clean };
           }
           return false;
         },
@@ -112,6 +155,13 @@ export const MathBlock = Node.create<MathBlockOptions>({
           latex: match[1].trim(),
         }),
       }),
+      nodeInputRule({
+        find: /^\$\$\s$/,
+        type: this.type,
+        getAttributes: () => ({
+          latex: '',
+        }),
+      }),
     ];
   },
 
@@ -142,7 +192,7 @@ export const MathBlock = Node.create<MathBlockOptions>({
       dom.setAttribute('data-type', 'math-block');
       dom.setAttribute('data-latex', node.attrs.latex);
 
-      let isEditing = false;
+      let isEditing = !node.attrs.latex;
       let currentLatex = node.attrs.latex || '';
 
       const renderView = () => {
@@ -157,11 +207,13 @@ export const MathBlock = Node.create<MathBlockOptions>({
           input.className =
             'flex-1 px-3 py-1.5 font-mono text-xs rounded-lg border border-[#DFD3C0] dark:border-[#2C4054] bg-white dark:bg-[#121A22] text-[#1C2B36] dark:text-[#E8EEF3] outline-none focus:ring-1 focus:ring-apple-yellow dark:focus:ring-[#7EAAD0]';
           input.value = currentLatex;
-          input.placeholder = 'Type LaTeX formula (e.g. \\frac{a}{b} = c)...';
+          input.placeholder = 'Type or paste LaTeX (e.g. x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a})...';
 
           const finishEditing = () => {
             isEditing = false;
-            currentLatex = input.value.trim();
+            let val = input.value.trim();
+            val = val.replace(/^(\$\$|\\\[|\\\()|(\$\$|\\\]|\\\))$/g, '').trim();
+            currentLatex = val;
             dom.setAttribute('data-latex', currentLatex);
             if (typeof getPos === 'function') {
               editor.commands.command(({ tr }) => {
@@ -230,7 +282,7 @@ export const MathBlock = Node.create<MathBlockOptions>({
           mathContainer.className =
             'katex-formula py-1 px-2 overflow-x-auto text-base text-[#1C2B36] dark:text-[#E8EEF3]';
           if (!currentLatex) {
-            mathContainer.innerHTML = '<span class="text-xs text-[#8AA0B4] italic font-sans select-none">$$ Type or paste math formula $$</span>';
+            mathContainer.innerHTML = '<span class="text-xs text-[#8AA0B4] italic font-sans select-none">Empty Math Formula (Click to edit)</span>';
           } else {
             try {
               mathContainer.innerHTML = katex.renderToString(currentLatex, {

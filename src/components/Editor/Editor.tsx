@@ -23,7 +23,7 @@ import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import { EditorToolbar } from './EditorToolbar';
 import { InNoteCanvas, DrawingToolType } from '../Drawing/InNoteCanvas';
-import { MathBlock } from '../../extensions/MathExtension';
+import { MathBlock, isLatexFormula } from '../../extensions/MathExtension';
 
 /**
  * CustomImage: Preserves drawing strokes JSON in data-strokes attribute for re-editing
@@ -592,6 +592,36 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     }
   }, [activeNote?.id]);
 
+  // Track drag vs click for text selection so dragging fast to the start doesn't clear selection
+  const isMouseSelectingRef = useRef(false);
+  const mouseDownCoordsRef = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      setTimeout(() => {
+        isMouseSelectingRef.current = false;
+        mouseDownCoordsRef.current = null;
+      }, 50);
+    };
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, []);
+
+  const handleContainerMouseDown = (e: React.MouseEvent) => {
+    mouseDownCoordsRef.current = { x: e.clientX, y: e.clientY };
+    isMouseSelectingRef.current = false;
+  };
+
+  const handleContainerMouseMove = (e: React.MouseEvent) => {
+    if (mouseDownCoordsRef.current && (e.buttons & 1) === 1) {
+      const dx = Math.abs(e.clientX - mouseDownCoordsRef.current.x);
+      const dy = Math.abs(e.clientY - mouseDownCoordsRef.current.y);
+      if (dx > 4 || dy > 4) {
+        isMouseSelectingRef.current = true;
+      }
+    }
+  };
+
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length !== 1 || isPenMode) return;
     const touch = e.touches[0];
@@ -755,6 +785,24 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     editorProps: {
       attributes: {
         class: 'focus:outline-none min-h-[140px] cursor-text select-text',
+      },
+      handlePaste: (view, event) => {
+        const target = event.target as HTMLElement | null;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+          return false;
+        }
+        const text = event.clipboardData?.getData('text/plain');
+        if (text && isLatexFormula(text)) {
+          event.preventDefault();
+          const clean = text.trim().replace(/^(\$\$|\\\[|\\\()|(\$\$|\\\]|\\\))$/g, '').trim();
+          const mathType = view.state.schema.nodes.mathBlock;
+          if (mathType) {
+            const tr = view.state.tr.replaceSelectionWith(mathType.create({ latex: clean }));
+            view.dispatch(tr);
+            return true;
+          }
+        }
+        return false;
       },
     },
     onUpdate: ({ editor, transaction }) => {
@@ -1003,6 +1051,12 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
   const handleFocusOrCreateLineBelow = useCallback(() => {
     if (!editor || activeNote?.isTrash || isPenMode) return;
 
+    // Do NOT move cursor or clear selection if user was dragging or has an active text selection
+    if (isMouseSelectingRef.current) return;
+    const domSel = window.getSelection();
+    if (domSel && domSel.toString().length > 0) return;
+    if (!editor.state.selection.empty) return;
+
     const { state, view } = editor;
     const { doc, schema, tr } = state;
     const paragraphType = schema.nodes.paragraph;
@@ -1210,8 +1264,23 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
         <div
           ref={editorScrollContainerRef}
           className="flex-1 overflow-y-auto px-5 md:px-14 py-3 pb-24 md:pb-8 cursor-text select-text"
+          onMouseDown={handleContainerMouseDown}
+          onMouseMove={handleContainerMouseMove}
           onClick={(e) => {
             if (editor && !activeNote.isTrash && !isPenMode) {
+              // If this was a drag or there is an active text selection, do NOT clear selection!
+              if (isMouseSelectingRef.current) {
+                isMouseSelectingRef.current = false;
+                return;
+              }
+              const domSel = window.getSelection();
+              if (domSel && domSel.toString().length > 0) {
+                return;
+              }
+              if (!editor.state.selection.empty) {
+                return;
+              }
+
               const target = e.target as HTMLElement;
               // Ignore if clicked on checkbox, label, select, or button
               if (
@@ -1233,7 +1302,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
         >
           <div className="max-w-3xl mx-auto">
             {/* Note Date Header: scrolls away with note content */}
-            <div className="pt-2 pb-3 flex items-center justify-center text-[11px] text-[#6E8092] dark:text-[#8AA0B4] select-none">
+            <div className="pt-2 pb-3 flex items-center justify-center text-[11px] text-[#6E8092] dark:text-[#8AA0B4] select-none pointer-events-none">
               <span className="font-semibold text-center">
                 {formatEditorDate(activeNote.updatedAt)}
               </span>
@@ -1250,6 +1319,14 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
                 onContextMenu={handleContextMenu}
                 onClick={(e) => {
                   if (isPenMode) return;
+                  if (isMouseSelectingRef.current) {
+                    isMouseSelectingRef.current = false;
+                    return;
+                  }
+                  const domSel = window.getSelection();
+                  if (domSel && domSel.toString().length > 0) return;
+                  if (editor && !editor.state.selection.empty) return;
+
                   const target = e.target as HTMLElement;
                   // If click was on a checkbox or its label, do NOT trigger focus or open keyboard
                   if (

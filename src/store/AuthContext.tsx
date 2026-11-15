@@ -31,6 +31,8 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signUp: (email: string, password: string) => Promise<{ error: AuthError | null; needsEmailConfirmation?: boolean }>;
   signOut: () => Promise<void>;
+  changePassword: (newPassword: string) => Promise<{ error: Error | null }>;
+  deleteAccount: () => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -181,6 +183,72 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setSyncStatus('synced');
   }, [user]);
 
+  const changePassword = useCallback(async (newPassword: string) => {
+    if (!user || !user.email) {
+      return { error: new Error('User not logged in') };
+    }
+    setSyncStatus('syncing');
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+    if (error) {
+      setSyncStatus('error');
+      return { error };
+    }
+
+    try {
+      // Re-derive Zero-Knowledge AES-GCM Key locally on this device with the new password
+      const newKey = await deriveKeyFromPassword(newPassword, user.email);
+      setEncryptionKey(newKey);
+      setIsKeyUnlocked(true);
+      const exported = await exportKeyToString(newKey);
+      localStorage.setItem(`apple_notes_e2ee_${user.id}`, exported);
+    } catch (keyErr) {
+      console.error('Failed to derive encryption key on password change:', keyErr);
+    }
+
+    if (data.user) {
+      setUser(data.user);
+    }
+    setSyncStatus('synced');
+    return { error: null };
+  }, [user]);
+
+  const deleteAccount = useCallback(async () => {
+    if (!user) {
+      return { error: new Error('User not logged in') };
+    }
+    setSyncStatus('syncing');
+
+    try {
+      // 1. Delete all user notes from cloud
+      await supabase.from('notes').delete().eq('user_id', user.id);
+      // 2. Delete all user custom folders from cloud
+      await supabase.from('folders').delete().eq('user_id', user.id);
+
+      // 3. Attempt to delete user via RPC if configured
+      try {
+        await supabase.rpc('delete_user');
+      } catch (_) {}
+
+      // 4. Remove local E2EE key
+      localStorage.removeItem(`apple_notes_e2ee_${user.id}`);
+
+      // 5. Sign out and clear session
+      await supabase.auth.signOut();
+      setSession(null);
+      setUser(null);
+      setEncryptionKey(null);
+      setIsKeyUnlocked(false);
+      setSyncStatus('synced');
+      return { error: null };
+    } catch (err: any) {
+      console.error('Failed to delete account:', err);
+      setSyncStatus('error');
+      return { error: err };
+    }
+  }, [user]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -198,6 +266,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         signIn,
         signUp,
         signOut,
+        changePassword,
+        deleteAccount,
       }}
     >
       {children}

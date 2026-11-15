@@ -940,13 +940,29 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               if (!editor) return;
               const { from, to, empty } = editor.state.selection;
               if (!empty) {
-                const selectedText = editor.state.doc.textBetween(from, to);
-                editor.chain().focus().insertContent(`$$${selectedText}$$`).run();
+                const selectedText = editor.state.doc.textBetween(from, to).trim();
+                const clean = selectedText.replace(/^(\$\$|\\\[|\\\()|(\$\$|\\\]|\\\))$/g, '').trim();
+                editor
+                  .chain()
+                  .focus()
+                  .deleteRange({ from, to })
+                  .insertContent({
+                    type: 'mathBlock',
+                    attrs: { latex: clean },
+                  })
+                  .run();
               } else {
-                editor.chain().focus().insertContent('$$  $$').setTextSelection(from + 2).run();
+                editor
+                  .chain()
+                  .focus()
+                  .insertContent({
+                    type: 'mathBlock',
+                    attrs: { latex: '' },
+                  })
+                  .run();
               }
             }}
-            title="Insert Math Equation ($$...$$)"
+            title="Insert Math Equation"
             className={`flex items-center space-x-1 p-1.5 rounded shrink-0 transition-colors outline-none focus:outline-none ${
               editor.isActive('mathBlock')
                 ? 'bg-[#E5DCCB] dark:bg-[#203448] text-[#213A50] dark:text-[#7EAAD0] font-bold shadow-xs'

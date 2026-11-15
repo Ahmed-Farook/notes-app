@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Cloud,
   X,
@@ -10,6 +11,9 @@ import {
   Sparkles,
   ShieldCheck,
   KeyRound,
+  Key,
+  Trash2,
+  ChevronDown,
 } from 'lucide-react';
 import { useAuth } from '../../store/AuthContext';
 import { triggerHaptic } from '../../utils/haptics';
@@ -25,6 +29,8 @@ export const AuthModal: React.FC = () => {
     signOut,
     isKeyUnlocked,
     unlockWithPassword,
+    changePassword,
+    deleteAccount,
   } = useAuth();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
@@ -33,6 +39,14 @@ export const AuthModal: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Change Password state
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+
+  // Delete Account confirmation state
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   if (!isAuthModalOpen) return null;
 
@@ -103,14 +117,70 @@ export const AuthModal: React.FC = () => {
     closeAuthModal();
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150">
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    if (!newPassword) {
+      setErrorMsg('Please enter a new password.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setErrorMsg('New password must be at least 6 characters.');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setErrorMsg('Passwords do not match.');
+      return;
+    }
+
+    triggerHaptic();
+    setIsLoading(true);
+    try {
+      const { error } = await changePassword(newPassword);
+      if (error) {
+        setErrorMsg(error.message);
+      } else {
+        setSuccessMsg('Password updated successfully!');
+        setNewPassword('');
+        setConfirmNewPassword('');
+        setIsChangingPassword(false);
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to update password.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    triggerHaptic();
+    setIsLoading(true);
+    setErrorMsg(null);
+    try {
+      const { error } = await deleteAccount();
+      if (error) {
+        setErrorMsg(error.message);
+      } else {
+        setIsConfirmingDelete(false);
+        closeAuthModal();
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to delete account.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const modalContent = (
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150 [app-region:no-drag]">
       <div
-        className="w-full max-w-sm bg-[#FAF6EF] dark:bg-[#16202A] rounded-2xl shadow-2xl border border-apple-border dark:border-apple-borderDark overflow-hidden flex flex-col text-[#1C2B36] dark:text-[#E8EEF3] animate-in zoom-in-95 duration-150"
+        className="w-full max-w-sm max-h-[90vh] bg-[#FAF6EF] dark:bg-[#16202A] rounded-2xl shadow-2xl border border-apple-border dark:border-apple-borderDark overflow-hidden flex flex-col text-[#1C2B36] dark:text-[#E8EEF3] animate-in zoom-in-95 duration-150 [app-region:no-drag]"
         role="dialog"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-apple-border dark:border-apple-borderDark bg-[#EFE7D8]/80 dark:bg-[#131B24]/80">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-apple-border dark:border-apple-borderDark bg-[#EFE7D8]/80 dark:bg-[#131B24]/80 shrink-0">
           <div className="flex items-center space-x-2">
             <TexoLogo size={18} />
             <h3 className="text-sm font-semibold">
@@ -126,7 +196,7 @@ export const AuthModal: React.FC = () => {
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto">
           {user ? (
             /* Logged in state */
             <div className="space-y-4 text-center">
@@ -178,13 +248,121 @@ export const AuthModal: React.FC = () => {
                 </p>
               </div>
 
-              <button
-                onClick={handleSignOut}
-                disabled={isLoading}
-                className="w-full mt-2 py-2 px-4 rounded-xl border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 text-xs font-semibold transition-colors disabled:opacity-50"
-              >
-                {isLoading ? 'Signing Out...' : 'Sign Out'}
-              </button>
+              {/* Status alerts inside logged-in view */}
+              {errorMsg && (
+                <div className="flex items-start space-x-2 p-2.5 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-lg text-xs text-red-600 dark:text-red-400 text-left">
+                  <AlertCircle size={15} className="shrink-0 mt-0.5" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+              {successMsg && (
+                <div className="flex items-start space-x-2 p-2.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 rounded-lg text-xs text-emerald-700 dark:text-emerald-400 text-left">
+                  <CheckCircle2 size={15} className="shrink-0 mt-0.5" />
+                  <span>{successMsg}</span>
+                </div>
+              )}
+
+              {/* Change Password Collapsible Section */}
+              <div className="border border-neutral-200 dark:border-neutral-800 rounded-xl overflow-hidden text-left bg-black/[0.02] dark:bg-white/[0.02]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsChangingPassword(!isChangingPassword);
+                    setErrorMsg(null);
+                    setSuccessMsg(null);
+                  }}
+                  className="w-full px-3.5 py-2.5 flex items-center justify-between text-xs font-semibold hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors"
+                >
+                  <div className="flex items-center space-x-2">
+                    <Key size={14} className="text-neutral-500" />
+                    <span>Change Password</span>
+                  </div>
+                  <ChevronDown
+                    size={14}
+                    className={`text-neutral-400 transition-transform ${isChangingPassword ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                {isChangingPassword && (
+                  <form onSubmit={handleChangePassword} className="p-3 pt-1 border-t border-neutral-200 dark:border-neutral-800 space-y-2.5">
+                    <input
+                      type="password"
+                      required
+                      placeholder="New password (min 6 characters)"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full text-xs px-3 py-1.5 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 outline-none focus:border-apple-yellow"
+                    />
+                    <input
+                      type="password"
+                      required
+                      placeholder="Confirm new password"
+                      value={confirmNewPassword}
+                      onChange={(e) => setConfirmNewPassword(e.target.value)}
+                      className="w-full text-xs px-3 py-1.5 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 outline-none focus:border-apple-yellow"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className="w-full py-1.5 bg-apple-yellow text-white rounded-lg text-xs font-semibold hover:bg-apple-yellowHover transition-colors disabled:opacity-50 flex items-center justify-center space-x-1"
+                    >
+                      {isLoading ? <Loader2 size={13} className="animate-spin" /> : <span>Update Password</span>}
+                    </button>
+                  </form>
+                )}
+              </div>
+
+              {/* Action Buttons: Sign Out and Delete Account */}
+              {!isConfirmingDelete ? (
+                <div className="space-y-2 pt-1">
+                  <button
+                    onClick={handleSignOut}
+                    disabled={isLoading}
+                    className="w-full py-2 px-4 rounded-xl border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-xs font-semibold transition-colors disabled:opacity-50"
+                  >
+                    {isLoading ? 'Signing Out...' : 'Sign Out'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsConfirmingDelete(true);
+                      setErrorMsg(null);
+                    }}
+                    className="w-full py-2 px-4 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 text-xs font-semibold transition-colors flex items-center justify-center space-x-1.5"
+                  >
+                    <Trash2 size={13} />
+                    <span>Delete Account</span>
+                  </button>
+                </div>
+              ) : (
+                /* Delete Account Confirmation Dialog */
+                <div className="p-3.5 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-xl space-y-2.5 text-left animate-in fade-in duration-150">
+                  <div className="flex items-center space-x-1.5 text-xs font-semibold text-red-700 dark:text-red-300">
+                    <Trash2 size={15} />
+                    <span>Permanently Delete Account?</span>
+                  </div>
+                  <p className="text-[11px] text-red-600/90 dark:text-red-400/90 leading-relaxed">
+                    This will permanently delete all your encrypted notes and folders from the cloud server and sign you out. This action cannot be undone.
+                  </p>
+                  <div className="flex items-center space-x-2 pt-1">
+                    <button
+                      type="button"
+                      disabled={isLoading}
+                      onClick={handleDeleteAccount}
+                      className="flex-1 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition-colors flex items-center justify-center space-x-1 disabled:opacity-50"
+                    >
+                      {isLoading ? <Loader2 size={13} className="animate-spin" /> : <span>Yes, Delete Account</span>}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isLoading}
+                      onClick={() => setIsConfirmingDelete(false)}
+                      className="px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-xs font-semibold transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             /* Sign in / Sign up form */
@@ -314,5 +492,11 @@ export const AuthModal: React.FC = () => {
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+
+  return modalContent;
 };
 
