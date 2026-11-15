@@ -1263,7 +1263,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
       ) : (
         <div
           ref={editorScrollContainerRef}
-          className="flex-1 overflow-y-auto px-4 md:px-8 py-3 pb-24 md:pb-8 cursor-text select-text"
+          className="flex-1 overflow-y-auto px-5 md:px-14 py-3 pb-24 md:pb-8 cursor-text select-text"
           onMouseDown={handleContainerMouseDown}
           onMouseMove={handleContainerMouseMove}
           onClick={(e) => {
@@ -1300,7 +1300,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
             }
           }}
         >
-          <div className="max-w-4xl lg:max-w-5xl mx-auto">
+          <div className="max-w-3xl mx-auto">
             {/* Note Date Header: scrolls away with note content */}
             <div className="pt-2 pb-3 flex items-center justify-center text-[11px] text-[#6E8092] dark:text-[#8AA0B4] select-none pointer-events-none">
               <span className="font-semibold text-center">
@@ -1312,7 +1312,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
               <EditorContent
                 editor={editor}
                 data-pdf-note-id={activeNote.id}
-                className="prose prose-neutral dark:prose-invert max-w-none focus:outline-none min-h-[140px] select-text cursor-text"
+                className="prose prose-neutral dark:prose-invert focus:outline-none min-h-[140px] select-text cursor-text"
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
