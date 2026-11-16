@@ -116,9 +116,9 @@ interface NotesContextType {
   relockNote: (noteId: string) => void;
 }
 
-export async function hashNotePassword(password: string): Promise<string> {
+export async function hashNotePassword(password: string, salt: string = ''): Promise<string> {
   const encoder = new TextEncoder();
-  const data = encoder.encode(password);
+  const data = encoder.encode(salt ? `texo_salt:${salt}:${password}` : password);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   return Array.from(new Uint8Array(hashBuffer))
     .map((b) => b.toString(16).padStart(2, '0'))
@@ -172,85 +172,105 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const setActiveNoteId = useCallback((nextId: string | null) => {
     setActiveNoteIdState((prevId) => {
-      if (prevId && prevId !== nextId && uneditedNewNoteIdsRef.current.has(prevId)) {
-        uneditedNewNoteIdsRef.current.delete(prevId);
-        setNotes((curr) => curr.filter((n) => n.id !== prevId));
+      if (prevId && prevId !== nextId) {
+        if (uneditedNewNoteIdsRef.current.has(prevId)) {
+          uneditedNewNoteIdsRef.current.delete(prevId);
+          setNotes((curr) => curr.filter((n) => n.id !== prevId));
+        } else if (cloudSaveTimers.current[prevId]) {
+          clearTimeout(cloudSaveTimers.current[prevId]);
+          delete cloudSaveTimers.current[prevId];
+          const target = notesRef.current.find((n) => n.id === prevId);
+          if (target && user && encryptionKeyRef.current) {
+            upsertNoteToCloud(target, user.id, encryptionKeyRef.current);
+          }
+        }
       }
       return nextId;
     });
-  }, []);
+  }, [user]);
 
   const setSelectedFolderId = useCallback((folderId: string) => {
     setActiveNoteIdState((prevId) => {
-      if (prevId && uneditedNewNoteIdsRef.current.has(prevId)) {
-        uneditedNewNoteIdsRef.current.delete(prevId);
-        setNotes((curr) => curr.filter((n) => n.id !== prevId));
-        return null;
+      if (prevId) {
+        if (uneditedNewNoteIdsRef.current.has(prevId)) {
+          uneditedNewNoteIdsRef.current.delete(prevId);
+          setNotes((curr) => curr.filter((n) => n.id !== prevId));
+          return null;
+        } else if (cloudSaveTimers.current[prevId]) {
+          clearTimeout(cloudSaveTimers.current[prevId]);
+          delete cloudSaveTimers.current[prevId];
+          const target = notesRef.current.find((n) => n.id === prevId);
+          if (target && user && encryptionKeyRef.current) {
+            upsertNoteToCloud(target, user.id, encryptionKeyRef.current);
+          }
+        }
       }
       return prevId;
     });
     setSelectedFolderIdState(folderId);
-  }, []);
+  }, [user]);
+
+  const isSyncingRef = useRef(false);
+
+  // Robust bidirectional cloud synchronization
+  const syncWithCloud = useCallback(async (showIndicator = false) => {
+    if (!user || !encryptionKeyRef.current || isSyncingRef.current) return;
+    isSyncingRef.current = true;
+    if (showIndicator) setSyncStatus('syncing');
+
+    try {
+      const [remoteNotes, remoteFolders] = await Promise.all([
+        fetchUserNotes(encryptionKeyRef.current),
+        fetchUserFolders(encryptionKeyRef.current),
+      ]);
+
+      let effectiveRemoteNotes = remoteNotes;
+      const isLegacySampleSet =
+        remoteNotes.length === 3 &&
+        remoteNotes.some((n) => n.id === 'note-roadmap') &&
+        remoteNotes.some((n) => n.id === 'note-weekend-ideas');
+
+      if (isLegacySampleSet) {
+        await Promise.all([
+          deleteNoteFromCloud('note-roadmap'),
+          deleteNoteFromCloud('note-weekend-ideas'),
+        ]);
+        effectiveRemoteNotes = INITIAL_NOTES;
+      }
+
+      const { merged: mergedNotes, toUpload: notesToUpload } = mergeNotes(
+        notesRef.current,
+        effectiveRemoteNotes
+      );
+      const { merged: mergedFolders, toUpload: foldersToUpload } = mergeFolders(
+        foldersRef.current,
+        remoteFolders
+      );
+
+      setNotes(mergedNotes);
+      setFolders(mergedFolders);
+      setSyncStatus('synced');
+
+      if (notesToUpload.length > 0 || foldersToUpload.length > 0) {
+        await Promise.all([
+          ...notesToUpload.map((n) => upsertNoteToCloud(n, user.id, encryptionKeyRef.current)),
+          ...foldersToUpload.map((f) => upsertFolderToCloud(f, user.id, encryptionKeyRef.current)),
+        ]);
+      }
+    } catch (err) {
+      console.warn('Sync error:', err);
+      setSyncStatus('offline');
+    } finally {
+      isSyncingRef.current = false;
+    }
+  }, [user, setSyncStatus]);
 
   // Sync with Supabase on user sign-in & listen to Realtime changes
   useEffect(() => {
     if (!user || !encryptionKey) return;
 
     let isMounted = true;
-    setSyncStatus('syncing');
-
-    // 1. Initial hydration & bidirectional merge
-    const hydrateAndSync = async () => {
-      try {
-        const [remoteNotes, remoteFolders] = await Promise.all([
-          fetchUserNotes(encryptionKey),
-          fetchUserFolders(encryptionKey),
-        ]);
-
-        if (!isMounted) return;
-
-        let effectiveRemoteNotes = remoteNotes;
-        // Clean up legacy 3 default sample notes from Supabase cloud if present
-        const isLegacySampleSet =
-          remoteNotes.length === 3 &&
-          remoteNotes.some(n => n.id === 'note-roadmap') &&
-          remoteNotes.some(n => n.id === 'note-weekend-ideas');
-
-        if (isLegacySampleSet) {
-          await Promise.all([
-            deleteNoteFromCloud('note-roadmap'),
-            deleteNoteFromCloud('note-weekend-ideas'),
-          ]);
-          effectiveRemoteNotes = INITIAL_NOTES;
-        }
-
-        const { merged: mergedNotes, toUpload: notesToUpload } = mergeNotes(
-          notesRef.current,
-          effectiveRemoteNotes
-        );
-        const { merged: mergedFolders, toUpload: foldersToUpload } = mergeFolders(
-          foldersRef.current,
-          remoteFolders
-        );
-
-        setNotes(mergedNotes);
-        setFolders(mergedFolders);
-        setSyncStatus('synced');
-
-        // Upload any local items not yet in cloud (encrypted with E2EE key)
-        for (const n of notesToUpload) {
-          upsertNoteToCloud(n, user.id, encryptionKey);
-        }
-        for (const f of foldersToUpload) {
-          upsertFolderToCloud(f, user.id, encryptionKey);
-        }
-      } catch (err) {
-        console.warn('Sync error:', err);
-        setSyncStatus('offline');
-      }
-    };
-
-    hydrateAndSync();
+    syncWithCloud(true);
 
     // 2. Realtime WebSocket subscription
     const channel = supabase
@@ -304,7 +324,36 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       isMounted = false;
       supabase.removeChannel(channel);
     };
-  }, [user, encryptionKey, setSyncStatus]);
+  }, [user, encryptionKey, syncWithCloud]);
+
+  // Fast background auto-sync whenever the window regains focus, becomes visible, or network comes online
+  useEffect(() => {
+    if (!user || !encryptionKey) return;
+
+    const handleWakeupSync = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        syncWithCloud(true);
+      }
+    };
+
+    window.addEventListener('focus', handleWakeupSync);
+    window.addEventListener('online', handleWakeupSync);
+    document.addEventListener('visibilitychange', handleWakeupSync);
+
+    // Periodic heartbeat sync every 25 seconds when app is visible
+    const heartbeatTimer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        syncWithCloud(false);
+      }
+    }, 25000);
+
+    return () => {
+      window.removeEventListener('focus', handleWakeupSync);
+      window.removeEventListener('online', handleWakeupSync);
+      document.removeEventListener('visibilitychange', handleWakeupSync);
+      clearInterval(heartbeatTimer);
+    };
+  }, [user, encryptionKey, syncWithCloud]);
 
   // Apply dark mode class to html element
   useEffect(() => {
@@ -357,14 +406,26 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         clearTimeout(saveTimerRef.current);
         saveStoredNotes(notes.filter((n) => !uneditedNewNoteIdsRef.current.has(n.id)));
       }
+      if (user && encryptionKeyRef.current) {
+        for (const noteId of Object.keys(cloudSaveTimers.current)) {
+          clearTimeout(cloudSaveTimers.current[noteId]);
+          delete cloudSaveTimers.current[noteId];
+          const target = notesRef.current.find((n) => n.id === noteId);
+          if (target) {
+            upsertNoteToCloud(target, user.id, encryptionKeyRef.current);
+          }
+        }
+      }
     };
     window.addEventListener('beforeunload', handleFlush);
     window.addEventListener('pagehide', handleFlush);
+    window.addEventListener('blur', handleFlush);
     return () => {
       window.removeEventListener('beforeunload', handleFlush);
       window.removeEventListener('pagehide', handleFlush);
+      window.removeEventListener('blur', handleFlush);
     };
-  }, [notes]);
+  }, [notes, user]);
 
   // Persist folders
   useEffect(() => {
@@ -522,10 +583,18 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             if (cloudSaveTimers.current[id]) {
               clearTimeout(cloudSaveTimers.current[id]);
             }
-            cloudSaveTimers.current[id] = setTimeout(() => {
-              upsertNoteToCloud(updated, user.id, encryptionKeyRef.current);
-              delete cloudSaveTimers.current[id];
-            }, 500);
+            cloudSaveTimers.current[id] = setTimeout(async () => {
+              try {
+                setSyncStatus('syncing');
+                await upsertNoteToCloud(updated, user.id, encryptionKeyRef.current);
+                setSyncStatus('synced');
+              } catch (err) {
+                console.warn('Failed cloud upsert:', err);
+                setSyncStatus('error');
+              } finally {
+                delete cloudSaveTimers.current[id];
+              }
+            }, 300);
           }
 
           return updated;
@@ -776,18 +845,22 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const unlockNote = useCallback(async (noteId: string, password: string): Promise<boolean> => {
     const note = notesRef.current.find((n) => n.id === noteId);
     if (!note || !note.passwordHash) return false;
-    const hash = await hashNotePassword(password);
-    if (hash === note.passwordHash) {
+    const saltedHash = await hashNotePassword(password, noteId);
+    const legacyHash = await hashNotePassword(password);
+    if (note.passwordHash === saltedHash || note.passwordHash === legacyHash) {
+      if (note.passwordHash === legacyHash) {
+        updateNote(noteId, { passwordHash: saltedHash });
+      }
       setUnlockedNoteIds((prev) => new Set(prev).add(noteId));
       triggerHaptic();
       return true;
     }
     return false;
-  }, []);
+  }, [updateNote]);
 
   const lockNoteWithPassword = useCallback(
     async (noteId: string, password: string, hint?: string): Promise<void> => {
-      const hash = await hashNotePassword(password);
+      const hash = await hashNotePassword(password, noteId);
       updateNote(noteId, {
         isLocked: true,
         passwordHash: hash,
@@ -807,8 +880,9 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     async (noteId: string, password: string): Promise<boolean> => {
       const note = notesRef.current.find((n) => n.id === noteId);
       if (!note || !note.passwordHash) return false;
-      const hash = await hashNotePassword(password);
-      if (hash === note.passwordHash) {
+      const saltedHash = await hashNotePassword(password, noteId);
+      const legacyHash = await hashNotePassword(password);
+      if (note.passwordHash === saltedHash || note.passwordHash === legacyHash) {
         updateNote(noteId, {
           isLocked: false,
           passwordHash: undefined,

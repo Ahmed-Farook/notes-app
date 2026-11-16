@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { Trash2, X } from 'lucide-react';
+import { Copy, Trash2, X } from 'lucide-react';
 import { triggerHaptic } from '../../utils/haptics';
 
 export interface InNotePoint {
@@ -761,6 +761,35 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     }
   }, [clearTrigger, commitStrokesWithHistory]);
 
+  // Copy / Duplicate currently lasso-selected strokes with a slight offset
+  const copySelectedStrokes = useCallback(() => {
+    if (selectedStrokeIds.size === 0) return;
+    triggerHaptic();
+    const prevSnapshot = strokesRef.current;
+    const selected = prevSnapshot.filter((s) => selectedStrokeIds.has(s.id));
+    if (selected.length === 0) return;
+
+    const OFFSET = 20;
+    const newSelectedIds = new Set<string>();
+    const clonedStrokes: InNoteStroke[] = selected.map((stroke, index) => {
+      const newId = `stroke-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 6)}`;
+      newSelectedIds.add(newId);
+      return {
+        ...stroke,
+        id: newId,
+        points: stroke.points.map((pt) => ({
+          ...pt,
+          x: pt.x + OFFSET,
+          y: pt.y + OFFSET,
+        })),
+      };
+    });
+
+    const nextStrokes = [...prevSnapshot, ...clonedStrokes];
+    commitStrokesWithHistory(nextStrokes, prevSnapshot);
+    setSelectedStrokeIds(newSelectedIds);
+  }, [selectedStrokeIds, commitStrokesWithHistory]);
+
   // Delete currently lasso-selected strokes
   const deleteSelectedStrokes = useCallback(() => {
     if (selectedStrokeIds.size === 0) return;
@@ -771,7 +800,7 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
     setSelectedStrokeIds(new Set());
   }, [selectedStrokeIds, commitStrokesWithHistory]);
 
-  // Support Backspace / Delete keyboard shortcut for lasso selection on desktop
+  // Support Backspace / Delete, Escape, and Cmd+C / Cmd+D keyboard shortcuts for lasso selection
   useEffect(() => {
     if (!isPenMode || selectedStrokeIds.size === 0) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -781,11 +810,14 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
       } else if (e.key === 'Escape') {
         e.preventDefault();
         setSelectedStrokeIds(new Set());
+      } else if ((e.metaKey || e.ctrlKey) && (e.key === 'c' || e.key === 'C' || e.key === 'd' || e.key === 'D')) {
+        e.preventDefault();
+        copySelectedStrokes();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPenMode, selectedStrokeIds, deleteSelectedStrokes]);
+  }, [isPenMode, selectedStrokeIds, deleteSelectedStrokes, copySelectedStrokes]);
 
   const distanceToSegment = (
     px: number,
@@ -1317,7 +1349,7 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
           onPointerCancel={finishTransformDrag}
           className="absolute z-30 border-2 border-dashed border-[#213A50] dark:border-[#7EAAD0] bg-[#213A50]/5 dark:bg-[#7EAAD0]/10 rounded cursor-move select-none"
         >
-          {/* Floating Action Pill (Delete / Deselect) */}
+          {/* Floating Action Pill (Copy / Delete / Deselect) */}
           <div
             onPointerDown={(e) => e.stopPropagation()}
             className="absolute -top-10 left-1/2 -translate-x-1/2 flex items-center space-x-1 bg-[#FAF6EF] dark:bg-[#16202A] border border-[#DFD3C0] dark:border-[#263747] rounded-full px-2 py-1 shadow-lg whitespace-nowrap"
@@ -1326,10 +1358,23 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
+                copySelectedStrokes();
+              }}
+              className="flex items-center space-x-1 px-2 py-0.5 rounded-full text-[11px] font-semibold text-[#1C2B36] dark:text-[#E8EEF3] hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+              title="Copy Selected Drawing (Cmd+C / Cmd+D)"
+            >
+              <Copy size={13} />
+              <span>Copy</span>
+            </button>
+            <div className="w-px h-3 bg-[#DFD3C0] dark:bg-[#263747]" />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
                 deleteSelectedStrokes();
               }}
               className="flex items-center space-x-1 px-2 py-0.5 rounded-full text-[11px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors"
-              title="Delete Selected Drawing"
+              title="Delete Selected Drawing (Delete / Backspace)"
             >
               <Trash2 size={13} />
               <span>Delete</span>
@@ -1342,7 +1387,7 @@ export const InNoteCanvas: React.FC<InNoteCanvasProps> = ({
                 setSelectedStrokeIds(new Set());
               }}
               className="p-0.5 rounded-full text-[#6E7E8E] dark:text-[#8AA0B4] hover:bg-[#E5DCCB] dark:hover:bg-[#223344] transition-colors"
-              title="Done"
+              title="Done (Escape)"
             >
               <X size={13} />
             </button>
