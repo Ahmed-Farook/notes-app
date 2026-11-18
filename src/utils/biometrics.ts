@@ -1,4 +1,4 @@
-// Unified Biometric Authentication Utility for macOS (Touch ID), Android (Fingerprint / Face Unlock), and Web (WebAuthn)
+// Unified Biometric Authentication Utility for macOS (Touch ID), Android (Fingerprint / Face Unlock), and Web (WebAuthn Platform Touch ID)
 import { Capacitor } from '@capacitor/core';
 
 export interface BiometricCheckResult {
@@ -10,6 +10,24 @@ export interface BiometricCheckResult {
 export interface BiometricAuthResult {
   success: boolean;
   error?: string;
+}
+
+function bufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
+}
+
+function base64ToBuffer(base64: string): ArrayBuffer {
+  const binary = window.atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
 }
 
 /**
@@ -39,13 +57,18 @@ export async function checkBiometricsAvailable(): Promise<BiometricCheckResult> 
     } catch (_) {}
   }
 
-  // 3. Check WebAuthn Platform Authenticator
+  // 3. Check WebAuthn Platform Authenticator (Touch ID on macOS / Windows Hello on PC)
   if (typeof window !== 'undefined' && window.PublicKeyCredential) {
     try {
       if (typeof PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function') {
         const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
         if (available) {
-          return { isAvailable: true, biometryType: 'webauthn', label: 'Touch ID / Windows Hello' };
+          const isMac = /Mac/i.test(navigator.userAgent);
+          return {
+            isAvailable: true,
+            biometryType: 'webauthn',
+            label: isMac ? 'Touch ID' : 'Windows Hello / Touch ID',
+          };
         }
       }
     } catch (_) {}
@@ -56,6 +79,7 @@ export async function checkBiometricsAvailable(): Promise<BiometricCheckResult> 
 
 /**
  * Prompt user for Biometric Authentication (Touch ID, Fingerprint, Face ID).
+ * Enforces native platform authenticator attachment so browsers never show "Scan QR or use security key".
  */
 export async function promptBiometricAuth(reason: string = 'Unlock locked note'): Promise<BiometricAuthResult> {
   const win = typeof window !== 'undefined' ? (window as any) : undefined;
@@ -81,30 +105,89 @@ export async function promptBiometricAuth(reason: string = 'Unlock locked note')
     }
   }
 
-  // 3. WebAuthn Platform Authenticator
+  // 3. WebAuthn Platform Authenticator (Forces Touch ID on Mac browser)
   if (typeof window !== 'undefined' && window.PublicKeyCredential) {
     try {
-      // Create a lightweight client challenge to trigger platform biometric verification
+      const storedCredId = localStorage.getItem('texo_webauthn_cred_id');
+
+      // If we already have a registered platform passkey for this browser, authenticate with it
+      if (storedCredId) {
+        try {
+          const challenge = new Uint8Array(32);
+          window.crypto.getRandomValues(challenge);
+
+          const credential = await navigator.credentials.get({
+            publicKey: {
+              challenge,
+              timeout: 60000,
+              userVerification: 'required',
+              rpId: window.location.hostname || undefined,
+              allowCredentials: [
+                {
+                  id: base64ToBuffer(storedCredId),
+                  type: 'public-key',
+                  transports: ['internal'],
+                },
+              ],
+            },
+          } as any);
+
+          if (credential) {
+            return { success: true };
+          }
+        } catch (authErr: any) {
+          // If credential was deleted or not found, fall through to re-register Touch ID
+          if (authErr?.name === 'NotAllowedError') {
+            // User actively dismissed Touch ID prompt
+            return { success: false, error: 'Touch ID cancelled' };
+          }
+          localStorage.removeItem('texo_webauthn_cred_id');
+        }
+      }
+
+      // First time enrollment: register Touch ID using authenticatorAttachment: 'platform'
+      // This strictly forces macOS Touch ID and completely avoids the QR / external security key modal!
       const challenge = new Uint8Array(32);
       window.crypto.getRandomValues(challenge);
-      const credential = await navigator.credentials.get({
+      const userId = new Uint8Array(16);
+      window.crypto.getRandomValues(userId);
+
+      const newCred = await navigator.credentials.create({
         publicKey: {
           challenge,
+          rp: {
+            name: 'texō notes',
+            id: window.location.hostname || undefined,
+          },
+          user: {
+            id: userId,
+            name: 'texo-user',
+            displayName: 'texō User',
+          },
+          pubKeyCredParams: [
+            { type: 'public-key', alg: -7 },   // ES256
+            { type: 'public-key', alg: -257 }, // RS256
+          ],
+          authenticatorSelection: {
+            authenticatorAttachment: 'platform', // Crucial: Touch ID sensor only!
+            userVerification: 'required',
+            residentKey: 'preferred',
+          },
           timeout: 60000,
-          userVerification: 'preferred',
-          rpId: window.location.hostname || undefined,
         },
-      } as any);
+      }) as any;
 
-      if (credential) {
+      if (newCred && newCred.rawId) {
+        localStorage.setItem('texo_webauthn_cred_id', bufferToBase64(newCred.rawId));
         return { success: true };
       }
     } catch (err: any) {
-      // User cancelled or not enrolled
-      return { success: false, error: err?.message || 'Biometric verification cancelled' };
+      if (err?.name === 'NotAllowedError') {
+        return { success: false, error: 'Touch ID cancelled or timed out' };
+      }
+      return { success: false, error: err?.message || 'Touch ID verification failed' };
     }
   }
 
   return { success: false, error: 'Biometric authentication is not supported on this platform' };
 }
-

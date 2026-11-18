@@ -49,7 +49,10 @@ export const CodeBlockView: React.FC<NodeViewProps> = ({ node, updateAttributes,
   };
 
   return (
-    <NodeViewWrapper className="code-block-wrapper relative my-3 rounded-xl overflow-hidden border border-[#DFD3C0] dark:border-[#223344] bg-[#F7F2EA] dark:bg-[#121922] shadow-xs select-none">
+    <NodeViewWrapper
+      className="code-block-wrapper relative my-3 rounded-xl overflow-hidden border border-[#DFD3C0] dark:border-[#223344] bg-[#F7F2EA] dark:bg-[#121922] shadow-xs select-none"
+      spellCheck={false}
+    >
       {/* Code Block Header */}
       <div
         className="flex items-center justify-between px-3 py-1.5 bg-[#EFE7D8]/80 dark:bg-[#18232E]/90 border-b border-[#DFD3C0]/60 dark:border-[#223344]/80 text-xs text-[#5A6E82] dark:text-[#8AA0B4] select-none"
@@ -97,8 +100,17 @@ export const CodeBlockView: React.FC<NodeViewProps> = ({ node, updateAttributes,
       </div>
 
       {/* Code Text Content */}
-      <pre className="p-3.5 m-0 font-mono text-[13px] leading-relaxed overflow-x-auto text-[#1C2B36] dark:text-[#E8EEF3] select-text">
-        <NodeViewContent as="code" className={currentLang ? `language-${currentLang}` : undefined} />
+      <pre
+        spellCheck={false}
+        autoCorrect="off"
+        autoCapitalize="off"
+        className="py-3.5 pl-5 pr-4 m-0 font-mono text-[13px] leading-relaxed overflow-x-auto text-[#1C2B36] dark:text-[#E8EEF3] select-text"
+      >
+        <NodeViewContent
+          as="code"
+          spellCheck={false}
+          className={currentLang ? `language-${currentLang}` : undefined}
+        />
       </pre>
     </NodeViewWrapper>
   );

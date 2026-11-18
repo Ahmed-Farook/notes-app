@@ -12,5 +12,10 @@ export const CustomCodeBlock = CodeBlockLowlight.extend({
 }).configure({
   lowlight,
   defaultLanguage: 'plaintext',
+  HTMLAttributes: {
+    spellcheck: 'false',
+    autocorrect: 'off',
+    autocapitalize: 'off',
+  },
 });
 

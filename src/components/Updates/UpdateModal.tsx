@@ -52,6 +52,22 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     }
   }, []);
 
+  useEffect(() => {
+    const win = window as any;
+    let removeListener: any = null;
+    if (win.Capacitor?.Plugins?.AppUpdater?.addListener) {
+      win.Capacitor.Plugins.AppUpdater.addListener('updateError', (err: any) => {
+        setIsInstalling(false);
+        setInstallError(err?.error || 'Update failed. Opening browser to download directly.');
+      }).then((h: any) => {
+        removeListener = h;
+      });
+    }
+    return () => {
+      if (removeListener?.remove) removeListener.remove();
+    };
+  }, []);
+
   const handleInstallNow = async () => {
     if (!updateInfo) return;
     setIsInstalling(true);
@@ -75,11 +91,21 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
         const win = window as any;
         if (win.Capacitor?.Plugins?.AppUpdater?.installUpdate) {
           setInstallProgress(40);
-          await win.Capacitor.Plugins.AppUpdater.installUpdate({ url: updateInfo.downloadUrl });
-          setInstallProgress(100);
+          try {
+            await win.Capacitor.Plugins.AppUpdater.installUpdate({ url: updateInfo.downloadUrl });
+            setInstallProgress(100);
+          } catch (capErr: any) {
+            setIsInstalling(false);
+            setInstallError(capErr?.message || 'Automatic installer failed. Opening browser download.');
+            if (win.Capacitor?.Plugins?.AppUpdater?.openInBrowser) {
+              await win.Capacitor.Plugins.AppUpdater.openInBrowser({ url: updateInfo.downloadUrl });
+            } else {
+              window.open(updateInfo.downloadUrl, '_system');
+            }
+          }
           return;
         } else {
-          window.location.href = updateInfo.downloadUrl;
+          window.open(updateInfo.downloadUrl, '_system');
           setInstallProgress(100);
           return;
         }

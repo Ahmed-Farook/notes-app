@@ -46,7 +46,7 @@
     }
 
     header {
-      padding: 1rem 1.5rem;
+      padding: 0.75rem 1.5rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -55,37 +55,47 @@
       position: sticky;
       top: 0;
       z-index: 50;
+      backdrop-filter: blur(8px);
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 0.6rem;
+      gap: 0.65rem;
       text-decoration: none;
       color: var(--text);
       font-weight: 700;
       font-size: 1.1rem;
     }
 
-    .brand img {
-      width: 24px;
-      height: 24px;
+    .brand-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.15rem 0.6rem;
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 9999px;
+      margin-left: 0.5rem;
     }
 
     .header-actions {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 0.5rem;
     }
 
     .btn {
-      padding: 0.4rem 0.85rem;
-      border-radius: 0.5rem;
-      font-size: 0.8rem;
+      padding: 0.45rem 0.85rem;
+      border-radius: 0.65rem;
+      font-size: 0.78rem;
       font-weight: 600;
       cursor: pointer;
       border: 1px solid var(--border);
-      background: var(--bg);
+      background: var(--card-bg);
       color: var(--text);
       display: inline-flex;
       align-items: center;
@@ -105,9 +115,13 @@
       border-color: var(--accent);
     }
 
+    .btn-icon {
+      padding: 0.45rem;
+    }
+
     main {
       flex: 1;
-      max-width: 800px;
+      max-width: 840px;
       width: 100%;
       margin: 2rem auto;
       padding: 0 1.25rem;
@@ -123,18 +137,20 @@
     }
 
     .note-meta {
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       color: var(--text-muted);
-      margin-bottom: 1.25rem;
+      margin-bottom: 1rem;
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.75rem;
     }
 
     .note-title {
-      font-size: 2rem;
+      font-size: 2.25rem;
       font-weight: 800;
-      line-height: 1.25;
+      line-height: 1.2;
       margin-bottom: 1.5rem;
       letter-spacing: -0.02em;
     }
@@ -148,136 +164,164 @@
       margin: 0.75rem 0 1rem 1.5rem;
     }
 
-    .note-content ul[data-type="taskList"] {
-      list-style: none;
-      margin-left: 0;
-    }
-
-    .note-content ul[data-type="taskList"] li {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.5rem;
-      margin-bottom: 0.35rem;
-    }
-
-    .note-content ul[data-type="taskList"] input[type="checkbox"] {
-      margin-top: 0.3rem;
-      accent-color: var(--accent);
-    }
-
-    .note-content table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 1.25rem 0;
-      border: 1px solid var(--border);
-      border-radius: 0.5rem;
-      overflow: hidden;
-    }
-
-    .note-content th, .note-content td {
-      border: 1px solid var(--border);
-      padding: 0.6rem 0.85rem;
-      text-align: left;
-    }
-
-    .note-content th {
-      background: var(--code-bg);
-      font-weight: 600;
-    }
-
     .note-content pre {
-      background: var(--code-bg);
+      background-color: var(--code-bg);
       border: 1px solid var(--pre-border);
+      padding: 0.85rem 1rem 0.85rem 1.25rem;
       border-radius: 0.75rem;
-      padding: 1rem;
-      overflow-x: auto;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 0.85rem;
-      margin: 1.25rem 0;
-    }
-
-    .note-content code:not(pre code) {
-      background: var(--code-bg);
-      padding: 0.15rem 0.35rem;
-      border-radius: 0.25rem;
-      font-size: 0.875em;
-      font-family: ui-monospace, monospace;
-    }
-
-    .note-content img {
-      max-width: 100%;
-      height: auto;
-      border-radius: 0.5rem;
+      font-size: 0.82rem;
+      line-height: 1.6;
       margin: 1rem 0;
-      border: 1px solid var(--border);
+      overflow-x: auto;
+      spellcheck: false;
+      -webkit-spell-check: false;
+    }
+
+    .note-content code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.85em;
+      spellcheck: false;
+    }
+
+    .note-content blockquote {
+      border-left: 3px solid var(--accent);
+      padding-left: 1rem;
+      margin: 1rem 0;
+      color: var(--text-muted);
+      font-style: italic;
     }
 
     .drawing-container {
-      margin-top: 1.5rem;
-      border: 1px dashed var(--border);
-      border-radius: 0.75rem;
-      background: var(--bg);
-      padding: 1rem;
-      position: relative;
+      margin-top: 2rem;
+      border-top: 1px solid var(--border);
+      padding-top: 1.25rem;
+    }
+
+    .drawing-title {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
     }
 
     .drawing-canvas {
       width: 100%;
       height: auto;
       display: block;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
     }
 
     footer {
       text-align: center;
-      padding: 2rem 1rem;
+      padding: 1.75rem 1rem;
       font-size: 0.8rem;
       color: var(--text-muted);
       border-top: 1px solid var(--border);
+      background: var(--card-bg);
+    }
+
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
     }
 
     @media (max-width: 600px) {
       .note-card { padding: 1.5rem; }
-      .note-title { font-size: 1.5rem; }
+      .note-title { font-size: 1.6rem; }
+    }
+
+    @media print {
+      header, footer, .header-actions { display: none !important; }
+      body { background: #FFFFFF !important; color: #000000 !important; }
+      .note-card { border: none !important; box-shadow: none !important; padding: 0 !important; }
     }
   </style>
 </head>
 <body>
   <header>
     <a href="./" class="brand">
-      <img src="./logo.svg" alt="texō">
+      <svg width="24" height="24" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+        <path d="M28 0H78L120 42V92A28 28 0 0 1 92 120H28A28 28 0 0 1 0 92V28A28 28 0 0 1 28 0Z" fill="#263850"/>
+        <path d="M78 0L120 42H90A12 12 0 0 1 78 30Z" fill="#4C627E"/>
+        <g transform="translate(19.8 27.5) scale(0.58)" fill="none" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M52 20V70C52 90 63 101 80 99C90 98 96 92 98 84" stroke="#F5F0E6" stroke-width="15"/>
+          <path d="M20 56C44 54 72 44 98 36" stroke="#263850" stroke-width="23"/>
+          <path d="M20 56C44 54 72 44 88 37" stroke="#F5F0E6" stroke-width="15"/>
+        </g>
+      </svg>
       <span>texō</span>
+      <span class="brand-badge">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span>Read-Only Note</span>
+      </span>
     </a>
     <div class="header-actions">
-      <button class="btn" id="theme-toggle" title="Toggle theme">🌓 Theme</button>
-      <button class="btn" onclick="window.print()" title="Print note">🖨️ Print</button>
-      <a href="./" class="btn btn-primary">Get texō</a>
+      <!-- Theme Toggle (Lucide Sun / Moon) -->
+      <button class="btn btn-icon" id="theme-toggle" title="Toggle dark mode" aria-label="Toggle theme">
+        <svg id="theme-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+        </svg>
+      </button>
+      <!-- Print (Lucide Printer) -->
+      <button class="btn" onclick="window.print()" title="Print note">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
+        <span>Print</span>
+      </button>
+      <!-- Copy Link (Lucide Copy) -->
+      <button class="btn" id="copy-btn" title="Copy share link">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+        <span id="copy-text">Copy Link</span>
+      </button>
+      <!-- Get texo (Lucide Sparkles) -->
+      <a href="./" class="btn btn-primary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+        <span>Get texō</span>
+      </a>
     </div>
   </header>
 
   <main>
     <article class="note-card" id="note-card">
-      <div class="note-meta" id="note-date">Shared Note</div>
+      <div class="note-meta">
+        <span id="note-date">Shared Note</span>
+        <span>Zero-Knowledge Link</span>
+      </div>
       <h1 class="note-title" id="note-title">Untitled Note</h1>
       <div class="note-content" id="note-content">Loading note...</div>
       
       <div id="drawing-wrapper" class="drawing-container" style="display: none;">
+        <div class="drawing-title">Handwritten Sketches &amp; Annotations</div>
         <canvas id="drawing-canvas" class="drawing-canvas"></canvas>
       </div>
     </article>
   </main>
 
   <footer>
-    Made with <strong>texō</strong> — the cross-platform, zero-knowledge note-taking app.
+    Made with <strong>texō</strong> — the cross-platform, zero-knowledge note-taking app. &bull; <a href="./">Create your own notes</a>
   </footer>
 
   <script>
     // Theme toggle
     const themeBtn = document.getElementById('theme-toggle');
+    const themeIcon = document.getElementById('theme-icon');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     let isDark = localStorage.getItem('texo_public_theme') === 'dark' || (!localStorage.getItem('texo_public_theme') && prefersDark);
     
     function applyTheme() {
       document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      if (isDark) {
+        // Moon icon
+        themeIcon.innerHTML = '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>';
+      } else {
+        // Sun icon
+        themeIcon.innerHTML = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>';
+      }
     }
     applyTheme();
 
@@ -286,6 +330,15 @@
       localStorage.setItem('texo_public_theme', isDark ? 'dark' : 'light');
       applyTheme();
       renderDrawings();
+    });
+
+    // Copy Link button
+    const copyBtn = document.getElementById('copy-btn');
+    const copyText = document.getElementById('copy-text');
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(window.location.href);
+      copyText.textContent = 'Copied!';
+      setTimeout(() => { copyText.textContent = 'Copy Link'; }, 2000);
     });
 
     let currentStrokes = [];
@@ -300,15 +353,23 @@
         let contentHtml = params.get('content') || '';
         let strokesRaw = params.get('strokes') || '';
 
-        // If encoded via base64 JSON payload
-        if (params.get('data')) {
+        // If encoded via base64 JSON payload (?share= or #share= or #data=)
+        const payloadParam = params.get('share') || params.get('data');
+        if (payloadParam) {
           try {
-            const decoded = decodeURIComponent(escape(atob(params.get('data'))));
+            const decoded = decodeURIComponent(escape(atob(payloadParam)));
             const json = JSON.parse(decoded);
             title = json.title || title;
             contentHtml = json.content || contentHtml;
             strokesRaw = json.strokes || strokesRaw;
-          } catch (_) {}
+          } catch (_) {
+            try {
+              const json = JSON.parse(atob(payloadParam));
+              title = json.title || title;
+              contentHtml = json.content || contentHtml;
+              strokesRaw = json.strokes || strokesRaw;
+            } catch (__) {}
+          }
         }
 
         document.title = `${title} - texō`;
@@ -350,18 +411,23 @@
 
       let maxX = 0, maxY = 0;
       for (const s of currentStrokes) {
-        for (const p of s.points) {
+        for (const p of (s.points || [])) {
           if (p.x > maxX) maxX = p.x;
           if (p.y > maxY) maxY = p.y;
         }
       }
 
+      const dpr = window.devicePixelRatio || 2;
       const width = Math.max(700, Math.ceil(maxX + 40));
       const height = Math.max(250, Math.ceil(maxY + 40));
 
-      canvas.width = width;
-      canvas.height = height;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
+
       const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
       ctx.clearRect(0, 0, width, height);
 
       for (const stroke of currentStrokes) {
@@ -370,45 +436,32 @@
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        let color = stroke.color;
-        // Invert black/white strokes based on dark theme
+        let color = stroke.color || (isDark ? '#E8EEF3' : '#1C2B36');
         if (isDark && (color === '#1C2B36' || color === '#213A50' || color === '#000000')) {
           color = '#E8EEF3';
         } else if (!isDark && (color === '#E8EEF3' || color === '#FFFFFF')) {
           color = '#213A50';
         }
 
-        if (stroke.tool === 'highlighter') {
-          ctx.globalAlpha = 0.45;
-          ctx.strokeStyle = color;
-          ctx.lineWidth = stroke.size * 2;
-        } else if (stroke.tool === 'eraser') {
-          ctx.globalCompositeOperation = 'destination-out';
-          ctx.strokeStyle = 'rgba(0,0,0,1)';
-          ctx.lineWidth = stroke.size * 3;
-        } else {
-          ctx.globalAlpha = 1;
-          ctx.strokeStyle = color;
-          ctx.lineWidth = stroke.size;
-        }
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.globalAlpha = stroke.tool === 'highlighter' ? 0.38 : 1;
+        ctx.lineWidth = stroke.tool === 'highlighter' ? (stroke.size || 2) * 2.8 : (stroke.size || 2);
 
-        const pts = stroke.points;
-        if (pts.length === 1) {
+        if (stroke.points.length === 1) {
+          const p = stroke.points[0];
           ctx.beginPath();
-          ctx.arc(pts[0].x, pts[0].y, ctx.lineWidth / 2, 0, Math.PI * 2);
-          ctx.fillStyle = ctx.strokeStyle;
+          ctx.arc(p.x, p.y, Math.max(1.5, (stroke.size || 2) / 2), 0, Math.PI * 2);
           ctx.fill();
         } else {
           ctx.beginPath();
-          ctx.moveTo(pts[0].x, pts[0].y);
-          for (let i = 1; i < pts.length; i++) {
-            const prev = pts[i - 1];
-            const curr = pts[i];
-            const midX = (prev.x + curr.x) / 2;
-            const midY = (prev.y + curr.y) / 2;
-            ctx.quadraticCurveTo(prev.x, prev.y, midX, midY);
+          ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+          for (let i = 1; i < stroke.points.length; i++) {
+            const prev = stroke.points[i - 1];
+            const curr = stroke.points[i];
+            ctx.quadraticCurveTo(prev.x, prev.y, (prev.x + curr.x) / 2, (prev.y + curr.y) / 2);
           }
-          const last = pts[pts.length - 1];
+          const last = stroke.points[stroke.points.length - 1];
           ctx.lineTo(last.x, last.y);
           ctx.stroke();
         }
@@ -417,7 +470,7 @@
     }
 
     window.addEventListener('DOMContentLoaded', loadSharedData);
+    window.addEventListener('hashchange', loadSharedData);
   </script>
 </body>
 </html>
-

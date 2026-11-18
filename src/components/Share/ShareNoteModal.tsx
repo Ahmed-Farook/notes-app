@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Share2, Copy, Check, ExternalLink, Globe, Lock, ShieldCheck } from 'lucide-react';
+import { X, Share2, Copy, Check, ExternalLink, Globe, ShieldCheck, Settings2 } from 'lucide-react';
 import { triggerHaptic } from '../../utils/haptics';
 import { Note } from '../../types/note';
 
@@ -16,6 +16,23 @@ export const ShareNoteModal: React.FC<ShareNoteModalProps> = ({
   note,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [showDomainInput, setShowDomainInput] = useState(false);
+  const [customOrigin, setCustomOrigin] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const curOrigin = window.location.origin;
+      if (curOrigin && curOrigin.startsWith('http') && !curOrigin.includes('localhost') && !curOrigin.includes('127.0.0.1')) {
+        return curOrigin;
+      }
+      return localStorage.getItem('texo_custom_web_origin') || '';
+    }
+    return '';
+  });
+
+  const isWebOrigin = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const curOrigin = window.location.origin;
+    return Boolean(curOrigin && curOrigin.startsWith('http') && !curOrigin.includes('localhost') && !curOrigin.includes('127.0.0.1'));
+  }, []);
 
   const shareUrl = useMemo(() => {
     if (!note) return '';
@@ -27,11 +44,28 @@ export const ShareNoteModal: React.FC<ShareNoteModalProps> = ({
       };
       const jsonStr = JSON.stringify(payload);
       const encoded = btoa(unescape(encodeURIComponent(jsonStr)));
-      return `https://ahmed-farook.github.io/notes-app/share.html#data=${encoded}`;
+
+      let base = customOrigin.trim();
+      if (!base && typeof window !== 'undefined') {
+        const curOrigin = window.location.origin;
+        if (curOrigin && curOrigin.startsWith('http') && !curOrigin.includes('localhost') && !curOrigin.includes('127.0.0.1')) {
+          base = curOrigin;
+        }
+      }
+      if (!base) {
+        base = 'https://ahmed-farook.github.io/notes-app';
+      }
+
+      base = base.replace(/\/$/, '');
+      const path = (typeof window !== 'undefined' && window.location.pathname !== '/' && !window.location.pathname.endsWith('.html'))
+        ? window.location.pathname.replace(/\/$/, '')
+        : '';
+
+      return `${base}${path}/?share=${encoded}`;
     } catch (_) {
       return '';
     }
-  }, [note]);
+  }, [note, customOrigin]);
 
   if (!isOpen || !note) return null;
 
@@ -49,6 +83,14 @@ export const ShareNoteModal: React.FC<ShareNoteModalProps> = ({
     if (!shareUrl) return;
     triggerHaptic();
     window.open(shareUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleSaveOrigin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('texo_custom_web_origin', customOrigin.trim());
+    }
+    setShowDomainInput(false);
   };
 
   const modalContent = (
@@ -92,7 +134,7 @@ export const ShareNoteModal: React.FC<ShareNoteModalProps> = ({
                 <Globe size={12} className="text-emerald-500" />
                 <span>Public Read-Only Web Link</span>
               </span>
-              <span>Rich Text & Drawing</span>
+              <span>Rich Text &amp; Sketches</span>
             </div>
             <p className="text-[#1C2B36] dark:text-[#E8EEF3] font-medium line-clamp-2">
               {note.plainTextPreview || 'No content preview'}
@@ -101,7 +143,7 @@ export const ShareNoteModal: React.FC<ShareNoteModalProps> = ({
 
           <div className="flex items-center space-x-1.5 text-[11px] text-[#6E8092] dark:text-[#8AA0B4]">
             <ShieldCheck size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <span>Anyone with this secret link can view the note in any browser without an account.</span>
+            <span>Anyone with this link can view the note in any browser without an account.</span>
           </div>
 
           {/* Share Link Input with Copy button */}
@@ -129,6 +171,47 @@ export const ShareNoteModal: React.FC<ShareNoteModalProps> = ({
                 </>
               )}
             </button>
+          </div>
+
+          {/* Custom Web Host (for Desktop/Electron or custom Vercel deployments) */}
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => setShowDomainInput(!showDomainInput)}
+              className="text-[11px] text-[#6E8092] dark:text-[#8AA0B4] hover:text-[#1C2B36] dark:hover:text-[#CBD8E3] flex items-center space-x-1"
+            >
+              <Settings2 size={11} />
+              <span>
+                {isWebOrigin
+                  ? `Hosted on this Vercel domain (${window.location.host})`
+                  : customOrigin
+                  ? `Linked to: ${customOrigin}`
+                  : 'Configure custom Vercel / Web domain'}
+              </span>
+            </button>
+
+            {showDomainInput && (
+              <form onSubmit={handleSaveOrigin} className="mt-2 space-y-1.5 p-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-[#DFD3C0] dark:border-[#263747]">
+                <label className="text-[10px] uppercase font-bold text-[#6E8092] dark:text-[#8AA0B4]">
+                  Vercel or Custom Web App URL
+                </label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="url"
+                    placeholder="https://your-notes.vercel.app"
+                    value={customOrigin}
+                    onChange={(e) => setCustomOrigin(e.target.value)}
+                    className="flex-1 px-2.5 py-1.5 text-xs rounded-lg bg-white dark:bg-[#121922] border border-[#DFD3C0] dark:border-[#2C4054] text-[#1C2B36] dark:text-[#CBD8E3] font-mono outline-none"
+                  />
+                  <button
+                    type="submit"
+                    className="px-2.5 py-1.5 bg-apple-yellow text-white rounded-lg text-xs font-semibold hover:bg-apple-yellowHover"
+                  >
+                    Save
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
 
@@ -160,4 +243,3 @@ export const ShareNoteModal: React.FC<ShareNoteModalProps> = ({
 
   return modalContent;
 };
-
