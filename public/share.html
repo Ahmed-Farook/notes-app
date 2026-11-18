@@ -357,14 +357,18 @@
         const payloadParam = params.get('share') || params.get('data');
         if (payloadParam) {
           try {
-            const decoded = decodeURIComponent(escape(atob(payloadParam)));
+            let str = payloadParam;
+            try { str = decodeURIComponent(payloadParam); } catch (_) {}
+            const clean = str.replace(/ /g, '+');
+            const decoded = decodeURIComponent(escape(atob(clean)));
             const json = JSON.parse(decoded);
             title = json.title || title;
             contentHtml = json.content || contentHtml;
             strokesRaw = json.strokes || strokesRaw;
           } catch (_) {
             try {
-              const json = JSON.parse(atob(payloadParam));
+              const clean = payloadParam.replace(/ /g, '+');
+              const json = JSON.parse(atob(clean));
               title = json.title || title;
               contentHtml = json.content || contentHtml;
               strokesRaw = json.strokes || strokesRaw;

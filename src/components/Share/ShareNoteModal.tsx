@@ -44,6 +44,7 @@ export const ShareNoteModal: React.FC<ShareNoteModalProps> = ({
       };
       const jsonStr = JSON.stringify(payload);
       const encoded = btoa(unescape(encodeURIComponent(jsonStr)));
+      const safeEncoded = encodeURIComponent(encoded);
 
       let base = customOrigin.trim();
       if (!base && typeof window !== 'undefined') {
@@ -61,7 +62,7 @@ export const ShareNoteModal: React.FC<ShareNoteModalProps> = ({
         ? window.location.pathname.replace(/\/$/, '')
         : '';
 
-      return `${base}${path}/?share=${encoded}`;
+      return `${base}${path}/?share=${safeEncoded}`;
     } catch (_) {
       return '';
     }

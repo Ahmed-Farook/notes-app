@@ -30,6 +30,7 @@ export const SUPPORTED_LANGUAGES = [
 export const CodeBlockView: React.FC<NodeViewProps> = ({ node, updateAttributes, extension }) => {
   const [copied, setCopied] = useState(false);
   const currentLang = node.attrs.language || '';
+  const currentLangLabel = SUPPORTED_LANGUAGES.find((l) => l.value === currentLang)?.label || 'Auto / Plain Text';
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -58,12 +59,17 @@ export const CodeBlockView: React.FC<NodeViewProps> = ({ node, updateAttributes,
         className="flex items-center justify-between px-3 py-1.5 bg-[#EFE7D8]/80 dark:bg-[#18232E]/90 border-b border-[#DFD3C0]/60 dark:border-[#223344]/80 text-xs text-[#5A6E82] dark:text-[#8AA0B4] select-none"
         contentEditable={false}
       >
-        {/* Language Selector */}
-        <div className="relative inline-flex items-center">
+        {/* Dynamic Auto-Sizing Language Selector */}
+        <div className="relative inline-flex items-center px-1.5 py-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer group">
+          <span className="font-mono text-[11px] font-medium text-[#213A50] dark:text-[#CBD8E3] mr-1 select-none pointer-events-none">
+            {currentLangLabel}
+          </span>
+          <ChevronDown size={11} className="pointer-events-none text-neutral-400 dark:text-neutral-500 shrink-0" />
           <select
             value={currentLang}
             onChange={handleLanguageChange}
-            className="appearance-none bg-transparent pl-1.5 pr-5 py-0.5 rounded text-[11px] font-mono font-medium text-[#213A50] dark:text-[#CBD8E3] hover:text-black dark:hover:text-white cursor-pointer outline-none focus:ring-1 focus:ring-apple-yellow dark:focus:ring-[#7EAAD0]"
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-xs"
+            title="Change code language"
           >
             {SUPPORTED_LANGUAGES.map((lang) => (
               <option
@@ -75,7 +81,6 @@ export const CodeBlockView: React.FC<NodeViewProps> = ({ node, updateAttributes,
               </option>
             ))}
           </select>
-          <ChevronDown size={11} className="pointer-events-none absolute right-0.5 text-neutral-400 dark:text-neutral-500" />
         </div>
 
         {/* Copy Button */}
@@ -104,7 +109,7 @@ export const CodeBlockView: React.FC<NodeViewProps> = ({ node, updateAttributes,
         spellCheck={false}
         autoCorrect="off"
         autoCapitalize="off"
-        className="py-3.5 pl-5 pr-4 m-0 font-mono text-[13px] leading-relaxed overflow-x-auto text-[#1C2B36] dark:text-[#E8EEF3] select-text"
+        className="py-3.5 pl-6 pr-4 m-0 font-mono text-[13px] leading-relaxed overflow-x-auto text-[#1C2B36] dark:text-[#E8EEF3] select-text"
       >
         <NodeViewContent
           as="code"

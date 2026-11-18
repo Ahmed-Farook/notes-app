@@ -174,6 +174,21 @@
   overflow-x: auto;
 }
 
+/* Ensure code inside the code block wrapper has clean aesthetic padding from the left border */
+.code-block-wrapper pre,
+.tiptap .code-block-wrapper pre {
+  padding-left: 1.5rem !important;
+  padding-right: 1.25rem !important;
+  padding-top: 0.85rem !important;
+  padding-bottom: 0.85rem !important;
+}
+
+.code-block-wrapper code,
+.tiptap .code-block-wrapper code {
+  display: block;
+  padding-left: 0.25rem !important;
+}
+
 .code-block-wrapper,
 .code-block-wrapper pre,
 .code-block-wrapper code,

@@ -41,18 +41,31 @@ export const SharedNoteView: React.FC<SharedNoteViewProps> = ({ payloadStr, onEx
   const contentRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Parse payload
+  // Parse payload with rock-solid decoding
   const noteData = useMemo<SharedPayload | null>(() => {
     if (!payloadStr) return null;
     try {
-      const decoded = decodeURIComponent(escape(atob(payloadStr)));
-      return JSON.parse(decoded);
-    } catch (_) {
+      let str = payloadStr;
       try {
-        return JSON.parse(atob(payloadStr));
-      } catch (err) {
-        return null;
+        str = decodeURIComponent(payloadStr);
+      } catch (_) {}
+
+      // In URL query parameters, '+' gets converted to space ' '; restore them:
+      const cleanBase64 = str.replace(/ /g, '+');
+
+      try {
+        const jsonStr = decodeURIComponent(escape(atob(cleanBase64)));
+        return JSON.parse(jsonStr);
+      } catch (_) {
+        try {
+          return JSON.parse(atob(cleanBase64));
+        } catch (_) {
+          return JSON.parse(str);
+        }
       }
+    } catch (err) {
+      console.warn('Failed to parse shared note payload:', err);
+      return null;
     }
   }, [payloadStr]);
 

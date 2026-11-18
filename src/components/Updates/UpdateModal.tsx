@@ -52,22 +52,6 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     }
   }, []);
 
-  useEffect(() => {
-    const win = window as any;
-    let removeListener: any = null;
-    if (win.Capacitor?.Plugins?.AppUpdater?.addListener) {
-      win.Capacitor.Plugins.AppUpdater.addListener('updateError', (err: any) => {
-        setIsInstalling(false);
-        setInstallError(err?.error || 'Update failed. Opening browser to download directly.');
-      }).then((h: any) => {
-        removeListener = h;
-      });
-    }
-    return () => {
-      if (removeListener?.remove) removeListener.remove();
-    };
-  }, []);
-
   const handleInstallNow = async () => {
     if (!updateInfo) return;
     setIsInstalling(true);
