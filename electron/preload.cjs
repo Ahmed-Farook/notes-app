@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sendCheckUpdates: (callback) => ipcRenderer.on('action:check-updates', callback),
   checkForUpdates: (token) => ipcRenderer.invoke('updater:check', token),
   installUpdate: (downloadUrl) => ipcRenderer.invoke('updater:install-update', downloadUrl),
+  checkBiometrics: () => ipcRenderer.invoke('biometrics:is-available'),
+  promptBiometrics: (reason) => ipcRenderer.invoke('biometrics:prompt', reason),
   onUpdateProgress: (callback) => {
     const listener = (_event, percent) => callback(percent);
     ipcRenderer.on('updater:progress', listener);

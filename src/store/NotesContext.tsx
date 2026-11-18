@@ -39,6 +39,7 @@ import {
   exportNotesAsZip,
   parseImportedFiles,
 } from '../utils/noteExportImport';
+import { promptBiometricAuth } from '../utils/biometrics';
 
 export type PendingTrashDelete =
   | { type: 'single'; id: string; title?: string }
@@ -111,6 +112,7 @@ interface NotesContextType {
   // Note Password Protection & Locking
   unlockedNoteIds: Set<string>;
   unlockNote: (noteId: string, password: string) => Promise<boolean>;
+  unlockNoteWithBiometrics: (noteId: string) => Promise<boolean>;
   lockNoteWithPassword: (noteId: string, password: string, hint?: string) => Promise<void>;
   removeNotePassword: (noteId: string, password: string) => Promise<boolean>;
   relockNote: (noteId: string) => void;
@@ -432,7 +434,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     saveStoredFolders(folders);
   }, [folders]);
 
-  // Listen to native Electron bridge actions if available
+  // Listen to native Electron bridge actions and Android widget events if available
   useEffect(() => {
     const electronAPI = (window as unknown as { electronAPI?: { sendNewNote: (cb: () => void) => void } })?.electronAPI;
     if (electronAPI?.sendNewNote) {
@@ -440,6 +442,12 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         createNote();
       });
     }
+
+    const handleWidgetNewNote = () => {
+      createNote();
+    };
+    window.addEventListener('action:new-note', handleWidgetNewNote);
+    return () => window.removeEventListener('action:new-note', handleWidgetNewNote);
   }, []);
 
   const toggleTheme = useCallback(() => {
@@ -858,6 +866,18 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return false;
   }, [updateNote]);
 
+  const unlockNoteWithBiometrics = useCallback(async (noteId: string): Promise<boolean> => {
+    const note = notesRef.current.find((n) => n.id === noteId);
+    if (!note) return false;
+    const res = await promptBiometricAuth(`Unlock "${note.title || 'Note'}"`);
+    if (res.success) {
+      setUnlockedNoteIds((prev) => new Set(prev).add(noteId));
+      triggerHaptic();
+      return true;
+    }
+    return false;
+  }, []);
+
   const lockNoteWithPassword = useCallback(
     async (noteId: string, password: string, hint?: string): Promise<void> => {
       const hash = await hashNotePassword(password, noteId);
@@ -1140,6 +1160,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         importNotes,
         unlockedNoteIds,
         unlockNote,
+        unlockNoteWithBiometrics,
         lockNoteWithPassword,
         removeNotePassword,
         relockNote,

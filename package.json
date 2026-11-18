@@ -1,6 +1,6 @@
 {
   "name": "apple-notes-crossplatform",
-  "version": "0.2.49",
+  "version": "0.2.50",
   "description": "texō cross-platform note taking application",
   "author": "Ahmed Farook",
   "license": "MIT",
@@ -68,6 +68,7 @@
     "@capacitor/share": "^8.0.3",
     "@capacitor/status-bar": "^8.0.4",
     "@supabase/supabase-js": "^2.118.0",
+    "@tiptap/extension-code-block-lowlight": "^2.27.3",
     "@tiptap/extension-highlight": "^2.11.5",
     "@tiptap/extension-image": "^2.27.3",
     "@tiptap/extension-placeholder": "^2.11.5",
@@ -87,6 +88,7 @@
     "jspdf": "^4.2.1",
     "jszip": "^3.10.2",
     "katex": "^0.19.1",
+    "lowlight": "^3.3.0",
     "lucide-react": "^1.16.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

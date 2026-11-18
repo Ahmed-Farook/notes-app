@@ -14,7 +14,7 @@ import Table from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableCell from '@tiptap/extension-table-cell';
 import TableHeader from '@tiptap/extension-table-header';
-import { RotateCcw, Trash2, Search, ChevronUp, ChevronDown, X, Plus, Edit3, Lock, Eye, EyeOff } from 'lucide-react';
+import { RotateCcw, Trash2, Search, ChevronUp, ChevronDown, X, Plus, Edit3, Lock, Eye, EyeOff, Fingerprint } from 'lucide-react';
 
 import { useNotes } from '../../store/NotesContext';
 import { formatEditorDate } from '../../utils/dateUtils';
@@ -23,7 +23,10 @@ import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import { EditorToolbar } from './EditorToolbar';
 import { InNoteCanvas, DrawingToolType } from '../Drawing/InNoteCanvas';
+import { ImageMarkupModal } from '../Drawing/ImageMarkupModal';
 import { MathBlock, isLatexFormula } from '../../extensions/MathExtension';
+import { CustomCodeBlock } from '../../extensions/CodeBlockExtension';
+import { checkBiometricsAvailable, BiometricCheckResult } from '../../utils/biometrics';
 
 /**
  * CustomImage: Preserves drawing strokes JSON in data-strokes attribute for re-editing
@@ -438,6 +441,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     theme,
     unlockedNoteIds,
     unlockNote,
+    unlockNoteWithBiometrics,
   } = useNotes();
 
   const isNoteLocked = Boolean(activeNote?.isLocked && !unlockedNoteIds.has(activeNote.id));
@@ -450,6 +454,27 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
   const [showUnlockPassword, setShowUnlockPassword] = useState(false);
   const [unlockError, setUnlockError] = useState('');
   const [isUnlocking, setIsUnlocking] = useState(false);
+  const [editorBiometrics, setEditorBiometrics] = useState<BiometricCheckResult | null>(null);
+
+  useEffect(() => {
+    checkBiometricsAvailable().then((info) => setEditorBiometrics(info));
+  }, []);
+
+  const handleEditorBiometricUnlock = async () => {
+    if (!activeNote) return;
+    setUnlockError('');
+    setIsUnlocking(true);
+    try {
+      const ok = await unlockNoteWithBiometrics(activeNote.id);
+      if (!ok) {
+        setUnlockError('Biometric verification cancelled or not recognized.');
+      }
+    } catch (_) {
+      setUnlockError('Biometric unlock failed');
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
 
   useEffect(() => {
     setUnlockPasswordInput('');
@@ -582,6 +607,51 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     type: 'image' | 'table' | 'math';
     targetEl: HTMLElement;
   } | null>(null);
+  const [markupTarget, setMarkupTarget] = useState<{
+    el: HTMLImageElement;
+    src: string;
+    strokes?: string | null;
+  } | null>(null);
+
+  const handleSaveMarkup = (newBase64: string, strokesJson: string) => {
+    if (!markupTarget || !editor) return;
+    try {
+      let replaced = false;
+      editor.state.doc.descendants((node, pos) => {
+        if (replaced) return false;
+        if (node.type.name === 'image') {
+          const dom = editor.view.nodeDOM(pos);
+          const targetImg = markupTarget.el;
+          if (
+            dom === targetImg ||
+            (dom && ((dom as HTMLElement) === targetImg || (dom as HTMLElement).querySelector('img') === targetImg))
+          ) {
+            editor
+              .chain()
+              .focus()
+              .setNodeSelection(pos)
+              .updateAttributes('image', {
+                src: newBase64,
+                'data-strokes': strokesJson,
+              })
+              .run();
+            replaced = true;
+            return false;
+          }
+        }
+        return true;
+      });
+
+      if (!replaced) {
+        markupTarget.el.src = newBase64;
+        markupTarget.el.setAttribute('data-strokes', strokesJson);
+      }
+    } catch (_) {
+      markupTarget.el.src = newBase64;
+      markupTarget.el.setAttribute('data-strokes', strokesJson);
+    }
+    setMarkupTarget(null);
+  };
   const longPressTimerRef = useRef<number | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -740,10 +810,12 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
+        codeBlock: false,
         heading: {
           levels: [1, 2, 3],
         },
       }),
+      CustomCodeBlock,
       EnforceTitleExtension,
       Underline,
       Highlight.configure({ multicolor: false }),
@@ -1218,6 +1290,25 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
           </p>
 
           <form onSubmit={handleUnlockSubmit} className="w-full max-w-xs space-y-3">
+            {editorBiometrics?.isAvailable && (
+              <div>
+                <button
+                  type="button"
+                  onClick={handleEditorBiometricUnlock}
+                  disabled={isUnlocking}
+                  className="w-full py-2.5 px-4 rounded-xl font-semibold text-xs bg-amber-500/10 dark:bg-amber-400/10 border border-amber-500/30 dark:border-amber-400/30 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 flex items-center justify-center space-x-2 transition-all active:scale-[0.98] cursor-pointer shadow-xs mb-3"
+                >
+                  <Fingerprint size={16} />
+                  <span>Unlock with {editorBiometrics.label}</span>
+                </button>
+                <div className="flex items-center my-2 text-[10px] text-[#6E8092] dark:text-[#8AA0B4]">
+                  <div className="flex-1 h-px bg-[#DFD3C0] dark:bg-[#2C4054]" />
+                  <span className="px-2">or password</span>
+                  <div className="flex-1 h-px bg-[#DFD3C0] dark:bg-[#2C4054]" />
+                </div>
+              </div>
+            )}
+
             <div className="relative">
               <input
                 type={showUnlockPassword ? 'text' : 'password'}
@@ -1413,29 +1504,54 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
             </div>
 
             {contextMenu.type === 'image' ? (
-              <button
-                type="button"
-                onClick={() => {
-                  triggerHaptic();
-                  if (editor && contextMenu.targetEl) {
-                    try {
-                      const pos = editor.view.posAtDOM(contextMenu.targetEl, 0);
-                      if (typeof pos === 'number' && pos >= 0) {
-                        editor.chain().focus().deleteRange({ from: pos, to: pos + 1 }).run();
-                      } else {
+              <div className="space-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic();
+                    if (contextMenu.targetEl) {
+                      const img = (contextMenu.targetEl.tagName === 'IMG'
+                        ? contextMenu.targetEl
+                        : contextMenu.targetEl.querySelector('img')) as HTMLImageElement;
+                      if (img) {
+                        setMarkupTarget({
+                          el: img,
+                          src: img.src,
+                          strokes: img.getAttribute('data-strokes'),
+                        });
+                      }
+                    }
+                    setContextMenu(null);
+                  }}
+                  className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-[#213A50] dark:text-[#E8EEF3] hover:bg-[#EBE2D3] dark:hover:bg-[#263747] font-medium transition-colors"
+                >
+                  <Edit3 size={14} className="text-apple-yellow" />
+                  <span>Annotate & Markup</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic();
+                    if (editor && contextMenu.targetEl) {
+                      try {
+                        const pos = editor.view.posAtDOM(contextMenu.targetEl, 0);
+                        if (typeof pos === 'number' && pos >= 0) {
+                          editor.chain().focus().deleteRange({ from: pos, to: pos + 1 }).run();
+                        } else {
+                          contextMenu.targetEl.remove();
+                        }
+                      } catch (_) {
                         contextMenu.targetEl.remove();
                       }
-                    } catch (_) {
-                      contextMenu.targetEl.remove();
                     }
-                  }
-                  setContextMenu(null);
-                }}
-                className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 font-medium transition-colors"
-              >
-                <Trash2 size={14} />
-                <span>Delete Image</span>
-              </button>
+                    setContextMenu(null);
+                  }}
+                  className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 font-medium transition-colors"
+                >
+                  <Trash2 size={14} />
+                  <span>Delete Image</span>
+                </button>
+              </div>
             ) : contextMenu.type === 'table' ? (
               <div className="space-y-0.5">
                 <button
@@ -1553,6 +1669,17 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
             </button>
           </div>
         </div>
+      )}
+
+      {/* Interactive Image Markup Modal */}
+      {markupTarget && (
+        <ImageMarkupModal
+          isOpen={Boolean(markupTarget)}
+          imageSrc={markupTarget.src}
+          initialStrokesJson={markupTarget.strokes}
+          onClose={() => setMarkupTarget(null)}
+          onSave={handleSaveMarkup}
+        />
       )}
     </div>
   );

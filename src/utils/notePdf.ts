@@ -12,6 +12,7 @@ import TableHeader from '@tiptap/extension-table-header';
 import { getFontEmbedCSS, toCanvas } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { MathBlock } from '../extensions/MathExtension';
+import { CustomCodeBlock } from '../extensions/CodeBlockExtension';
 import type { Note } from '../types/note';
 import type { InNoteStroke } from '../components/Drawing/InNoteCanvas';
 
@@ -234,7 +235,8 @@ export async function prepareNoteForPdf(note: Note, options: PdfExportOptions = 
         element: content,
         editable: false,
         extensions: [
-          StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
+          StarterKit.configure({ codeBlock: false, heading: { levels: [1, 2, 3] } }),
+          CustomCodeBlock,
           Underline, Highlight.configure({ multicolor: false }), TaskList,
           TaskItem.configure({ nested: true }),
           Table.configure({ resizable: true, HTMLAttributes: { class: 'tiptap-table' } }),

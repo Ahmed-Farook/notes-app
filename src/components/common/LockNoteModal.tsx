@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Lock, Eye, EyeOff, KeyRound, X } from 'lucide-react';
+import { Lock, Eye, EyeOff, KeyRound, X, Fingerprint } from 'lucide-react';
 import { triggerHaptic } from '../../utils/haptics';
+import { checkBiometricsAvailable, BiometricCheckResult } from '../../utils/biometrics';
 import { Note } from '../../types/note';
 
 interface LockNoteModalProps {
@@ -11,6 +12,7 @@ interface LockNoteModalProps {
   mode: 'lock' | 'unlock' | 'remove';
   onLockWithPassword: (password: string, hint?: string) => Promise<void>;
   onUnlockWithPassword: (password: string) => Promise<boolean>;
+  onUnlockWithBiometrics?: () => Promise<boolean>;
   onRemovePassword: (password: string) => Promise<boolean>;
 }
 
@@ -21,6 +23,7 @@ export const LockNoteModal: React.FC<LockNoteModalProps> = ({
   mode,
   onLockWithPassword,
   onUnlockWithPassword,
+  onUnlockWithBiometrics,
   onRemovePassword,
 }) => {
   const [password, setPassword] = useState('');
@@ -29,6 +32,44 @@ export const LockNoteModal: React.FC<LockNoteModalProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [biometricInfo, setBiometricInfo] = useState<BiometricCheckResult | null>(null);
+  const hasAutoPromptedRef = useRef(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      hasAutoPromptedRef.current = false;
+      checkBiometricsAvailable().then((info) => {
+        setBiometricInfo(info);
+      });
+    }
+  }, [isOpen]);
+
+  const handleBiometricUnlock = async () => {
+    if (!onUnlockWithBiometrics) return;
+    setErrorMsg('');
+    setIsSubmitting(true);
+    try {
+      const ok = await onUnlockWithBiometrics();
+      if (ok) {
+        triggerHaptic();
+        handleClose();
+      } else {
+        setErrorMsg('Biometric authentication cancelled or not recognized.');
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Biometric authentication failed.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Automatically trigger biometrics once when opening an unlock modal if available
+  useEffect(() => {
+    if (isOpen && mode === 'unlock' && biometricInfo?.isAvailable && onUnlockWithBiometrics && !hasAutoPromptedRef.current) {
+      hasAutoPromptedRef.current = true;
+      handleBiometricUnlock();
+    }
+  }, [isOpen, mode, biometricInfo, onUnlockWithBiometrics]);
 
   if (!isOpen || !note) return null;
 
@@ -152,6 +193,25 @@ export const LockNoteModal: React.FC<LockNoteModalProps> = ({
           {errorMsg && (
             <div className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/40 rounded-lg px-3 py-2 animate-in fade-in duration-100">
               {errorMsg}
+            </div>
+          )}
+
+          {mode === 'unlock' && biometricInfo?.isAvailable && (
+            <div>
+              <button
+                type="button"
+                onClick={handleBiometricUnlock}
+                disabled={isSubmitting}
+                className="w-full py-2.5 px-3 rounded-xl bg-amber-500/10 dark:bg-amber-400/10 border border-amber-500/30 dark:border-amber-400/30 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 font-semibold text-xs flex items-center justify-center space-x-2 transition-all active:scale-[0.98] cursor-pointer shadow-xs"
+              >
+                <Fingerprint size={16} />
+                <span>Unlock with {biometricInfo.label}</span>
+              </button>
+              <div className="flex items-center my-2 text-[10px] text-[#6E8092] dark:text-[#8AA0B4]">
+                <div className="flex-1 h-px bg-[#DFD3C0] dark:bg-[#2C4054]" />
+                <span className="px-2">or enter password</span>
+                <div className="flex-1 h-px bg-[#DFD3C0] dark:bg-[#2C4054]" />
+              </div>
             </div>
           )}
 

@@ -17,12 +17,14 @@ import {
   Lock,
   LockKeyholeOpen,
   KeyRound,
+  Share2,
 } from 'lucide-react';
 import { useNotes } from '../../store/NotesContext';
 import { useAuth } from '../../store/AuthContext';
 import { triggerHaptic } from '../../utils/haptics';
 import { TexoMark } from '../common/TexoMark';
 import { LockNoteModal } from '../common/LockNoteModal';
+import { ShareNoteModal } from '../Share/ShareNoteModal';
 
 interface TopNavbarProps {
   onToggleChecklist?: () => void;
@@ -56,6 +58,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     unlockedNoteIds,
     lockNoteWithPassword,
     unlockNote,
+    unlockNoteWithBiometrics,
     removeNotePassword,
     relockNote,
   } = useNotes();
@@ -65,6 +68,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
   const [showLockMenu, setShowLockMenu] = useState(false);
   const [isLockModalOpen, setIsLockModalOpen] = useState(false);
   const [lockModalMode, setLockModalMode] = useState<'lock' | 'unlock' | 'remove'>('lock');
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   const [isMacApp, setIsMacApp] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -289,6 +293,21 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           )}
         </div>
 
+        {/* Share Note Public Link */}
+        {activeNote && !activeNote.isTrash && (
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic();
+              setIsShareModalOpen(true);
+            }}
+            title="Share read-only public web link"
+            className="p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 transition-colors active:scale-95"
+          >
+            <Share2 size={17} />
+          </button>
+        )}
+
         {/* Lock Note with Password */}
         {activeNote && !activeNote.isTrash && (
           <div className="relative" ref={lockMenuRef}>
@@ -483,10 +502,21 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           if (!activeNote) return false;
           return await unlockNote(activeNote.id, pwd);
         }}
+        onUnlockWithBiometrics={async () => {
+          if (!activeNote) return false;
+          return await unlockNoteWithBiometrics(activeNote.id);
+        }}
         onRemovePassword={async (pwd) => {
           if (!activeNote) return false;
           return await removeNotePassword(activeNote.id, pwd);
         }}
+      />
+
+      {/* Public Read-Only Share Modal */}
+      <ShareNoteModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        note={activeNote}
       />
     </header>
   );

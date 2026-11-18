@@ -22,7 +22,7 @@ if (typeof electron === 'string') {
   return;
 }
 
-const { app, BrowserWindow, Menu, ipcMain, shell } = electron;
+const { app, BrowserWindow, Menu, ipcMain, shell, systemPreferences } = electron;
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -479,6 +479,30 @@ ipcMain.handle('updater:check', async (_event, token) => {
     } catch (fallbackErr) {
       throw new Error(`Unable to reach update servers: ${fallbackErr.message}`);
     }
+  }
+});
+
+// Native Biometrics (Touch ID on macOS)
+ipcMain.handle('biometrics:is-available', async () => {
+  try {
+    if (process.platform === 'darwin' && systemPreferences?.canPromptTouchID) {
+      return Boolean(systemPreferences.canPromptTouchID());
+    }
+  } catch (err) {
+    console.warn('Touch ID check error:', err);
+  }
+  return false;
+});
+
+ipcMain.handle('biometrics:prompt', async (_event, reason = 'Unlock locked note in texō') => {
+  try {
+    if (process.platform === 'darwin' && systemPreferences?.promptTouchID) {
+      await systemPreferences.promptTouchID(reason);
+      return { success: true };
+    }
+    return { success: false, error: 'Touch ID not supported on this platform' };
+  } catch (err) {
+    return { success: false, error: err?.message || 'Touch ID authentication failed' };
   }
 });
 

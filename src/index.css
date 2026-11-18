@@ -165,13 +165,117 @@
 }
 
 .tiptap pre {
-  background: #192531;
-  color: #f8fafc;
+  background: transparent;
+  color: inherit;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
-  margin: 0.75rem 0;
+  padding: 0;
+  border-radius: 0;
+  margin: 0;
   overflow-x: auto;
+}
+
+/* Kyoto Syntax Highlighting Tokens (Light Mode) */
+.hljs-comment,
+.hljs-quote {
+  color: #7A8B99;
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-name,
+.hljs-tag {
+  color: #B23A48;
+  font-weight: 600;
+}
+
+.hljs-string,
+.hljs-title,
+.hljs-section,
+.hljs-attribute,
+.hljs-literal,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-addition {
+  color: #2D6A4F;
+}
+
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link {
+  color: #D97706;
+}
+
+.hljs-title.function_,
+.hljs-function {
+  color: #1D4ED8;
+  font-weight: 500;
+}
+
+.hljs-variable,
+.hljs-params,
+.hljs-attr {
+  color: #374151;
+}
+
+.hljs-meta,
+.hljs-subst {
+  color: #6B7280;
+}
+
+/* Kyoto Syntax Highlighting Tokens (Dark Mode) */
+.dark .hljs-comment,
+.dark .hljs-quote {
+  color: #718096;
+  font-style: italic;
+}
+
+.dark .hljs-keyword,
+.dark .hljs-selector-tag,
+.dark .hljs-built_in,
+.dark .hljs-name,
+.dark .hljs-tag {
+  color: #F472B6;
+  font-weight: 600;
+}
+
+.dark .hljs-string,
+.dark .hljs-title,
+.dark .hljs-section,
+.dark .hljs-attribute,
+.dark .hljs-literal,
+.dark .hljs-template-tag,
+.dark .hljs-template-variable,
+.dark .hljs-type,
+.dark .hljs-addition {
+  color: #86EFAC;
+}
+
+.dark .hljs-number,
+.dark .hljs-symbol,
+.dark .hljs-bullet,
+.dark .hljs-link {
+  color: #FBBF24;
+}
+
+.dark .hljs-title.function_,
+.dark .hljs-function {
+  color: #60A5FA;
+  font-weight: 500;
+}
+
+.dark .hljs-variable,
+.dark .hljs-params,
+.dark .hljs-attr {
+  color: #E2E8F0;
+}
+
+.dark .hljs-meta,
+.dark .hljs-subst {
+  color: #94A3B8;
 }
 
 .tiptap code:not(pre code) {

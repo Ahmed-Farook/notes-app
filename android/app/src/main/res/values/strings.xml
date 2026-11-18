@@ -4,4 +4,8 @@
     <string name="title_activity_main">texō</string>
     <string name="package_name">com.ahmedfarook.notesapp</string>
     <string name="custom_url_scheme">com.ahmedfarook.notesapp</string>
+    <string name="quick_note_widget_name">Quick Note</string>
+    <string name="quick_note_widget_desc">Instantly create a new note with one tap.</string>
+    <string name="notes_bar_widget_name">texō Notes Bar</string>
+    <string name="notes_bar_widget_desc">Quick access to new notes, checklists, and drawings.</string>
 </resources>
