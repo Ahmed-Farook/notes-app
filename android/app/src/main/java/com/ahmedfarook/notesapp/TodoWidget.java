@@ -122,13 +122,19 @@ public class TodoWidget extends AppWidgetProvider {
             views.setOnClickPendingIntent(R.id.widget_todo_header, openPending);
             views.setOnClickPendingIntent(R.id.widget_todo_empty, openPending);
 
-            // Intent for quick "+" button to create a new note
-            Intent newNoteIntent = new Intent(context, MainActivity.class);
-            newNoteIntent.setAction(QuickNoteWidget.ACTION_NEW_NOTE);
-            newNoteIntent.putExtra("action", "new_note");
-            newNoteIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            PendingIntent newNotePending = PendingIntent.getActivity(context, 200 + appWidgetId, newNoteIntent, flags);
-            views.setOnClickPendingIntent(R.id.widget_todo_btn_add, newNotePending);
+            // Intent for quick "+" button to add a checklist item or create a note
+            Intent addIntent = new Intent(context, MainActivity.class);
+            addIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            if (!noteId.isEmpty()) {
+                addIntent.setAction("com.ahmedfarook.notesapp.ADD_CHECKLIST_ITEM");
+                addIntent.putExtra("action", "add_checklist_item");
+                addIntent.putExtra("note_id", noteId);
+            } else {
+                addIntent.setAction(QuickNoteWidget.ACTION_NEW_NOTE);
+                addIntent.putExtra("action", "new_note");
+            }
+            PendingIntent addPending = PendingIntent.getActivity(context, 200 + appWidgetId, addIntent, flags);
+            views.setOnClickPendingIntent(R.id.widget_todo_btn_add, addPending);
 
             // Clear previously rendered dynamic checklist rows
             views.removeAllViews(R.id.widget_todo_items_container);

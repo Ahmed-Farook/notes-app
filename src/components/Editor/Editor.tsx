@@ -917,6 +917,20 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     }
   }, [editor, onRegisterToggleChecklist]);
 
+  // Handle widget quick-add checklist event from Android home screen widget
+  useEffect(() => {
+    if (!editor) return;
+    const handleQuickAdd = () => {
+      setTimeout(() => {
+        editor.chain().focus('end').splitBlock().toggleTaskList().run();
+      }, 100);
+    };
+    window.addEventListener('editor:quick-add-checklist', handleQuickAdd);
+    return () => {
+      window.removeEventListener('editor:quick-add-checklist', handleQuickAdd);
+    };
+  }, [editor]);
+
   // Reset scroll position to top whenever switching notes so the new note starts cleanly from the top
   useEffect(() => {
     if (editorScrollContainerRef.current) {

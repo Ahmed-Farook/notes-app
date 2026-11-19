@@ -7,7 +7,7 @@ import { NotesList } from './NotesList/NotesList';
 import { Editor } from './Editor/Editor';
 import { useNotes } from '../store/NotesContext';
 import { useAuth } from '../store/AuthContext';
-import { Plus } from 'lucide-react';
+import { Plus, Sparkles } from 'lucide-react';
 import { triggerHaptic } from '../utils/haptics';
 import { useAppUpdater } from '../hooks/useAppUpdater';
 import { UpdateBanner } from './Updates/UpdateBanner';
@@ -32,6 +32,8 @@ export const Layout: React.FC = () => {
     pendingTrashDelete,
     confirmPendingTrashDelete,
     cancelPendingTrashDelete,
+    importedSharedToast,
+    dismissImportedSharedToast,
   } = useNotes();
   const { isAuthModalOpen, closeAuthModal } = useAuth();
   const [showFormatToolbar, setShowFormatToolbar] = useState(true);
@@ -109,6 +111,15 @@ export const Layout: React.FC = () => {
 
   const isSelectionModeRef = useRef(isSelectionMode);
   isSelectionModeRef.current = isSelectionMode;
+
+  // Auto-dismiss shared note import toast
+  useEffect(() => {
+    if (!importedSharedToast) return;
+    const timer = setTimeout(() => {
+      dismissImportedSharedToast();
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [importedSharedToast, dismissImportedSharedToast]);
 
   // Android Hardware Back Button navigation
   useEffect(() => {
@@ -344,6 +355,20 @@ export const Layout: React.FC = () => {
         count={pendingTrashDelete?.type === 'bulk' ? pendingTrashDelete.ids.length : 1}
         noteTitle={pendingTrashDelete?.type === 'single' ? pendingTrashDelete.title : undefined}
       />
+
+      {/* Shared Note Opened Toast */}
+      {importedSharedToast && (
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-[200] max-w-sm px-4 py-2.5 rounded-2xl bg-[#1C2B36] text-[#FAF6EF] dark:bg-[#FAF6EF] dark:text-[#1C2B36] shadow-2xl border border-white/10 dark:border-black/10 flex items-center space-x-2.5 animate-in fade-in slide-in-from-top-3 duration-200">
+          <Sparkles size={16} className="text-apple-yellow shrink-0" />
+          <span className="text-xs font-medium truncate">{importedSharedToast}</span>
+          <button
+            onClick={dismissImportedSharedToast}
+            className="text-xs opacity-70 hover:opacity-100 font-semibold underline shrink-0 pl-1"
+          >
+            OK
+          </button>
+        </div>
+      )}
     </div>
   );
 };

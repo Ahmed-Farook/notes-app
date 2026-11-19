@@ -40,7 +40,17 @@ import {
   parseImportedFiles,
 } from '../utils/noteExportImport';
 import { promptBiometricAuth } from '../utils/biometrics';
-import { syncNoteToAndroidWidget, syncPendingWidgetToggles } from '../utils/widgetSync';
+import {
+  syncNoteToAndroidWidget,
+  syncPendingWidgetToggles,
+  getWidgetPinnedNoteId,
+  setWidgetPinnedNoteId,
+} from '../utils/widgetSync';
+import {
+  getSharePayloadFromUrl,
+  parseSharedPayload,
+  cleanShareUrl,
+} from '../utils/shareUtils';
 
 export type PendingTrashDelete =
   | { type: 'single'; id: string; title?: string }
@@ -117,6 +127,14 @@ interface NotesContextType {
   lockNoteWithPassword: (noteId: string, password: string, hint?: string) => Promise<void>;
   removeNotePassword: (noteId: string, password: string) => Promise<boolean>;
   relockNote: (noteId: string) => void;
+
+  // Android Widget Pinning
+  widgetPinnedNoteId: string | null;
+  toggleWidgetPinnedNote: (noteId: string) => void;
+
+  // Shared Note Toast
+  importedSharedToast: string | null;
+  dismissImportedSharedToast: () => void;
 }
 
 export async function hashNotePassword(password: string, salt: string = ''): Promise<string> {
@@ -149,6 +167,9 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
   const [unlockedNoteIds, setUnlockedNoteIds] = useState<Set<string>>(new Set());
   const [pendingTrashDelete, setPendingTrashDelete] = useState<PendingTrashDelete>(null);
+  const [widgetPinnedNoteId, setWidgetPinnedNoteIdState] = useState<string | null>(() => getWidgetPinnedNoteId());
+  const [importedSharedToast, setImportedSharedToast] = useState<string | null>(null);
+  const sharedPayloadProcessedRef = useRef(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('apple_notes_theme');
@@ -622,14 +643,88 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         setMobileView('editor');
       }
     };
+    const handleWidgetAddChecklistItem = (e: any) => {
+      const targetId = e.detail?.noteId;
+      if (targetId) {
+        setActiveNoteId(targetId);
+        setMobileView('editor');
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('editor:quick-add-checklist'));
+        }, 300);
+      } else {
+        createNote();
+      }
+    };
 
     window.addEventListener('action:new-note', handleWidgetNewNote);
     window.addEventListener('action:open-note', handleWidgetOpenNote);
+    window.addEventListener('action:add-checklist-item', handleWidgetAddChecklistItem);
     return () => {
       window.removeEventListener('action:new-note', handleWidgetNewNote);
       window.removeEventListener('action:open-note', handleWidgetOpenNote);
+      window.removeEventListener('action:add-checklist-item', handleWidgetAddChecklistItem);
     };
   }, [createNote, setActiveNoteId]);
+
+  const dismissImportedSharedToast = useCallback(() => {
+    setImportedSharedToast(null);
+  }, []);
+
+  const toggleWidgetPinnedNote = useCallback((noteId: string) => {
+    triggerHaptic();
+    setWidgetPinnedNoteIdState((prev) => {
+      const next = prev === noteId ? null : noteId;
+      setWidgetPinnedNoteId(next);
+      setTimeout(() => {
+        syncNoteToAndroidWidget(notesRef.current, next || activeNoteId);
+      }, 50);
+      return next;
+    });
+  }, [activeNoteId]);
+
+  // Decode and automatically open shared note when recipient opens a ?share= URL
+  useEffect(() => {
+    if (sharedPayloadProcessedRef.current) return;
+    const payloadStr = getSharePayloadFromUrl();
+    if (!payloadStr) return;
+
+    sharedPayloadProcessedRef.current = true;
+    const sharedData = parseSharedPayload(payloadStr);
+    if (sharedData) {
+      const importedNoteId = `note-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+
+      let plainSnippet = '';
+      if (typeof document !== 'undefined') {
+        try {
+          const tmp = document.createElement('div');
+          tmp.innerHTML = sharedData.content || '';
+          plainSnippet = (tmp.textContent || tmp.innerText || '').trim().substring(0, 150);
+        } catch (_) {}
+      }
+      if (!plainSnippet && sharedData.strokes) {
+        plainSnippet = '[Handwritten Drawing / Annotation]';
+      }
+
+      const importedNote: Note = {
+        id: importedNoteId,
+        title: sharedData.title || 'Shared Note',
+        content: sharedData.content || '<h1>Shared Note</h1><p></p>',
+        drawingStrokes: sharedData.strokes || undefined,
+        plainTextPreview: plainSnippet || 'Shared note imported into texō',
+        folderId: 'default',
+        isPinned: false,
+        isTrash: false,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      setNotes((prev) => [importedNote, ...prev]);
+      setActiveNoteId(importedNoteId);
+      setMobileView('editor');
+      cleanShareUrl();
+      setImportedSharedToast(`Shared note "${importedNote.title}" opened in texō`);
+    }
+  }, [setActiveNoteId]);
 
   // Keep Android Home Screen Widget in sync with the user's latest checklist / note
   useEffect(() => {
@@ -1245,6 +1340,10 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         lockNoteWithPassword,
         removeNotePassword,
         relockNote,
+        widgetPinnedNoteId,
+        toggleWidgetPinnedNote,
+        importedSharedToast,
+        dismissImportedSharedToast,
       }}
     >
       {children}

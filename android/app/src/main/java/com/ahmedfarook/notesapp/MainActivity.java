@@ -25,7 +25,15 @@ public class MainActivity extends BridgeActivity {
         if (intent == null) return;
 
         if (getBridge() != null && getBridge().getWebView() != null) {
-            if (QuickNoteWidget.ACTION_NEW_NOTE.equals(intent.getAction())) {
+            if ("add_checklist_item".equals(intent.getStringExtra("action")) || "com.ahmedfarook.notesapp.ADD_CHECKLIST_ITEM".equals(intent.getAction())) {
+                String noteId = intent.getStringExtra("note_id");
+                getBridge().getWebView().postDelayed(() -> {
+                    getBridge().getWebView().evaluateJavascript(
+                        "window.dispatchEvent(new CustomEvent('action:add-checklist-item', { detail: { noteId: '" + (noteId != null ? noteId : "") + "' } }));",
+                        null
+                    );
+                }, 400);
+            } else if (QuickNoteWidget.ACTION_NEW_NOTE.equals(intent.getAction())) {
                 getBridge().getWebView().postDelayed(() -> {
                     getBridge().getWebView().evaluateJavascript(
                         "window.dispatchEvent(new CustomEvent('action:new-note'));",

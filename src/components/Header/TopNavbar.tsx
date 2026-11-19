@@ -18,6 +18,7 @@ import {
   LockKeyholeOpen,
   KeyRound,
   Share2,
+  ListTodo,
 } from 'lucide-react';
 import { useNotes } from '../../store/NotesContext';
 import { useAuth } from '../../store/AuthContext';
@@ -61,6 +62,8 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     unlockNoteWithBiometrics,
     removeNotePassword,
     relockNote,
+    widgetPinnedNoteId,
+    toggleWidgetPinnedNote,
   } = useNotes();
   const { user, openAuthModal, syncStatus } = useAuth();
 
@@ -305,6 +308,29 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             className="p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 transition-colors active:scale-95"
           >
             <Share2 size={17} />
+          </button>
+        )}
+
+        {/* Pin to Home Screen Widget */}
+        {activeNote && !activeNote.isTrash && !activeNote.isLocked && (
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic();
+              toggleWidgetPinnedNote(activeNote.id);
+            }}
+            title={
+              widgetPinnedNoteId === activeNote.id
+                ? 'Pinned to Home Screen Widget (Click to unpin)'
+                : 'Pin this note to Home Screen Widget'
+            }
+            className={`p-1.5 rounded-md transition-colors active:scale-95 ${
+              widgetPinnedNoteId === activeNote.id
+                ? 'text-apple-yellow dark:text-[#E5A93C] bg-apple-yellow/15 dark:bg-[#E5A93C]/20 ring-1 ring-apple-yellow/30'
+                : 'hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300'
+            }`}
+          >
+            <ListTodo size={17} />
           </button>
         )}
 

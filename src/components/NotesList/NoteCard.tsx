@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Pin, Trash2, RotateCcw, Check, Lock } from 'lucide-react';
+import { Pin, Trash2, RotateCcw, Check, Lock, ListTodo } from 'lucide-react';
 import { Note, ViewMode } from '../../types/note';
 import { formatListDate } from '../../utils/dateUtils';
 import { useNotes } from '../../store/NotesContext';
@@ -22,6 +22,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
     toggleSelectNote,
     enterSelectionMode,
     unlockedNoteIds,
+    widgetPinnedNoteId,
   } = useNotes();
 
   const isChecked = selectedNoteIds.includes(note.id);
@@ -203,6 +204,11 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
               <h4 className="font-semibold text-xs text-neutral-900 dark:text-neutral-100 truncate">
                 {note.title || 'New Note'}
               </h4>
+              {widgetPinnedNoteId === note.id && (
+                <span title="Pinned to Home Screen Widget" className="shrink-0 ml-1">
+                  <ListTodo size={12} className="text-apple-yellow dark:text-[#E5A93C]" />
+                </span>
+              )}
             </div>
             {/* Gallery Pin Button: Single button for both pinning and unpinning */}
             {!note.isTrash && (
@@ -412,6 +418,20 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
                 </button>
               )}
             </div>
+
+            {/* Home Screen Widget Indicator */}
+            {widgetPinnedNoteId === note.id && !note.isTrash && (
+              <span
+                title="Pinned to Home Screen Widget"
+                className={`p-1 shrink-0 ${
+                  !isSelectionMode && isSelected
+                    ? 'text-white'
+                    : 'text-apple-yellow dark:text-[#E5A93C]'
+                }`}
+              >
+                <ListTodo size={14} />
+              </span>
+            )}
 
             {/* Pin Button: Single button for both pinning and unpinning */}
             {!note.isTrash && (

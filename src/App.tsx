@@ -1,41 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Capacitor } from '@capacitor/core';
+import React from 'react';
 import { AuthProvider } from './store/AuthContext';
 import { NotesProvider } from './store/NotesContext';
 import { Layout } from './components/Layout';
 import { AuthModal } from './components/Auth/AuthModal';
-import { SharedNoteView } from './components/Share/SharedNoteView';
-
-function getSharePayloadFromUrl(): string | null {
-  if (typeof window === 'undefined') return null;
-
-  // Native mobile app always boots into the user's notes app
-  if (Capacitor.isNativePlatform()) {
-    return null;
-  }
-
-  try {
-    // 1. Check query parameter: ?share=<payload>
-    const params = new URLSearchParams(window.location.search);
-    const shareParam = params.get('share');
-    if (shareParam && shareParam.trim()) {
-      return shareParam.trim();
-    }
-
-    // 2. Check hash: #share=<payload> or #data=<payload>
-    const hash = window.location.hash;
-    if (hash.includes('share=')) {
-      const val = hash.split('share=')[1]?.split('&')[0];
-      if (val && val.trim()) return val.trim();
-    }
-    if (hash.includes('data=')) {
-      const val = hash.split('data=')[1]?.split('&')[0];
-      if (val && val.trim()) return val.trim();
-    }
-  } catch (_) {}
-
-  return null;
-}
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -104,34 +71,6 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 }
 
 function App() {
-  const [sharePayload, setSharePayload] = useState<string | null>(() => getSharePayloadFromUrl());
-
-  useEffect(() => {
-    const handlePopState = () => {
-      setSharePayload(getSharePayloadFromUrl());
-    };
-    window.addEventListener('popstate', handlePopState);
-    window.addEventListener('hashchange', handlePopState);
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-      window.removeEventListener('hashchange', handlePopState);
-    };
-  }, []);
-
-  const handleExitSharedView = () => {
-    const cleanUrl = window.location.pathname;
-    window.history.replaceState({}, '', cleanUrl);
-    setSharePayload(null);
-  };
-
-  if (sharePayload) {
-    return (
-      <ErrorBoundary>
-        <SharedNoteView payloadStr={sharePayload} onExit={handleExitSharedView} />
-      </ErrorBoundary>
-    );
-  }
-
   return (
     <ErrorBoundary>
       <AuthProvider>

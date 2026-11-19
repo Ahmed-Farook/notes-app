@@ -6,6 +6,22 @@ export interface WidgetTodoItem {
   checked: boolean;
 }
 
+export const WIDGET_PINNED_NOTE_KEY = 'texo_pinned_widget_note_id';
+
+export function getWidgetPinnedNoteId(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(WIDGET_PINNED_NOTE_KEY);
+}
+
+export function setWidgetPinnedNoteId(noteId: string | null): void {
+  if (typeof window === 'undefined') return;
+  if (noteId) {
+    localStorage.setItem(WIDGET_PINNED_NOTE_KEY, noteId);
+  } else {
+    localStorage.removeItem(WIDGET_PINNED_NOTE_KEY);
+  }
+}
+
 /**
  * Extracts task list checklist items from a Note's HTML content.
  */
@@ -86,25 +102,34 @@ export function toggleTaskItemInHtml(html: string, targetIndex: number, checked:
 
 /**
  * Finds the most relevant note for the widget:
- * 1. The currently active note if it has checklist items or text.
- * 2. Or a pinned note that contains checklist items.
- * 3. Or the latest updated note with checklist items.
- * 4. Or the latest non-trash note.
+ * 1. The note explicitly pinned to the widget by the user.
+ * 2. The currently active note if it has checklist items or text.
+ * 3. Or a pinned note that contains checklist items.
+ * 4. Or the latest updated note with checklist items.
+ * 5. Or the latest non-trash note.
  */
 export function findBestWidgetNote(notes: Note[], activeNoteId: string | null): Note | null {
   const activeNotes = notes.filter((n) => !n.isTrash && !n.isLocked);
   if (activeNotes.length === 0) return null;
 
+  // 1. Explicit user selection for widget
+  const pinnedWidgetId = getWidgetPinnedNoteId();
+  if (pinnedWidgetId) {
+    const chosen = activeNotes.find((n) => n.id === pinnedWidgetId);
+    if (chosen) return chosen;
+  }
+
+  // 2. Active note
   if (activeNoteId) {
     const active = activeNotes.find((n) => n.id === activeNoteId);
     if (active) return active;
   }
 
-  // Find a note with checklist items
+  // 3. Any note containing task items
   const withChecklist = activeNotes.find((n) => n.content && n.content.includes('data-type="taskItem"'));
   if (withChecklist) return withChecklist;
 
-  // Otherwise return the first pinned note or latest note
+  // 4. Pinned note or first note
   const pinned = activeNotes.find((n) => n.isPinned);
   if (pinned) return pinned;
 
@@ -143,7 +168,7 @@ export async function syncNoteToAndroidWidget(notes: Note[], activeNoteId: strin
           .split('\n')
           .map((l) => l.trim())
           .filter(Boolean)
-          .slice(0, 5)
+          .slice(0, 6)
           .map((text) => ({ text, checked: false }));
 
   try {
@@ -189,4 +214,3 @@ export async function syncPendingWidgetToggles(
     console.warn('Failed to apply pending widget toggles:', err);
   }
 }
-
