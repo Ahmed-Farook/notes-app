@@ -19,6 +19,7 @@ import {
   KeyRound,
   Share2,
   ListTodo,
+  BookmarkPlus,
 } from 'lucide-react';
 import { useNotes } from '../../store/NotesContext';
 import { useAuth } from '../../store/AuthContext';
@@ -64,7 +65,11 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     relockNote,
     widgetPinnedNoteId,
     toggleWidgetPinnedNote,
+    sharedPreviewNote,
+    saveSharedPreviewToNotes,
+    dismissSharedPreview,
   } = useNotes();
+  const isSharedPreview = Boolean(sharedPreviewNote && activeNote?.id === sharedPreviewNote.id);
   const { user, openAuthModal, syncStatus } = useAuth();
 
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -128,8 +133,12 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         {mobileView === 'editor' && (
           <button
             onClick={() => {
-              setMobileView('list');
-              setActiveNoteId(null);
+              if (isSharedPreview) {
+                dismissSharedPreview();
+              } else {
+                setMobileView('list');
+                setActiveNoteId(null);
+              }
             }}
             className="md:hidden flex items-center space-x-1 text-apple-yellow hover:text-apple-yellowHover dark:text-[#7EAAD0] dark:hover:text-[#9DC3E6] text-xs font-semibold py-1 px-1 rounded active:opacity-70 transition-opacity"
           >
@@ -296,8 +305,21 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           )}
         </div>
 
+        {/* Shared Preview Save Button */}
+        {isSharedPreview && (
+          <button
+            type="button"
+            onClick={saveSharedPreviewToNotes}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-apple-yellow hover:bg-apple-yellowHover text-white font-semibold text-xs shadow-xs active:scale-95 transition-all cursor-pointer"
+            title="Save this shared note to your notes"
+          >
+            <BookmarkPlus size={15} />
+            <span className="hidden sm:inline">Save</span>
+          </button>
+        )}
+
         {/* Share Note Public Link */}
-        {activeNote && !activeNote.isTrash && (
+        {activeNote && !activeNote.isTrash && !isSharedPreview && (
           <button
             type="button"
             onClick={() => {
@@ -312,7 +334,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         )}
 
         {/* Pin to Home Screen Widget */}
-        {activeNote && !activeNote.isTrash && !activeNote.isLocked && (
+        {activeNote && !activeNote.isTrash && !activeNote.isLocked && !isSharedPreview && (
           <button
             type="button"
             onClick={() => {
@@ -335,7 +357,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         )}
 
         {/* Lock Note with Password */}
-        {activeNote && !activeNote.isTrash && (
+        {activeNote && !activeNote.isTrash && !isSharedPreview && (
           <div className="relative" ref={lockMenuRef}>
             <button
               type="button"
@@ -460,7 +482,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
 
         {/* Mobile: In editor view, show Delete button. In list view, show Software Update button. */}
         {mobileView === 'editor' ? (
-          activeNote && (
+          activeNote && !isSharedPreview && (
             <button
               key="mobile-nav-delete-btn"
               onClick={() => {

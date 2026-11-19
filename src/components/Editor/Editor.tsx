@@ -14,7 +14,7 @@ import Table from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableCell from '@tiptap/extension-table-cell';
 import TableHeader from '@tiptap/extension-table-header';
-import { RotateCcw, Trash2, Search, ChevronUp, ChevronDown, X, Plus, Edit3, Lock, Eye, EyeOff, Fingerprint } from 'lucide-react';
+import { RotateCcw, Trash2, Search, ChevronUp, ChevronDown, X, Plus, Edit3, Lock, Eye, EyeOff, Fingerprint, BookmarkPlus } from 'lucide-react';
 
 import { useNotes } from '../../store/NotesContext';
 import { formatEditorDate } from '../../utils/dateUtils';
@@ -442,8 +442,12 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     unlockedNoteIds,
     unlockNote,
     unlockNoteWithBiometrics,
+    sharedPreviewNote,
+    saveSharedPreviewToNotes,
+    dismissSharedPreview,
   } = useNotes();
 
+  const isSharedPreview = Boolean(sharedPreviewNote && activeNote?.id === sharedPreviewNote.id);
   const isNoteLocked = Boolean(activeNote?.isLocked && !unlockedNoteIds.has(activeNote.id));
 
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
@@ -942,11 +946,11 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
   useEffect(() => {
     if (!editor || !activeNote) return;
 
-    editor.setEditable(!activeNote.isTrash);
+    editor.setEditable(!activeNote.isTrash && !isSharedPreview);
 
     let contentToLoad = activeNote.content || '<p></p>';
-    // Migrate legacy notes where title was saved as <h3> to <h1>
-    if (/^\s*<h3>([\s\S]*?)<\/h3>/i.test(contentToLoad)) {
+    // Migrate legacy notes where title was saved as <h3> to <h1> (personal notes only)
+    if (!isSharedPreview && /^\s*<h3>([\s\S]*?)<\/h3>/i.test(contentToLoad)) {
       contentToLoad = contentToLoad.replace(/^\s*<h3>([\s\S]*?)<\/h3>/i, '<h1>$1</h1>');
       updateNote(activeNote.id, { content: contentToLoad });
     }
@@ -1183,7 +1187,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
       {/* Samsung Notes Toolbar */}
       <EditorToolbar
         editor={editor}
-        isVisible={showToolbar && !isNoteLocked}
+        isVisible={showToolbar && !isNoteLocked && !isSharedPreview}
         isPenMode={isPenMode}
         onTogglePenMode={(mode) => {
           setIsPenMode(mode);
@@ -1254,6 +1258,35 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
               className="p-1 rounded hover:bg-[#E5DCCB] dark:hover:bg-[#203244] text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors active:scale-95"
             >
               <X size={15} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Shared Note In-App Preview Banner */}
+      {isSharedPreview && (
+        <div className="bg-[#FAF6EF] dark:bg-[#16202A] border-b border-[#DFD3C0] dark:border-[#223344] px-4 md:px-8 py-2.5 flex items-center justify-between text-xs select-none shadow-xs sticky top-0 z-30">
+          <div className="flex items-center space-x-2 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-apple-yellow animate-pulse shrink-0" />
+            <span className="font-semibold text-[#1C2B36] dark:text-[#E8EEF3] truncate">
+              Shared Note Preview
+            </span>
+          </div>
+          <div className="flex items-center space-x-2 shrink-0">
+            <button
+              type="button"
+              onClick={saveSharedPreviewToNotes}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-apple-yellow hover:bg-apple-yellowHover text-white font-semibold text-xs shadow-xs active:scale-95 transition-all cursor-pointer"
+            >
+              <BookmarkPlus size={14} />
+              <span>Save to My Notes</span>
+            </button>
+            <button
+              type="button"
+              onClick={dismissSharedPreview}
+              className="px-2.5 py-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-[#5A6E82] dark:text-[#8AA0B4] font-medium text-xs transition-colors cursor-pointer"
+            >
+              Close
             </button>
           </div>
         </div>
@@ -1372,7 +1405,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
           onMouseDown={handleContainerMouseDown}
           onMouseMove={handleContainerMouseMove}
           onClick={(e) => {
-            if (editor && !activeNote.isTrash && !isPenMode) {
+            if (editor && !activeNote.isTrash && !isPenMode && !isSharedPreview) {
               // If this was a drag or there is an active text selection, do NOT clear selection!
               if (isMouseSelectingRef.current) {
                 isMouseSelectingRef.current = false;

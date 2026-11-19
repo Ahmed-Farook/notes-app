@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Share2, Copy, Check, ExternalLink, Globe, ShieldCheck, Settings2 } from 'lucide-react';
+import { X, Share2, Copy, Check } from 'lucide-react';
 import { triggerHaptic } from '../../utils/haptics';
 import { Note } from '../../types/note';
+import { buildShareUrl } from '../../utils/shareUtils';
 
 interface ShareNoteModalProps {
   isOpen: boolean;
@@ -16,57 +17,15 @@ export const ShareNoteModal: React.FC<ShareNoteModalProps> = ({
   note,
 }) => {
   const [copied, setCopied] = useState(false);
-  const [showDomainInput, setShowDomainInput] = useState(false);
-  const [customOrigin, setCustomOrigin] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const curOrigin = window.location.origin;
-      if (curOrigin && curOrigin.startsWith('http') && !curOrigin.includes('localhost') && !curOrigin.includes('127.0.0.1')) {
-        return curOrigin;
-      }
-      return localStorage.getItem('texo_custom_web_origin') || '';
-    }
-    return '';
-  });
-
-  const isWebOrigin = useMemo(() => {
-    if (typeof window === 'undefined') return false;
-    const curOrigin = window.location.origin;
-    return Boolean(curOrigin && curOrigin.startsWith('http') && !curOrigin.includes('localhost') && !curOrigin.includes('127.0.0.1'));
-  }, []);
 
   const shareUrl = useMemo(() => {
     if (!note) return '';
-    try {
-      const payload = {
-        title: note.title || 'Untitled Note',
-        content: note.content || '',
-        strokes: note.drawingStrokes || undefined,
-      };
-      const jsonStr = JSON.stringify(payload);
-      const encoded = btoa(unescape(encodeURIComponent(jsonStr)));
-      const safeEncoded = encodeURIComponent(encoded);
-
-      let base = customOrigin.trim();
-      if (!base && typeof window !== 'undefined') {
-        const curOrigin = window.location.origin;
-        if (curOrigin && curOrigin.startsWith('http') && !curOrigin.includes('localhost') && !curOrigin.includes('127.0.0.1')) {
-          base = curOrigin;
-        }
-      }
-      if (!base) {
-        base = 'https://ahmed-farook.github.io/notes-app';
-      }
-
-      base = base.replace(/\/$/, '');
-      const path = (typeof window !== 'undefined' && window.location.pathname !== '/' && !window.location.pathname.endsWith('.html'))
-        ? window.location.pathname.replace(/\/$/, '')
-        : '';
-
-      return `${base}${path}/?share=${safeEncoded}`;
-    } catch (_) {
-      return '';
-    }
-  }, [note, customOrigin]);
+    return buildShareUrl({
+      title: note.title,
+      content: note.content,
+      drawingStrokes: note.drawingStrokes,
+    });
+  }, [note]);
 
   if (!isOpen || !note) return null;
 
@@ -76,22 +35,8 @@ export const ShareNoteModal: React.FC<ShareNoteModalProps> = ({
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      setTimeout(() => setCopied(false), 2200);
     } catch (_) {}
-  };
-
-  const handleOpenBrowser = () => {
-    if (!shareUrl) return;
-    triggerHaptic();
-    window.open(shareUrl, '_blank', 'noopener,noreferrer');
-  };
-
-  const handleSaveOrigin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('texo_custom_web_origin', customOrigin.trim());
-    }
-    setShowDomainInput(false);
   };
 
   const modalContent = (
@@ -100,20 +45,20 @@ export const ShareNoteModal: React.FC<ShareNoteModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md my-auto bg-[#FAF6EF] dark:bg-[#16202A] rounded-2xl shadow-2xl border border-apple-border dark:border-apple-borderDark p-5 animate-in zoom-in-95 duration-150 text-[#1C2B36] dark:text-[#E8EEF3] [app-region:no-drag]"
+        className="w-full max-w-sm my-auto bg-[#FAF6EF] dark:bg-[#16202A] rounded-2xl shadow-2xl border border-apple-border dark:border-apple-borderDark p-5 animate-in zoom-in-95 duration-150 text-[#1C2B36] dark:text-[#E8EEF3] [app-region:no-drag] space-y-4"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
-            <div className="w-9 h-9 rounded-xl bg-blue-500/10 dark:bg-blue-400/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
-              <Share2 size={18} />
+            <div className="w-8 h-8 rounded-xl bg-apple-yellow/15 text-apple-yellow flex items-center justify-center shrink-0">
+              <Share2 size={16} />
             </div>
             <div>
               <h3 className="font-bold text-sm tracking-tight text-[#1C2B36] dark:text-[#E8EEF3]">
-                Share Note Link
+                Share Note
               </h3>
-              <p className="text-[11px] text-[#6E8092] dark:text-[#8AA0B4] truncate max-w-[240px]">
+              <p className="text-[11px] text-[#6E8092] dark:text-[#8AA0B4] truncate max-w-[210px]">
                 {note.title || 'Untitled Note'}
               </p>
             </div>
@@ -127,120 +72,40 @@ export const ShareNoteModal: React.FC<ShareNoteModalProps> = ({
           </button>
         </div>
 
-        {/* Note Details & Badges */}
-        <div className="space-y-3 mb-4">
-          <div className="p-3 rounded-xl bg-[#EFE8DA] dark:bg-[#1C2733] border border-[#DFD3C0] dark:border-[#263747] text-xs">
-            <div className="flex items-center justify-between text-[11px] text-[#6E8092] dark:text-[#8AA0B4] mb-1">
-              <span className="flex items-center space-x-1">
-                <Globe size={12} className="text-emerald-500" />
-                <span>Public Read-Only Web Link</span>
-              </span>
-              <span>Rich Text &amp; Sketches</span>
-            </div>
-            <p className="text-[#1C2B36] dark:text-[#E8EEF3] font-medium line-clamp-2">
-              {note.plainTextPreview || 'No content preview'}
-            </p>
-          </div>
-
-          <div className="flex items-center space-x-1.5 text-[11px] text-[#6E8092] dark:text-[#8AA0B4]">
-            <ShieldCheck size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <span>Anyone with this link can view the note in any browser without an account.</span>
-          </div>
-
-          {/* Share Link Input with Copy button */}
-          <div className="flex items-center space-x-2">
-            <input
-              type="text"
-              readOnly
-              value={shareUrl}
-              className="flex-1 px-3 py-2 text-xs rounded-xl bg-white dark:bg-[#121922] border border-[#DFD3C0] dark:border-[#2C4054] text-[#1C2B36] dark:text-[#CBD8E3] font-mono outline-none select-all truncate"
-            />
-            <button
-              type="button"
-              onClick={handleCopyLink}
-              className="px-3.5 py-2 rounded-xl bg-apple-yellow hover:bg-apple-yellowHover text-white font-semibold text-xs flex items-center space-x-1.5 transition-all active:scale-95 shrink-0 shadow-xs"
-            >
-              {copied ? (
-                <>
-                  <Check size={14} className="text-white" />
-                  <span>Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Copy size={14} />
-                  <span>Copy Link</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* Custom Web Host (for Desktop/Electron or custom Vercel deployments) */}
-          <div className="pt-1">
-            <button
-              type="button"
-              onClick={() => setShowDomainInput(!showDomainInput)}
-              className="text-[11px] text-[#6E8092] dark:text-[#8AA0B4] hover:text-[#1C2B36] dark:hover:text-[#CBD8E3] flex items-center space-x-1"
-            >
-              <Settings2 size={11} />
-              <span>
-                {isWebOrigin
-                  ? `Hosted on this Vercel domain (${window.location.host})`
-                  : customOrigin
-                  ? `Linked to: ${customOrigin}`
-                  : 'Configure custom Vercel / Web domain'}
-              </span>
-            </button>
-
-            {showDomainInput && (
-              <form onSubmit={handleSaveOrigin} className="mt-2 space-y-1.5 p-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-[#DFD3C0] dark:border-[#263747]">
-                <label className="text-[10px] uppercase font-bold text-[#6E8092] dark:text-[#8AA0B4]">
-                  Vercel or Custom Web App URL
-                </label>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="url"
-                    placeholder="https://your-notes.vercel.app"
-                    value={customOrigin}
-                    onChange={(e) => setCustomOrigin(e.target.value)}
-                    className="flex-1 px-2.5 py-1.5 text-xs rounded-lg bg-white dark:bg-[#121922] border border-[#DFD3C0] dark:border-[#2C4054] text-[#1C2B36] dark:text-[#CBD8E3] font-mono outline-none"
-                  />
-                  <button
-                    type="submit"
-                    className="px-2.5 py-1.5 bg-apple-yellow text-white rounded-lg text-xs font-semibold hover:bg-apple-yellowHover"
-                  >
-                    Save
-                  </button>
-                </div>
-              </form>
+        {/* Share Link Input with Copy button */}
+        <div className="flex items-center space-x-2">
+          <input
+            type="text"
+            readOnly
+            value={shareUrl}
+            onClick={(e) => (e.target as HTMLInputElement).select()}
+            className="flex-1 px-3 py-2 text-xs rounded-xl bg-white dark:bg-[#121922] border border-[#DFD3C0] dark:border-[#2C4054] text-[#1C2B36] dark:text-[#CBD8E3] outline-none select-all truncate font-mono"
+          />
+          <button
+            type="button"
+            onClick={handleCopyLink}
+            className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center space-x-1.5 shrink-0 transition-all active:scale-95 shadow-xs ${
+              copied
+                ? 'bg-emerald-600 text-white'
+                : 'bg-apple-yellow hover:bg-apple-yellowHover text-white'
+            }`}
+          >
+            {copied ? (
+              <>
+                <Check size={14} />
+                <span>Copied</span>
+              </>
+            ) : (
+              <>
+                <Copy size={14} />
+                <span>Copy Link</span>
+              </>
             )}
-          </div>
-        </div>
-
-        {/* Footer Actions */}
-        <div className="flex items-center justify-between pt-2 border-t border-[#DFD3C0]/60 dark:border-[#263747]">
-          <button
-            type="button"
-            onClick={handleOpenBrowser}
-            className="flex items-center space-x-1.5 text-xs text-[#213A50] dark:text-[#7EAAD0] hover:underline font-medium"
-          >
-            <ExternalLink size={13} />
-            <span>Open preview in browser</span>
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="py-1.5 px-3 rounded-lg text-xs font-semibold text-[#6E8092] dark:text-[#8AA0B4] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-          >
-            Done
           </button>
         </div>
       </div>
     </div>
   );
 
-  if (typeof document !== 'undefined') {
-    return createPortal(modalContent, document.body);
-  }
-
-  return modalContent;
+  return createPortal(modalContent, document.body);
 };

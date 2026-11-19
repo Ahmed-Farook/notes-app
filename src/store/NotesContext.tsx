@@ -135,6 +135,11 @@ interface NotesContextType {
   // Shared Note Toast
   importedSharedToast: string | null;
   dismissImportedSharedToast: () => void;
+
+  // Shared Note In-App Preview
+  sharedPreviewNote: Note | null;
+  saveSharedPreviewToNotes: () => void;
+  dismissSharedPreview: () => void;
 }
 
 export async function hashNotePassword(password: string, salt: string = ''): Promise<string> {
@@ -169,6 +174,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [pendingTrashDelete, setPendingTrashDelete] = useState<PendingTrashDelete>(null);
   const [widgetPinnedNoteId, setWidgetPinnedNoteIdState] = useState<string | null>(() => getWidgetPinnedNoteId());
   const [importedSharedToast, setImportedSharedToast] = useState<string | null>(null);
+  const [sharedPreviewNote, setSharedPreviewNote] = useState<Note | null>(null);
   const sharedPayloadProcessedRef = useRef(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
@@ -525,21 +531,27 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return filteredNotes.filter(n => !n.isPinned);
   }, [filteredNotes, selectedFolderId]);
 
-  // Active note instance
+  // Active note instance (prioritizes temporary in-app shared preview if active)
   const activeNote = useMemo(() => {
+    if (sharedPreviewNote && activeNoteId === sharedPreviewNote.id) {
+      return sharedPreviewNote;
+    }
     if (!activeNoteId) return null;
     return notes.find(n => n.id === activeNoteId) || null;
-  }, [notes, activeNoteId]);
+  }, [notes, activeNoteId, sharedPreviewNote]);
 
   // Only update active note if an active note is no longer in the list (e.g. moved or deleted)
   useEffect(() => {
     if (activeNoteId) {
+      if (sharedPreviewNote && activeNoteId === sharedPreviewNote.id) {
+        return;
+      }
       const activeStillInList = filteredNotes.some(n => n.id === activeNoteId);
       if (!activeStillInList) {
         setActiveNoteId(null);
       }
     }
-  }, [filteredNotes, activeNoteId]);
+  }, [filteredNotes, activeNoteId, sharedPreviewNote]);
 
   // Create new note (kept as local draft until user makes first edit or drawing)
   const createNote = useCallback((folderId?: string): Note => {
@@ -682,7 +694,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     });
   }, [activeNoteId]);
 
-  // Decode and automatically open shared note when recipient opens a ?share= URL
+  // Decode and load shared note into in-app preview mode (WITHOUT auto-saving to private library)
   useEffect(() => {
     if (sharedPayloadProcessedRef.current) return;
     const payloadStr = getSharePayloadFromUrl();
@@ -691,8 +703,6 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     sharedPayloadProcessedRef.current = true;
     const sharedData = parseSharedPayload(payloadStr);
     if (sharedData) {
-      const importedNoteId = `note-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-
       let plainSnippet = '';
       if (typeof document !== 'undefined') {
         try {
@@ -705,12 +715,12 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         plainSnippet = '[Handwritten Drawing / Annotation]';
       }
 
-      const importedNote: Note = {
-        id: importedNoteId,
+      const previewNote: Note = {
+        id: 'shared-preview-note',
         title: sharedData.title || 'Shared Note',
-        content: sharedData.content || '<h1>Shared Note</h1><p></p>',
+        content: sharedData.content || '<p></p>',
         drawingStrokes: sharedData.strokes || undefined,
-        plainTextPreview: plainSnippet || 'Shared note imported into texō',
+        plainTextPreview: plainSnippet || 'Shared note preview',
         folderId: 'default',
         isPinned: false,
         isTrash: false,
@@ -718,12 +728,39 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         updatedAt: Date.now(),
       };
 
-      setNotes((prev) => [importedNote, ...prev]);
-      setActiveNoteId(importedNoteId);
+      // Set as preview only: DO NOT mutate private notes or write to storage
+      setSharedPreviewNote(previewNote);
+      setActiveNoteId('shared-preview-note');
       setMobileView('editor');
-      cleanShareUrl();
-      setImportedSharedToast(`Shared note "${importedNote.title}" opened in texō`);
     }
+  }, [setActiveNoteId]);
+
+  // Saves the previewed shared note into the user's permanent personal notes collection
+  const saveSharedPreviewToNotes = useCallback(() => {
+    if (!sharedPreviewNote) return;
+    triggerHaptic();
+
+    const permanentNote: Note = {
+      ...sharedPreviewNote,
+      id: `note-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    setNotes((prev) => [permanentNote, ...prev]);
+    setSharedPreviewNote(null);
+    setActiveNoteId(permanentNote.id);
+    cleanShareUrl();
+    setImportedSharedToast(`"${permanentNote.title}" saved to your notes`);
+  }, [sharedPreviewNote, setActiveNoteId]);
+
+  // Dismisses the shared note preview without touching the user's private library
+  const dismissSharedPreview = useCallback(() => {
+    triggerHaptic();
+    setSharedPreviewNote(null);
+    cleanShareUrl();
+    setActiveNoteId(null);
+    setMobileView('list');
   }, [setActiveNoteId]);
 
   // Keep Android Home Screen Widget in sync with the user's latest checklist / note
@@ -1344,6 +1381,9 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         toggleWidgetPinnedNote,
         importedSharedToast,
         dismissImportedSharedToast,
+        sharedPreviewNote,
+        saveSharedPreviewToNotes,
+        dismissSharedPreview,
       }}
     >
       {children}

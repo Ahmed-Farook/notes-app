@@ -34,6 +34,8 @@ export const Layout: React.FC = () => {
     cancelPendingTrashDelete,
     importedSharedToast,
     dismissImportedSharedToast,
+    sharedPreviewNote,
+    dismissSharedPreview,
   } = useNotes();
   const { isAuthModalOpen, closeAuthModal } = useAuth();
   const [showFormatToolbar, setShowFormatToolbar] = useState(true);
@@ -112,6 +114,9 @@ export const Layout: React.FC = () => {
   const isSelectionModeRef = useRef(isSelectionMode);
   isSelectionModeRef.current = isSelectionMode;
 
+  const sharedPreviewNoteRef = useRef(sharedPreviewNote);
+  sharedPreviewNoteRef.current = sharedPreviewNote;
+
   // Auto-dismiss shared note import toast
   useEffect(() => {
     if (!importedSharedToast) return;
@@ -129,6 +134,12 @@ export const Layout: React.FC = () => {
 
     const setupListener = async () => {
       listenerHandle = await CapApp.addListener('backButton', () => {
+        // -1. If viewing shared preview note, dismiss preview cleanly
+        if (sharedPreviewNoteRef.current) {
+          dismissSharedPreview();
+          return;
+        }
+
         // 0. Exit multi-selection mode if active
         if (isSelectionModeRef.current) {
           exitSelectionMode();
