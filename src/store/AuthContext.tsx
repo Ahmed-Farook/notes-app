@@ -126,13 +126,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signUp = useCallback(async (email: string, password: string) => {
     setSyncStatus('syncing');
 
-    // Verification landing page hosted on GitHub Pages or current domain
-    const emailRedirectTo =
+    // Verification landing page hosted on Vercel domain or current web origin
+    const baseOrigin =
       typeof window !== 'undefined' &&
       window.location.protocol.startsWith('http') &&
-      !window.location.hostname.includes('localhost')
-        ? `${window.location.origin}/verified.html`
-        : 'https://ahmed-farook.github.io/notes-app/verified.html';
+      !window.location.hostname.includes('localhost') &&
+      !window.location.hostname.includes('127.0.0.1')
+        ? window.location.origin
+        : 'https://texo.vercel.app';
+
+    const emailRedirectTo = `${baseOrigin}/verified.html`;
 
     const { data, error } = await supabase.auth.signUp({
       email,

@@ -484,7 +484,38 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     setUnlockPasswordInput('');
     setUnlockError('');
     setShowUnlockPassword(false);
+    hasShownSavePromptRef.current = false;
+    setShowSaveRequiredPopup(false);
   }, [activeNote?.id]);
+
+  const [showSaveRequiredPopup, setShowSaveRequiredPopup] = useState(false);
+  const hasShownSavePromptRef = useRef(false);
+
+  const triggerSaveRequiredNotice = useCallback(() => {
+    if (!isSharedPreview) return;
+    if (hasShownSavePromptRef.current) return;
+    hasShownSavePromptRef.current = true;
+    triggerHaptic();
+    setShowSaveRequiredPopup(true);
+    setTimeout(() => {
+      setShowSaveRequiredPopup(false);
+    }, 4500);
+  }, [isSharedPreview]);
+
+  // Listen for typing attempts while in shared preview
+  useEffect(() => {
+    if (!isSharedPreview) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.key === 'Escape' || e.key === 'Tab') return;
+      triggerSaveRequiredNotice();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isSharedPreview, triggerSaveRequiredNotice]);
 
   const handleUnlockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1292,6 +1323,30 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
         </div>
       )}
 
+      {/* Save Required Notice Popup (shown only once when typing/editing in preview) */}
+      {showSaveRequiredPopup && (
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 flex items-center space-x-2.5 px-3.5 py-2 rounded-xl bg-[#1C2B36] text-[#FAF6EF] dark:bg-[#FAF6EF] dark:text-[#1C2B36] shadow-xl border border-white/10 dark:border-black/10 text-xs animate-in fade-in slide-in-from-top-2 duration-150 select-none">
+          <span className="font-medium">You have to save the note to edit it.</span>
+          <button
+            type="button"
+            onClick={() => {
+              setShowSaveRequiredPopup(false);
+              saveSharedPreviewToNotes();
+            }}
+            className="px-2.5 py-1 rounded-lg bg-apple-yellow text-white font-semibold text-[11px] hover:bg-apple-yellowHover active:scale-95 transition-all cursor-pointer shadow-xs"
+          >
+            Save Now
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowSaveRequiredPopup(false)}
+            className="opacity-60 hover:opacity-100 p-0.5 cursor-pointer transition-opacity"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Trash Warning Banner */}
       {activeNote.isTrash && (
         <div className="bg-[#EFE7D8] dark:bg-[#16202A] border-b border-[#DFD3C0] dark:border-[#223344] px-4 md:px-8 py-2.5 flex items-center justify-between text-xs transition-colors">
@@ -1405,7 +1460,11 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
           onMouseDown={handleContainerMouseDown}
           onMouseMove={handleContainerMouseMove}
           onClick={(e) => {
-            if (editor && !activeNote.isTrash && !isPenMode && !isSharedPreview) {
+            if (isSharedPreview) {
+              triggerSaveRequiredNotice();
+              return;
+            }
+            if (editor && !activeNote.isTrash && !isPenMode) {
               // If this was a drag or there is an active text selection, do NOT clear selection!
               if (isMouseSelectingRef.current) {
                 isMouseSelectingRef.current = false;

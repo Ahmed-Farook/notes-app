@@ -1,10 +1,14 @@
 {
   "framework": "vite",
+  "cleanUrls": false,
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/verified.html",
+      "destination": "/verified.html"
+    },
+    {
+      "source": "/((?!verified\\.html).*)",
       "destination": "/index.html"
     }
   ]
 }
-

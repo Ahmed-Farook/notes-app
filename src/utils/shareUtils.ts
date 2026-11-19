@@ -72,7 +72,7 @@ export function buildShareUrl(note: { title?: string; content?: string; drawingS
     }
   }
   if (!base) {
-    base = 'https://texo-notes.vercel.app';
+    base = 'https://texo.vercel.app';
   }
 
   base = base.replace(/\/$/, '');
