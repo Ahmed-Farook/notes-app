@@ -482,9 +482,20 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
                 : 'text-[#485B6D] dark:text-[#A0B5C8]'
             } ${note.isLocked && !unlockedNoteIds.has(note.id) ? 'italic opacity-85' : ''}`}
           >
-            {note.isLocked && !unlockedNoteIds.has(note.id)
-              ? 'Locked Note'
-              : note.plainTextPreview || 'No additional text'}
+            {(() => {
+              if (note.isLocked && !unlockedNoteIds.has(note.id)) {
+                return 'Locked Note';
+              }
+              const isChecklist = note.folderId === 'checklists' || (note.content && note.content.includes('data-type="taskItem"'));
+              if (isChecklist) {
+                const totalTasks = (note.content?.match(/data-type="taskItem"/g) || []).length;
+                const completedTasks = (note.content?.match(/data-checked="true"/g) || []).length;
+                if (totalTasks > 0) {
+                  return `✓ ${completedTasks}/${totalTasks} completed`;
+                }
+              }
+              return note.plainTextPreview || 'No additional text';
+            })()}
           </span>
         </div>
       </div>

@@ -54,9 +54,9 @@
             android:contentDescription="New Note">
 
             <ImageView
-                android:layout_width="18dp"
-                android:layout_height="18dp"
-                android:src="@android:drawable/ic_input_add"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/ic_widget_add"
                 android:contentDescription="Add" />
         </LinearLayout>
     </LinearLayout>
@@ -74,7 +74,7 @@
         android:id="@+id/widget_todo_empty"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="No checklist items. Tap to open note in texō."
+        android:text="No checklist items. Tap to open texō."
         android:textColor="#5A6E82"
         android:textSize="12sp"
         android:paddingTop="12dp"

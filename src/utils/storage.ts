@@ -5,6 +5,7 @@ const FOLDERS_STORAGE_KEY = 'apple_notes_folders_v1';
 
 export const SYSTEM_FOLDERS: Folder[] = [
   { id: 'default', name: 'Notes', isSystem: true },
+  { id: 'checklists', name: 'Checklists', isSystem: true },
   { id: 'trash', name: 'Recently Deleted', isSystem: true },
 ];
 

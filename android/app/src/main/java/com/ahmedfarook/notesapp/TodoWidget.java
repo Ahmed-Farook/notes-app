@@ -119,6 +119,7 @@ public class TodoWidget extends AppWidgetProvider {
             }
 
             PendingIntent openPending = PendingIntent.getActivity(context, 100 + appWidgetId, openIntent, flags);
+            views.setOnClickPendingIntent(R.id.widget_todo_root, openPending);
             views.setOnClickPendingIntent(R.id.widget_todo_header, openPending);
             views.setOnClickPendingIntent(R.id.widget_todo_empty, openPending);
 
@@ -173,16 +174,16 @@ public class TodoWidget extends AppWidgetProvider {
                         toggleIntent.putExtra("note_id", noteId);
                         toggleIntent.putExtra("item_index", i);
 
-                        int mutableFlags = PendingIntent.FLAG_UPDATE_CURRENT;
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                            mutableFlags |= PendingIntent.FLAG_MUTABLE;
+                        int itemFlags = PendingIntent.FLAG_UPDATE_CURRENT;
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            itemFlags |= PendingIntent.FLAG_IMMUTABLE;
                         }
 
                         PendingIntent togglePending = PendingIntent.getBroadcast(
                                 context,
                                 (appWidgetId * 1000) + i,
                                 toggleIntent,
-                                mutableFlags
+                                itemFlags
                         );
 
                         itemViews.setOnClickPendingIntent(R.id.widget_todo_item_row, togglePending);

@@ -508,10 +508,15 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         if (note.isTrash) return false;
         const noteFolder = note.folderId || 'default';
         if (selectedFolderId === 'default') {
-          // Main Notes section contains default notes and legacy quick/all
+          // Main Notes section contains default notes and legacy quick/all (excluding checklists)
+          if (noteFolder === 'checklists') return false;
           if (noteFolder !== 'default' && noteFolder !== 'quick' && noteFolder !== 'all') {
             return false;
           }
+        } else if (selectedFolderId === 'checklists') {
+          // Checklists section shows dedicated checklist notes and notes containing task items
+          const isChecklist = noteFolder === 'checklists' || (note.content && note.content.includes('data-type="taskItem"'));
+          if (!isChecklist) return false;
         } else {
           if (noteFolder !== selectedFolderId) return false;
         }
@@ -556,6 +561,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // Create new note (kept as local draft until user makes first edit or drawing)
   const createNote = useCallback((folderId?: string): Note => {
     triggerHaptic();
+    const isChecklistTarget = folderId === 'checklists' || (!folderId && selectedFolderId === 'checklists');
     const targetFolder =
       folderId ||
       (selectedFolderId === 'trash' || selectedFolderId === 'all' || selectedFolderId === 'pinned'
@@ -564,9 +570,11 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     const newNote: Note = {
       id: `note-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      title: 'New Note',
-      content: '<h1>New Note</h1><p></p>',
-      plainTextPreview: 'No additional text',
+      title: isChecklistTarget ? 'To-Do List' : 'New Note',
+      content: isChecklistTarget
+        ? '<h1>To-Do List</h1><ul data-type="taskList"><li data-type="taskItem" data-checked="false"><p></p></li></ul>'
+        : '<h1>New Note</h1><p></p>',
+      plainTextPreview: isChecklistTarget ? '0 tasks completed' : 'No additional text',
       folderId: targetFolder,
       isPinned: false,
       isTrash: false,
@@ -578,6 +586,12 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setNotes(prev => [newNote, ...prev]);
     setActiveNoteId(newNote.id);
     setMobileView('editor');
+
+    if (isChecklistTarget) {
+      setTimeout(() => {
+        syncNoteToAndroidWidget([newNote, ...notesRef.current], newNote.id);
+      }, 60);
+    }
 
     return newNote;
   }, [selectedFolderId, setActiveNoteId]);

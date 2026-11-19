@@ -10,6 +10,7 @@ import {
   Check,
   Sparkles,
   Pencil,
+  ListTodo,
 } from 'lucide-react';
 import { useNotes } from '../../store/NotesContext';
 import { CURRENT_VERSION } from '../../utils/updateChecker';
@@ -71,8 +72,12 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
   }, [contextMenu]);
 
   // Calculate note counts
+  const checklistsCount = notes.filter(
+    n => !n.isTrash && (n.folderId === 'checklists' || (n.content && n.content.includes('data-type="taskItem"')))
+  ).length;
+
   const defaultNotesCount = notes.filter(
-    n => !n.isTrash && (n.folderId === 'default' || n.folderId === 'quick' || n.folderId === 'all' || !n.folderId)
+    n => !n.isTrash && n.folderId !== 'checklists' && (!n.content || !n.content.includes('data-type="taskItem"')) && (n.folderId === 'default' || n.folderId === 'quick' || n.folderId === 'all' || !n.folderId)
   ).length;
   const trashCount = notes.filter(n => n.isTrash).length;
 
@@ -153,10 +158,10 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
   return (
     <aside className="w-56 bg-[#EFE7D8] dark:bg-[#101720] border-r border-apple-border dark:border-apple-borderDark h-full flex flex-col justify-between select-none shrink-0 text-sm relative">
       <div className="overflow-y-auto px-2 py-3 space-y-4 flex-1">
-        {/* Main Notes Section */}
+        {/* Main Notes & Checklists Section */}
         <div>
           <div className="px-2 pb-1 text-[11px] font-semibold tracking-wider text-[#5A6E82] dark:text-[#8AA0B4] uppercase">
-            Notes
+            Library
           </div>
           <div className="space-y-0.5">
             <button
@@ -176,6 +181,26 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
               </div>
               <span className={`text-[11px] ${selectedFolderId === 'default' ? 'text-white/80' : 'text-[#485B6D] dark:text-[#95ACC0] font-medium'}`}>
                 {defaultNotesCount}
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                triggerHaptic();
+                setSelectedFolderId('checklists');
+              }}
+              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                selectedFolderId === 'checklists'
+                  ? 'bg-apple-yellow dark:bg-[#253D56] text-white font-medium shadow-xs'
+                  : 'text-[#1C2B36] dark:text-[#CBD8E3] hover:bg-[#E5DCCB] dark:hover:bg-[#1A2530]'
+              }`}
+            >
+              <div className="flex items-center space-x-2 truncate">
+                <ListTodo size={15} className={selectedFolderId === 'checklists' ? 'text-white' : 'text-[#395060] dark:text-[#7EAAD0]'} />
+                <span className="truncate">Checklists</span>
+              </div>
+              <span className={`text-[11px] ${selectedFolderId === 'checklists' ? 'text-white/80' : 'text-[#485B6D] dark:text-[#95ACC0] font-medium'}`}>
+                {checklistsCount}
               </span>
             </button>
           </div>

@@ -119,17 +119,29 @@ export function findBestWidgetNote(notes: Note[], activeNoteId: string | null): 
     if (chosen) return chosen;
   }
 
-  // 2. Active note
+  // 2. Active note if it is in checklists folder or has checklist items
+  if (activeNoteId) {
+    const active = activeNotes.find((n) => n.id === activeNoteId);
+    if (active && (active.folderId === 'checklists' || active.content?.includes('data-type="taskItem"'))) {
+      return active;
+    }
+  }
+
+  // 3. Most recently updated note in checklists folder
+  const checklistFolderNote = activeNotes.find((n) => n.folderId === 'checklists');
+  if (checklistFolderNote) return checklistFolderNote;
+
+  // 4. Any note containing task items
+  const withChecklist = activeNotes.find((n) => n.content && n.content.includes('data-type="taskItem"'));
+  if (withChecklist) return withChecklist;
+
+  // 5. Active note (even without checklist items)
   if (activeNoteId) {
     const active = activeNotes.find((n) => n.id === activeNoteId);
     if (active) return active;
   }
 
-  // 3. Any note containing task items
-  const withChecklist = activeNotes.find((n) => n.content && n.content.includes('data-type="taskItem"'));
-  if (withChecklist) return withChecklist;
-
-  // 4. Pinned note or first note
+  // 6. Pinned note or first note
   const pinned = activeNotes.find((n) => n.isPinned);
   if (pinned) return pinned;
 

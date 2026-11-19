@@ -637,6 +637,9 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
   // Editor scroll container ref to reset scroll position on note change
   const editorScrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Dedicated quick-add input for checklist notes
+  const [newChecklistInput, setNewChecklistInput] = useState('');
+
   // Long-press / context menu state for Images, Tables and Math Formulas
   const [contextMenu, setContextMenu] = useState<{
     type: 'image' | 'table' | 'math';
@@ -965,6 +968,21 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
       window.removeEventListener('editor:quick-add-checklist', handleQuickAdd);
     };
   }, [editor]);
+
+  // Dedicated quick-add action for checklist notes
+  const handleQuickAddChecklistItem = useCallback(() => {
+    if (!editor || !newChecklistInput.trim()) return;
+    const text = newChecklistInput.trim();
+    setNewChecklistInput('');
+    triggerHaptic();
+
+    const currentHtml = editor.getHTML();
+    if (!currentHtml.includes('data-type="taskList"')) {
+      editor.chain().focus('end').toggleTaskList().insertContent(text).run();
+    } else {
+      editor.chain().focus('end').splitBlock().insertContent(text).run();
+    }
+  }, [editor, newChecklistInput]);
 
   // Reset scroll position to top whenever switching notes so the new note starts cleanly from the top
   useEffect(() => {
@@ -1543,6 +1561,34 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
                   }
                 }}
               />
+
+              {/* Quick Add Task Input for Checklists */}
+              {activeNote.folderId === 'checklists' && !activeNote.isTrash && !isSharedPreview && (
+                <div className="mt-4 mb-2 flex items-center space-x-2 bg-[#FAF6EF] dark:bg-[#1C2733] p-1.5 rounded-xl border border-[#DFD3C0] dark:border-[#2C4054] shadow-xs">
+                  <div className="w-4 h-4 ml-2 rounded-md border-2 border-[#DFD3C0] dark:border-[#384F66] shrink-0" />
+                  <input
+                    type="text"
+                    value={newChecklistInput}
+                    onChange={(e) => setNewChecklistInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleQuickAddChecklistItem();
+                      }
+                    }}
+                    placeholder="Add a task... (Press Enter)"
+                    className="flex-1 bg-transparent px-2 py-1 text-xs text-[#1C2B36] dark:text-[#E8EEF3] placeholder-[#8AA0B4] outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleQuickAddChecklistItem}
+                    disabled={!newChecklistInput.trim()}
+                    className="px-3 py-1.5 rounded-lg bg-apple-yellow hover:bg-apple-yellowHover dark:bg-[#345A7D] dark:hover:bg-[#3D6A94] text-white text-xs font-semibold shadow-xs disabled:opacity-40 transition-all active:scale-95 cursor-pointer shrink-0"
+                  >
+                    Add
+                  </button>
+                </div>
+              )}
 
               {/* 5 lines of visual padding (~112px) where clicking brings the cursor up to the line below, and typing preserves this buffer underneath */}
               <div
