@@ -405,7 +405,7 @@ function fetchJson(url, headers = {}) {
 
 // Check for updates via Node.js main process (bypasses browser CORS & Rate Limits)
 ipcMain.handle('updater:check', async (_event, token) => {
-  const repo = 'Ahmed-Farook/notes-app';
+  const repo = 'Ahmed-Farook/texo';
   const platform = process.platform === 'darwin' ? 'mac' : process.platform === 'win32' ? 'windows' : 'web';
 
   const headers = {

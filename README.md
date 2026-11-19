@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Ahmed-Farook/notes-app/releases/latest"><strong>Download the app ↗</strong></a><br>
+  <a href="https://github.com/Ahmed-Farook/texo/releases/latest"><strong>Download the app ↗</strong></a><br>
   <sub>macOS · Apple Silicon DMG &nbsp; / &nbsp; Windows · EXE &nbsp; / &nbsp; Android · APK</sub>
 </p>
 

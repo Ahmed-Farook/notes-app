@@ -133,7 +133,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       !window.location.hostname.includes('localhost') &&
       !window.location.hostname.includes('127.0.0.1')
         ? window.location.origin
-        : 'https://texo.vercel.app';
+        : 'https://texo-notes.vercel.app';
 
     const emailRedirectTo = `${baseOrigin}/verified.html`;
 

@@ -1,7 +1,7 @@
 // Update Checker Utility for macOS, Android, and Web
 
 export const CURRENT_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.1.0';
-export const GITHUB_REPO = 'Ahmed-Farook/notes-app';
+export const GITHUB_REPO = 'Ahmed-Farook/texo';
 
 export type PlatformType = 'mac' | 'windows' | 'android' | 'web';
 
