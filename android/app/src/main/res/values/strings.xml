@@ -8,4 +8,6 @@
     <string name="quick_note_widget_desc">Instantly create a new note with one tap.</string>
     <string name="notes_bar_widget_name">texō Notes Bar</string>
     <string name="notes_bar_widget_desc">Quick access to new notes, checklists, and drawings.</string>
+    <string name="todo_widget_name">texō To-Do &amp; Note</string>
+    <string name="todo_widget_description">View and check off to-do list items directly from your home screen.</string>
 </resources>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_todo_item_row"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingTop="5dp"
+    android:paddingBottom="5dp"
+    android:paddingStart="2dp"
+    android:paddingEnd="2dp"
+    android:clickable="true"
+    android:focusable="true">
+
+    <ImageView
+        android:id="@+id/widget_todo_item_check"
+        android:layout_width="19dp"
+        android:layout_height="19dp"
+        android:layout_marginEnd="10dp"
+        android:src="@drawable/widget_checkbox_unchecked"
+        android:contentDescription="Checkbox" />
+
+    <TextView
+        android:id="@+id/widget_todo_item_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Task item"
+        android:textColor="#1C2B36"
+        android:textSize="13sp"
+        android:maxLines="2"
+        android:ellipsize="end" />
+
+</LinearLayout>
+

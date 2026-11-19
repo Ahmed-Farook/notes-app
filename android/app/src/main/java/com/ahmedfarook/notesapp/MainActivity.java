@@ -9,6 +9,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(AppUpdaterPlugin.class);
         registerPlugin(BiometricAuthPlugin.class);
+        registerPlugin(NotesWidgetPlugin.class);
         super.onCreate(savedInstanceState);
         handleWidgetIntent(getIntent());
     }
@@ -21,14 +22,26 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void handleWidgetIntent(Intent intent) {
-        if (intent != null && QuickNoteWidget.ACTION_NEW_NOTE.equals(intent.getAction())) {
-            if (getBridge() != null && getBridge().getWebView() != null) {
+        if (intent == null) return;
+
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            if (QuickNoteWidget.ACTION_NEW_NOTE.equals(intent.getAction())) {
                 getBridge().getWebView().postDelayed(() -> {
                     getBridge().getWebView().evaluateJavascript(
                         "window.dispatchEvent(new CustomEvent('action:new-note'));",
                         null
                     );
                 }, 400);
+            } else if (intent.hasExtra("note_id")) {
+                String noteId = intent.getStringExtra("note_id");
+                if (noteId != null && !noteId.isEmpty()) {
+                    getBridge().getWebView().postDelayed(() -> {
+                        getBridge().getWebView().evaluateJavascript(
+                            "window.dispatchEvent(new CustomEvent('action:open-note', { detail: { noteId: '" + noteId + "' } }));",
+                            null
+                        );
+                    }, 400);
+                }
             }
         }
     }

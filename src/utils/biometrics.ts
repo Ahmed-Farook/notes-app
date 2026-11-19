@@ -98,7 +98,11 @@ export async function promptBiometricAuth(reason: string = 'Unlock locked note')
   // 2. Android Capacitor Native Biometrics
   if (Capacitor.isNativePlatform() || win.Capacitor?.Plugins?.BiometricAuth) {
     try {
-      const res = await win.Capacitor.Plugins.BiometricAuth?.authenticate({ reason });
+      const BiometricPlugin = win.Capacitor?.Plugins?.BiometricAuth;
+      if (!BiometricPlugin) {
+        return { success: false, error: 'Biometric plugin not initialized' };
+      }
+      const res = await BiometricPlugin.authenticate({ reason });
       return { success: Boolean(res?.success), error: res?.error };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Biometric authentication failed' };
@@ -135,13 +139,10 @@ export async function promptBiometricAuth(reason: string = 'Unlock locked note')
           if (credential) {
             return { success: true };
           }
+          return { success: false, error: 'Verification failed' };
         } catch (authErr: any) {
-          // If credential was deleted or not found, fall through to re-register Touch ID
-          if (authErr?.name === 'NotAllowedError') {
-            // User actively dismissed Touch ID prompt
-            return { success: false, error: 'Touch ID cancelled' };
-          }
-          localStorage.removeItem('texo_webauthn_cred_id');
+          // Authentication was dismissed or fingerprint failed - return failure immediately
+          return { success: false, error: authErr?.message || 'Touch ID cancelled or not recognized' };
         }
       }
 

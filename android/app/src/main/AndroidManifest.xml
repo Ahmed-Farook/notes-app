@@ -61,6 +61,20 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/notes_bar_widget_info" />
         </receiver>
+
+        <!-- To-Do & Note Checklist Interactive Widget -->
+        <receiver
+            android:name=".TodoWidget"
+            android:label="@string/todo_widget_name"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.ahmedfarook.notesapp.ACTION_TOGGLE_TODO" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/todo_widget_info" />
+        </receiver>
     </application>
 
     <!-- Permissions -->

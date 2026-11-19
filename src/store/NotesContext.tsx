@@ -40,6 +40,7 @@ import {
   parseImportedFiles,
 } from '../utils/noteExportImport';
 import { promptBiometricAuth } from '../utils/biometrics';
+import { syncNoteToAndroidWidget, syncPendingWidgetToggles } from '../utils/widgetSync';
 
 export type PendingTrashDelete =
   | { type: 'single'; id: string; title?: string }
@@ -434,22 +435,6 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     saveStoredFolders(folders);
   }, [folders]);
 
-  // Listen to native Electron bridge actions and Android widget events if available
-  useEffect(() => {
-    const electronAPI = (window as unknown as { electronAPI?: { sendNewNote: (cb: () => void) => void } })?.electronAPI;
-    if (electronAPI?.sendNewNote) {
-      electronAPI.sendNewNote(() => {
-        createNote();
-      });
-    }
-
-    const handleWidgetNewNote = () => {
-      createNote();
-    };
-    window.addEventListener('action:new-note', handleWidgetNewNote);
-    return () => window.removeEventListener('action:new-note', handleWidgetNewNote);
-  }, []);
-
   const toggleTheme = useCallback(() => {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   }, []);
@@ -573,7 +558,13 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             (updates.content !== undefined && updates.content !== note.content) ||
             (updates.title !== undefined && updates.title !== note.title) ||
             (updates.plainTextPreview !== undefined && updates.plainTextPreview !== note.plainTextPreview) ||
-            (updates.drawingStrokes !== undefined && updates.drawingStrokes !== note.drawingStrokes);
+            (updates.drawingStrokes !== undefined && updates.drawingStrokes !== note.drawingStrokes) ||
+            (updates.isLocked !== undefined && updates.isLocked !== note.isLocked) ||
+            (updates.passwordHash !== undefined && updates.passwordHash !== note.passwordHash) ||
+            (updates.passwordHint !== undefined && updates.passwordHint !== note.passwordHint) ||
+            (updates.isPinned !== undefined && updates.isPinned !== note.isPinned) ||
+            (updates.isTrash !== undefined && updates.isTrash !== note.isTrash) ||
+            (updates.folderId !== undefined && updates.folderId !== note.folderId);
 
           if (hasContentChanged) {
             uneditedNewNoteIdsRef.current.delete(id);
@@ -611,6 +602,58 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       })
     );
   }, [user]);
+
+  // Listen to native Electron bridge actions and Android widget events if available
+  useEffect(() => {
+    const electronAPI = (window as unknown as { electronAPI?: { sendNewNote: (cb: () => void) => void } })?.electronAPI;
+    if (electronAPI?.sendNewNote) {
+      electronAPI.sendNewNote(() => {
+        createNote();
+      });
+    }
+
+    const handleWidgetNewNote = () => {
+      createNote();
+    };
+    const handleWidgetOpenNote = (e: any) => {
+      const targetId = e.detail?.noteId;
+      if (targetId) {
+        setActiveNoteId(targetId);
+        setMobileView('editor');
+      }
+    };
+
+    window.addEventListener('action:new-note', handleWidgetNewNote);
+    window.addEventListener('action:open-note', handleWidgetOpenNote);
+    return () => {
+      window.removeEventListener('action:new-note', handleWidgetNewNote);
+      window.removeEventListener('action:open-note', handleWidgetOpenNote);
+    };
+  }, [createNote, setActiveNoteId]);
+
+  // Keep Android Home Screen Widget in sync with the user's latest checklist / note
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      syncNoteToAndroidWidget(notes, activeNoteId);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [notes, activeNoteId]);
+
+  // Apply any checklist items toggled on the Android widget while app was backgrounded
+  useEffect(() => {
+    syncPendingWidgetToggles(notesRef.current, updateNote);
+
+    const handleFocusOrResume = () => {
+      syncPendingWidgetToggles(notesRef.current, updateNote);
+    };
+
+    window.addEventListener('focus', handleFocusOrResume);
+    window.addEventListener('visibilitychange', handleFocusOrResume);
+    return () => {
+      window.removeEventListener('focus', handleFocusOrResume);
+      window.removeEventListener('visibilitychange', handleFocusOrResume);
+    };
+  }, [updateNote]);
 
   // Move note to Recycle Bin (or open confirmation modal if already in Recycle Bin)
   const deleteNote = useCallback((id: string) => {
@@ -868,9 +911,9 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const unlockNoteWithBiometrics = useCallback(async (noteId: string): Promise<boolean> => {
     const note = notesRef.current.find((n) => n.id === noteId);
-    if (!note) return false;
+    if (!note || !note.isLocked) return false;
     const res = await promptBiometricAuth(`Unlock "${note.title || 'Note'}"`);
-    if (res.success) {
+    if (res && res.success === true) {
       setUnlockedNoteIds((prev) => new Set(prev).add(noteId));
       triggerHaptic();
       return true;
@@ -881,19 +924,40 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const lockNoteWithPassword = useCallback(
     async (noteId: string, password: string, hint?: string): Promise<void> => {
       const hash = await hashNotePassword(password, noteId);
+      const now = Date.now();
       updateNote(noteId, {
         isLocked: true,
         passwordHash: hash,
         passwordHint: hint ? hint.trim() : undefined,
+        updatedAt: now,
       });
       setUnlockedNoteIds((prev) => {
         const next = new Set(prev);
         next.delete(noteId);
         return next;
       });
+
+      // Instantly upload lock metadata to cloud so cloud sync never strips the lock
+      if (user && encryptionKeyRef.current) {
+        const target = notesRef.current.find((n) => n.id === noteId);
+        if (target) {
+          upsertNoteToCloud(
+            {
+              ...target,
+              isLocked: true,
+              passwordHash: hash,
+              passwordHint: hint ? hint.trim() : undefined,
+              updatedAt: now,
+            },
+            user.id,
+            encryptionKeyRef.current
+          ).catch((err) => console.warn('Failed cloud lock upsert:', err));
+        }
+      }
+
       triggerHaptic();
     },
-    [updateNote]
+    [updateNote, user]
   );
 
   const removeNotePassword = useCallback(
@@ -903,22 +967,39 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const saltedHash = await hashNotePassword(password, noteId);
       const legacyHash = await hashNotePassword(password);
       if (note.passwordHash === saltedHash || note.passwordHash === legacyHash) {
+        const now = Date.now();
         updateNote(noteId, {
           isLocked: false,
           passwordHash: undefined,
           passwordHint: undefined,
+          updatedAt: now,
         });
         setUnlockedNoteIds((prev) => {
           const next = new Set(prev);
           next.delete(noteId);
           return next;
         });
+
+        if (user && encryptionKeyRef.current) {
+          upsertNoteToCloud(
+            {
+              ...note,
+              isLocked: false,
+              passwordHash: undefined,
+              passwordHint: undefined,
+              updatedAt: now,
+            },
+            user.id,
+            encryptionKeyRef.current
+          ).catch((err) => console.warn('Failed cloud remove lock upsert:', err));
+        }
+
         triggerHaptic();
         return true;
       }
       return false;
     },
-    [updateNote]
+    [updateNote, user]
   );
 
   const relockNote = useCallback((noteId: string): void => {
