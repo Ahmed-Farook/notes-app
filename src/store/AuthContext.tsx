@@ -64,24 +64,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   useEffect(() => {
-    // 1. Get initial session
-    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
-      if (!error && session) {
-        setSession(session);
-        setUser(session.user);
-        await loadStoredKey(session.user.id);
-      }
-      setIsLoading(false);
-    });
+    let isMounted = true;
 
-    // 2. Listen for auth changes
+    // 1. Fast initial session check with 3-second safety race timeout
+    const sessionPromise = supabase.auth.getSession();
+    const timeoutPromise = new Promise<{ data: { session: null }; error: Error }>((resolve) =>
+      setTimeout(() => resolve({ data: { session: null }, error: new Error('Session timeout') }), 3000)
+    );
+
+    Promise.race([sessionPromise, timeoutPromise])
+      .then(({ data: { session }, error }: any) => {
+        if (!isMounted) return;
+        if (!error && session) {
+          setSession(session);
+          setUser(session.user);
+          loadStoredKey(session.user.id);
+        }
+        setIsLoading(false);
+      })
+      .catch(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    // 2. Listen for ongoing auth state changes without blocking event queue
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
       setSession(session);
       setUser(session ? session.user : null);
       if (session?.user) {
-        await loadStoredKey(session.user.id);
+        loadStoredKey(session.user.id);
       } else {
         setEncryptionKey(null);
         setIsKeyUnlocked(false);
@@ -90,6 +103,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, [loadStoredKey]);

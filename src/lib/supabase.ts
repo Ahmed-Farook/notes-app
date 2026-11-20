@@ -10,6 +10,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
+    // Override browser LockManager (navigator.locks) to eliminate the 30-40s deadlock on launch
+    lock: async (_name, _acquireTimeout, fn) => {
+      return await fn();
+    },
   },
 });
 

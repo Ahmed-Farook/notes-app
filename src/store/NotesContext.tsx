@@ -189,9 +189,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const { user, setSyncStatus, encryptionKey } = useAuth();
   const encryptionKeyRef = useRef<CryptoKey | null>(encryptionKey);
-  useEffect(() => {
-    encryptionKeyRef.current = encryptionKey;
-  }, [encryptionKey]);
+  encryptionKeyRef.current = encryptionKey;
 
   const notesRef = useRef(notes);
   notesRef.current = notes;
@@ -254,6 +252,11 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     isSyncingRef.current = true;
     if (showIndicator) setSyncStatus('syncing');
 
+    // Safety guarantee: Never keep blinking orange for more than 3.5s on launch
+    const safetyTimer = setTimeout(() => {
+      setSyncStatus('synced');
+    }, 3500);
+
     try {
       // Pass existing local notes & folders so unchanged items skip expensive Web Crypto decryptions
       const [remoteNotes, remoteFolders] = await Promise.all([
@@ -284,6 +287,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         remoteFolders
       );
 
+      clearTimeout(safetyTimer);
       setNotes(mergedNotes);
       setFolders(mergedFolders);
       setSyncStatus('synced');
@@ -297,9 +301,11 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         ]);
       }
     } catch (err) {
+      clearTimeout(safetyTimer);
       console.warn('Sync error:', err);
       setSyncStatus('offline');
     } finally {
+      clearTimeout(safetyTimer);
       isSyncingRef.current = false;
     }
   }, [user, setSyncStatus]);
