@@ -138,10 +138,52 @@ const CustomTaskItem = TaskItem.extend({
                 return false;
               }
               const currentNode = tr.doc.nodeAt(position);
-              tr.setNodeMarkup(position, undefined, {
-                ...currentNode?.attrs,
-                checked,
-              });
+              if (!currentNode) return false;
+
+              const resolved = tr.doc.resolve(position);
+              const parentList = resolved.parent;
+
+              // If inside a taskList with multiple items, reorder so completed items move to the bottom of this specific checklist
+              if (parentList && parentList.type.name === 'taskList' && parentList.childCount > 1) {
+                const parentPos = resolved.before(resolved.depth);
+                const indexInParent = resolved.index(resolved.depth);
+
+                const uncompleted: any[] = [];
+                const completed: any[] = [];
+
+                parentList.forEach((child, _offset, index) => {
+                  if (index === indexInParent) return;
+                  if (child.attrs.checked) {
+                    completed.push(child);
+                  } else {
+                    uncompleted.push(child);
+                  }
+                });
+
+                const toggledChild = parentList.child(indexInParent);
+                const toggledItem = toggledChild.type.create(
+                  { ...toggledChild.attrs, checked },
+                  toggledChild.content,
+                  toggledChild.marks
+                );
+
+                if (checked) {
+                  // Checked: move to the bottom of the current checklist
+                  completed.push(toggledItem);
+                } else {
+                  // Unchecked: move to the bottom of uncompleted items (above completed items)
+                  uncompleted.push(toggledItem);
+                }
+
+                const finalItems = [...uncompleted, ...completed];
+                const newTaskList = parentList.type.create(parentList.attrs, finalItems);
+                tr.replaceWith(parentPos, parentPos + parentList.nodeSize, newTaskList);
+              } else {
+                tr.setNodeMarkup(position, undefined, {
+                  ...currentNode.attrs,
+                  checked,
+                });
+              }
               return true;
             })
             .run();
@@ -1701,9 +1743,33 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
               ) {
                 return;
               }
-              // If clicked on empty space around or below the text, bring cursor up 1-2 lines below content
+              // If clicked on empty space around or below the text:
               if (!target.closest('.ProseMirror')) {
-                handleFocusOrCreateLineBelow();
+                const pmDom = editor.view?.dom;
+                if (!pmDom) {
+                  handleFocusOrCreateLineBelow();
+                  return;
+                }
+                const pmRect = pmDom.getBoundingClientRect();
+                if (e.clientY > pmRect.bottom) {
+                  // Clicks strictly below the note content -> focus or create clean line below
+                  handleFocusOrCreateLineBelow();
+                } else if (e.clientY < pmRect.top) {
+                  // Clicks above the note content (e.g. date header) -> focus title/start
+                  editor.chain().focus('start').run();
+                } else {
+                  // Clicks in the left or right gutter/padding aligned with a line of text or bullet point
+                  const clampedX = Math.max(pmRect.left + 8, Math.min(e.clientX, pmRect.right - 8));
+                  const pos = editor.view.posAtCoords({ left: clampedX, top: e.clientY });
+                  if (pos && typeof pos.pos === 'number') {
+                    const resolved = editor.state.doc.resolve(pos.pos);
+                    const selection = Selection.near(resolved);
+                    editor.view.dispatch(editor.state.tr.setSelection(selection));
+                    editor.commands.focus();
+                  } else {
+                    handleFocusOrCreateLineBelow();
+                  }
+                }
               }
             }
           }}
@@ -1747,7 +1813,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
                     return;
                   }
                   const proseMirror = target.closest('.ProseMirror') as HTMLElement | null;
-                  if (proseMirror && e.clientY > proseMirror.getBoundingClientRect().bottom - 40) {
+                  if (proseMirror && e.clientY > proseMirror.getBoundingClientRect().bottom) {
                     handleFocusOrCreateLineBelow();
                   } else if (editor && !editor.isFocused && !activeNote.isTrash) {
                     editor.commands.focus();

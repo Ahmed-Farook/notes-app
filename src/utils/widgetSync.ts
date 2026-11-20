@@ -92,6 +92,20 @@ export function toggleTaskItemInHtml(html: string, targetIndex: number, checked:
             cb.removeAttribute('checked');
           }
         }
+
+        // Reorder within its parent taskList: completed items to bottom
+        const parentList = target.parentElement;
+        if (parentList && parentList.getAttribute('data-type') === 'taskList') {
+          if (checked) {
+            parentList.appendChild(target);
+          } else {
+            const firstCompleted = parentList.querySelector('li[data-type="taskItem"][data-checked="true"]');
+            if (firstCompleted && firstCompleted !== target) {
+              parentList.insertBefore(target, firstCompleted);
+            }
+          }
+        }
+
         return doc.body.innerHTML;
       }
     }
