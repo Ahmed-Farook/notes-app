@@ -55,6 +55,33 @@ public class NotesWidgetPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void syncAllChecklists(PluginCall call) {
+        try {
+            JSArray checklistsArray = call.getArray("checklists", new JSArray());
+            Context context = getContext();
+            SharedPreferences prefs = context.getSharedPreferences(TodoWidget.PREFS_NAME, Context.MODE_PRIVATE);
+            prefs.edit().putString(TodoWidget.KEY_ALL_CHECKLISTS_JSON, checklistsArray.toString()).apply();
+
+            // Refresh all widgets
+            AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
+            ComponentName thisWidget = new ComponentName(context, TodoWidget.class);
+            int[] appWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget);
+            if (appWidgetIds != null && appWidgetIds.length > 0) {
+                appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetIds, R.id.widget_todo_listview);
+                for (int id : appWidgetIds) {
+                    TodoWidget.updateAppWidget(context, appWidgetManager, id);
+                }
+            }
+
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Failed to sync all checklists: " + e.getMessage(), e);
+        }
+    }
+
+    @PluginMethod
     public void getPendingToggles(PluginCall call) {
         try {
             Context context = getContext();

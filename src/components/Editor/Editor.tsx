@@ -517,6 +517,9 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     };
   }, [isSharedPreview, triggerSaveRequiredNotice]);
 
+  // Pure checklist mode: strictly checkboxes, no drawing, no complex formatters
+  const isChecklistFile = activeNote?.folderId === 'checklists';
+
   const handleUnlockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeNote || !unlockPasswordInput) return;
@@ -539,6 +542,13 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
   // Samsung Notes Seamless In-Note Stylus Drawing State with Independent Persistent Sizes/Colors
   const [isPenMode, setIsPenMode] = useState(false);
   const [activeDrawingTool, setActiveDrawingTool] = useState<DrawingToolType>('pen');
+
+  // Checklist files strictly disable pen and drawing mode
+  useEffect(() => {
+    if (isChecklistFile && isPenMode) {
+      setIsPenMode(false);
+    }
+  }, [isChecklistFile, isPenMode]);
 
   const [penSize, setPenSize] = useState<number>(() => {
     try {
@@ -998,6 +1008,14 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     editor.setEditable(!activeNote.isTrash && !isSharedPreview);
 
     let contentToLoad = activeNote.content || '<p></p>';
+    if (isChecklistFile && !isSharedPreview) {
+      if (!contentToLoad.includes('data-type="taskList"')) {
+        const titleMatch = contentToLoad.match(/<h1>([\s\S]*?)<\/h1>/i);
+        const titleHtml = titleMatch ? titleMatch[0] : '<h1>To-Do List</h1>';
+        contentToLoad = `${titleHtml}<ul data-type="taskList"><li data-type="taskItem" data-checked="false"><p></p></li></ul>`;
+        updateNote(activeNote.id, { content: contentToLoad });
+      }
+    }
     // Migrate legacy notes where title was saved as <h3> to <h1> (personal notes only)
     if (!isSharedPreview && /^\s*<h3>([\s\S]*?)<\/h3>/i.test(contentToLoad)) {
       contentToLoad = contentToLoad.replace(/^\s*<h3>([\s\S]*?)<\/h3>/i, '<h1>$1</h1>');
@@ -1201,6 +1219,11 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     const paragraphType = schema.nodes.paragraph;
     if (!paragraphType) return;
 
+    if (isChecklistFile) {
+      editor.chain().focus('end').splitBlock().toggleTaskList().run();
+      return;
+    }
+
     const lastChild = doc.lastChild;
 
     // If the last child is already an empty paragraph, focus it directly
@@ -1233,10 +1256,10 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
 
   return (
     <div className="flex-1 apple-paper-bg flex flex-col h-full overflow-hidden relative select-text animate-editor-enter">
-      {/* Samsung Notes Toolbar */}
+      {/* Samsung Notes Toolbar (Hidden in Checklist-only mode) */}
       <EditorToolbar
         editor={editor}
-        isVisible={showToolbar && !isNoteLocked && !isSharedPreview}
+        isVisible={showToolbar && !isNoteLocked && !isSharedPreview && !isChecklistFile}
         isPenMode={isPenMode}
         onTogglePenMode={(mode) => {
           setIsPenMode(mode);
@@ -1597,41 +1620,43 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
                 aria-hidden="true"
               />
 
-              {/* Seamless In-Note Drawing Canvas Overlay */}
-              <InNoteCanvas
-                noteId={activeNote.id}
-                theme={theme}
-                initialStrokesJson={activeNote.drawingStrokes}
-                isPenMode={isPenMode}
-                activeTool={activeDrawingTool}
-                activeColor={currentDrawingColor}
-                activeSize={currentDrawingSize}
-                stylusOnly={stylusOnly}
-                onStylusDetected={handleStylusDetected}
-                onStrokesUpdate={(strokesJson) => {
-                  const currentNote = activeNoteRef.current;
-                  if (!currentNote) return;
+              {/* Seamless In-Note Drawing Canvas Overlay (Disabled in Checklist mode) */}
+              {!isChecklistFile && (
+                <InNoteCanvas
+                  noteId={activeNote.id}
+                  theme={theme}
+                  initialStrokesJson={activeNote.drawingStrokes}
+                  isPenMode={isPenMode}
+                  activeTool={activeDrawingTool}
+                  activeColor={currentDrawingColor}
+                  activeSize={currentDrawingSize}
+                  stylusOnly={stylusOnly}
+                  onStylusDetected={handleStylusDetected}
+                  onStrokesUpdate={(strokesJson) => {
+                    const currentNote = activeNoteRef.current;
+                    if (!currentNote) return;
 
-                  const updates: any = {
-                    drawingStrokes: strokesJson,
-                  };
+                    const updates: any = {
+                      drawingStrokes: strokesJson,
+                    };
 
-                  // If note has no custom title or is 'New Note', and user drew something
-                  if ((!currentNote.title || currentNote.title === 'New Note') && strokesJson !== '[]') {
-                    updates.title = 'Handwritten Note';
-                    updates.plainTextPreview = '[Handwritten Drawing / Annotation]';
-                  }
+                    // If note has no custom title or is 'New Note', and user drew something
+                    if ((!currentNote.title || currentNote.title === 'New Note') && strokesJson !== '[]') {
+                      updates.title = 'Handwritten Note';
+                      updates.plainTextPreview = '[Handwritten Drawing / Annotation]';
+                    }
 
-                  updateNote(currentNote.id, updates);
-                }}
-                onHistoryChange={(canUndo, canRedo) => {
-                  setCanDrawingUndo(canUndo);
-                  setCanDrawingRedo(canRedo);
-                }}
-                undoTrigger={drawingUndoTrigger}
-                redoTrigger={drawingRedoTrigger}
-                clearTrigger={drawingClearTrigger}
-              />
+                    updateNote(currentNote.id, updates);
+                  }}
+                  onHistoryChange={(canUndo, canRedo) => {
+                    setCanDrawingUndo(canUndo);
+                    setCanDrawingRedo(canRedo);
+                  }}
+                  undoTrigger={drawingUndoTrigger}
+                  redoTrigger={drawingRedoTrigger}
+                  clearTrigger={drawingClearTrigger}
+                />
+              )}
             </div>
           </div>
         </div>

@@ -8,4 +8,5 @@
     android:initialLayout="@layout/widget_todo_list"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
+    android:configure="com.ahmedfarook.notesapp.TodoWidgetConfigureActivity"
     android:description="@string/todo_widget_description" />

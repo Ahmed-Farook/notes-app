@@ -419,20 +419,6 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
               )}
             </div>
 
-            {/* Home Screen Widget Indicator */}
-            {widgetPinnedNoteId === note.id && !note.isTrash && (
-              <span
-                title="Pinned to Home Screen Widget"
-                className={`p-1 shrink-0 ${
-                  !isSelectionMode && isSelected
-                    ? 'text-white'
-                    : 'text-apple-yellow dark:text-[#E5A93C]'
-                }`}
-              >
-                <ListTodo size={14} />
-              </span>
-            )}
-
             {/* Pin Button: Single button for both pinning and unpinning */}
             {!note.isTrash && (
               <button
@@ -486,7 +472,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
               if (note.isLocked && !unlockedNoteIds.has(note.id)) {
                 return 'Locked Note';
               }
-              const isChecklist = note.folderId === 'checklists' || (note.content && note.content.includes('data-type="taskItem"'));
+              const isChecklist = note.folderId === 'checklists';
               if (isChecklist) {
                 const totalTasks = (note.content?.match(/data-type="taskItem"/g) || []).length;
                 const completedTasks = (note.content?.match(/data-checked="true"/g) || []).length;

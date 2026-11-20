@@ -189,8 +189,37 @@ export async function syncNoteToAndroidWidget(notes: Note[], activeNoteId: strin
       title: targetNote.title || 'To-Do List',
       items: widgetItems,
     });
+    // Also sync all available checklists for multi-widget note selection
+    await syncAllChecklistsToAndroidWidget(notes);
   } catch (err) {
     console.warn('Failed to sync data to Android widget:', err);
+  }
+}
+
+/**
+ * Syncs all available checklists to Android so each home screen widget can choose and display its list.
+ */
+export async function syncAllChecklistsToAndroidWidget(notes: Note[]): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+
+  const win = typeof window !== 'undefined' ? (window as any) : undefined;
+  const widgetPlugin = win?.Capacitor?.Plugins?.NotesWidget;
+  if (!widgetPlugin?.syncAllChecklists) return;
+
+  const checklistNotes = notes.filter(
+    (n) => !n.isTrash && !n.isLocked && (n.folderId === 'checklists' || n.content?.includes('data-type="taskItem"'))
+  );
+
+  const payload = checklistNotes.map((note) => ({
+    id: note.id,
+    title: note.title || 'To-Do List',
+    items: extractChecklistFromHtml(note.content || ''),
+  }));
+
+  try {
+    await widgetPlugin.syncAllChecklists({ checklists: payload });
+  } catch (err) {
+    console.warn('Failed to sync all checklists to Android:', err);
   }
 }
 

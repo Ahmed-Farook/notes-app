@@ -11,8 +11,9 @@
 </p>
 
 <p align="center">
+  <a href="https://texo-notes.vercel.app"><strong>Open Web App ↗</strong></a> &nbsp;&bull;&nbsp;
   <a href="https://github.com/Ahmed-Farook/texo/releases/latest"><strong>Download the app ↗</strong></a><br>
-  <sub>macOS · Apple Silicon DMG &nbsp; / &nbsp; Windows · EXE &nbsp; / &nbsp; Android · APK</sub>
+  <sub>Web (texo-notes.vercel.app) &nbsp;&bull;&nbsp; macOS · DMG &nbsp;&bull;&nbsp; Android · APK &nbsp;&bull;&nbsp; Windows · EXE</sub>
 </p>
 
 > [!TIP]

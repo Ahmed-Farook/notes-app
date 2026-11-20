@@ -7,11 +7,8 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Color;
+import android.net.Uri;
 import android.os.Build;
-import android.text.SpannableString;
-import android.text.style.StrikethroughSpan;
-import android.view.View;
 import android.widget.RemoteViews;
 
 import org.json.JSONArray;
@@ -24,6 +21,7 @@ public class TodoWidget extends AppWidgetProvider {
     public static final String KEY_NOTE_ID = "widget_note_id";
     public static final String KEY_NOTE_TITLE = "widget_note_title";
     public static final String KEY_ITEMS_JSON = "widget_items_json";
+    public static final String KEY_ALL_CHECKLISTS_JSON = "widget_all_checklists_json";
     public static final String KEY_PENDING_TOGGLES = "widget_pending_toggles";
 
     @Override
@@ -33,54 +31,85 @@ public class TodoWidget extends AppWidgetProvider {
         if (ACTION_TOGGLE_TODO.equals(intent.getAction())) {
             int itemIndex = intent.getIntExtra("item_index", -1);
             String noteId = intent.getStringExtra("note_id");
+            int appWidgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID);
 
             if (itemIndex >= 0) {
-                toggleTodoItem(context, noteId, itemIndex);
+                toggleTodoItem(context, noteId, itemIndex, appWidgetId);
             }
         }
     }
 
-    private void toggleTodoItem(Context context, String noteId, int itemIndex) {
+    private void toggleTodoItem(Context context, String noteId, int itemIndex, int appWidgetId) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        String itemsJsonStr = prefs.getString(KEY_ITEMS_JSON, "[]");
+        String allJson = prefs.getString(KEY_ALL_CHECKLISTS_JSON, "[]");
 
         try {
-            JSONArray items = new JSONArray(itemsJsonStr);
-            if (itemIndex < items.length()) {
-                JSONObject item = items.getJSONObject(itemIndex);
-                boolean current = item.optBoolean("checked", false);
-                boolean next = !current;
-                item.put("checked", next);
+            JSONArray arr = new JSONArray(allJson);
+            boolean toggledState = false;
+            boolean updatedInAll = false;
 
-                // Save updated items back to preferences
-                SharedPreferences.Editor editor = prefs.edit();
-                editor.putString(KEY_ITEMS_JSON, items.toString());
-
-                // Record pending toggle event so web app can sync it when opened
-                JSONArray pending;
-                String pendingStr = prefs.getString(KEY_PENDING_TOGGLES, "[]");
-                try {
-                    pending = new JSONArray(pendingStr);
-                } catch (Exception e) {
-                    pending = new JSONArray();
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject noteObj = arr.getJSONObject(i);
+                if (noteObj.optString("id", "").equals(noteId) || (noteId == null || noteId.isEmpty())) {
+                    JSONArray itemsArr = noteObj.optJSONArray("items");
+                    if (itemsArr != null && itemIndex < itemsArr.length()) {
+                        JSONObject it = itemsArr.getJSONObject(itemIndex);
+                        boolean cur = it.optBoolean("checked", false);
+                        toggledState = !cur;
+                        it.put("checked", toggledState);
+                        updatedInAll = true;
+                    }
+                    break;
                 }
-
-                JSONObject toggleEvent = new JSONObject();
-                toggleEvent.put("noteId", noteId);
-                toggleEvent.put("itemIndex", itemIndex);
-                toggleEvent.put("checked", next);
-                toggleEvent.put("timestamp", System.currentTimeMillis());
-                pending.put(toggleEvent);
-
-                editor.putString(KEY_PENDING_TOGGLES, pending.toString());
-                editor.apply();
-
-                // Refresh all widget instances immediately
-                AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
-                ComponentName thisWidget = new ComponentName(context, TodoWidget.class);
-                int[] appWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget);
-                onUpdate(context, appWidgetManager, appWidgetIds);
             }
+
+            SharedPreferences.Editor editor = prefs.edit();
+            if (updatedInAll) {
+                editor.putString(KEY_ALL_CHECKLISTS_JSON, arr.toString());
+            }
+
+            // Also update legacy single items json if matching
+            String singleJson = prefs.getString(KEY_ITEMS_JSON, "[]");
+            try {
+                JSONArray singleArr = new JSONArray(singleJson);
+                if (itemIndex < singleArr.length()) {
+                    JSONObject singleIt = singleArr.getJSONObject(itemIndex);
+                    singleIt.put("checked", toggledState);
+                    editor.putString(KEY_ITEMS_JSON, singleArr.toString());
+                }
+            } catch (Exception ignored) {}
+
+            // Record pending toggle event so web/desktop app syncs it upon opening
+            JSONArray pending;
+            String pendingStr = prefs.getString(KEY_PENDING_TOGGLES, "[]");
+            try {
+                pending = new JSONArray(pendingStr);
+            } catch (Exception e) {
+                pending = new JSONArray();
+            }
+
+            JSONObject toggleEvent = new JSONObject();
+            toggleEvent.put("noteId", noteId != null ? noteId : "");
+            toggleEvent.put("itemIndex", itemIndex);
+            toggleEvent.put("checked", toggledState);
+            toggleEvent.put("timestamp", System.currentTimeMillis());
+            pending.put(toggleEvent);
+
+            editor.putString(KEY_PENDING_TOGGLES, pending.toString());
+            editor.apply();
+
+            // Notify ListView to refresh scrollable content
+            AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
+            if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_todo_listview);
+            } else {
+                ComponentName thisWidget = new ComponentName(context, TodoWidget.class);
+                int[] ids = appWidgetManager.getAppWidgetIds(thisWidget);
+                if (ids != null && ids.length > 0) {
+                    appWidgetManager.notifyAppWidgetViewDataChanged(ids, R.id.widget_todo_listview);
+                }
+            }
+
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -88,113 +117,103 @@ public class TodoWidget extends AppWidgetProvider {
 
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        String noteId = prefs.getString(KEY_NOTE_ID, "");
-        String noteTitle = prefs.getString(KEY_NOTE_TITLE, "To-Do List");
-        String itemsJsonStr = prefs.getString(KEY_ITEMS_JSON, "[]");
-
-        JSONArray items;
-        try {
-            items = new JSONArray(itemsJsonStr);
-        } catch (Exception e) {
-            items = new JSONArray();
-        }
-
         for (int appWidgetId : appWidgetIds) {
-            RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_todo_list);
-
-            views.setTextViewText(R.id.widget_todo_title, noteTitle.isEmpty() ? "To-Do List" : noteTitle);
-
-            // Intent to open the specific note inside Texo
-            Intent openIntent = new Intent(context, MainActivity.class);
-            openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            if (!noteId.isEmpty()) {
-                openIntent.putExtra("note_id", noteId);
-                openIntent.setAction("com.ahmedfarook.notesapp.OPEN_NOTE");
-            }
-
-            int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                flags |= PendingIntent.FLAG_IMMUTABLE;
-            }
-
-            PendingIntent openPending = PendingIntent.getActivity(context, 100 + appWidgetId, openIntent, flags);
-            views.setOnClickPendingIntent(R.id.widget_todo_root, openPending);
-            views.setOnClickPendingIntent(R.id.widget_todo_header, openPending);
-            views.setOnClickPendingIntent(R.id.widget_todo_empty, openPending);
-
-            // Intent for quick "+" button to add a checklist item or create a note
-            Intent addIntent = new Intent(context, MainActivity.class);
-            addIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            if (!noteId.isEmpty()) {
-                addIntent.setAction("com.ahmedfarook.notesapp.ADD_CHECKLIST_ITEM");
-                addIntent.putExtra("action", "add_checklist_item");
-                addIntent.putExtra("note_id", noteId);
-            } else {
-                addIntent.setAction(QuickNoteWidget.ACTION_NEW_NOTE);
-                addIntent.putExtra("action", "new_note");
-            }
-            PendingIntent addPending = PendingIntent.getActivity(context, 200 + appWidgetId, addIntent, flags);
-            views.setOnClickPendingIntent(R.id.widget_todo_btn_add, addPending);
-
-            // Clear previously rendered dynamic checklist rows
-            views.removeAllViews(R.id.widget_todo_items_container);
-
-            if (items.length() == 0) {
-                views.setViewVisibility(R.id.widget_todo_empty, View.VISIBLE);
-                views.setViewVisibility(R.id.widget_todo_items_container, View.GONE);
-            } else {
-                views.setViewVisibility(R.id.widget_todo_empty, View.GONE);
-                views.setViewVisibility(R.id.widget_todo_items_container, View.VISIBLE);
-
-                int maxItems = Math.min(items.length(), 10);
-                for (int i = 0; i < maxItems; i++) {
-                    try {
-                        JSONObject item = items.getJSONObject(i);
-                        String text = item.optString("text", "");
-                        boolean checked = item.optBoolean("checked", false);
-
-                        RemoteViews itemViews = new RemoteViews(context.getPackageName(), R.layout.widget_todo_item);
-
-                        if (checked) {
-                            itemViews.setImageViewResource(R.id.widget_todo_item_check, R.drawable.widget_checkbox_checked);
-                            SpannableString span = new SpannableString(text);
-                            span.setSpan(new StrikethroughSpan(), 0, text.length(), 0);
-                            itemViews.setTextViewText(R.id.widget_todo_item_text, span);
-                            itemViews.setTextColor(R.id.widget_todo_item_text, Color.parseColor("#8AA0B4"));
-                        } else {
-                            itemViews.setImageViewResource(R.id.widget_todo_item_check, R.drawable.widget_checkbox_unchecked);
-                            itemViews.setTextViewText(R.id.widget_todo_item_text, text);
-                            itemViews.setTextColor(R.id.widget_todo_item_text, Color.parseColor("#1C2B36"));
-                        }
-
-                        // Broadcast PendingIntent when tapping this item
-                        Intent toggleIntent = new Intent(context, TodoWidget.class);
-                        toggleIntent.setAction(ACTION_TOGGLE_TODO);
-                        toggleIntent.putExtra("note_id", noteId);
-                        toggleIntent.putExtra("item_index", i);
-
-                        int itemFlags = PendingIntent.FLAG_UPDATE_CURRENT;
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                            itemFlags |= PendingIntent.FLAG_IMMUTABLE;
-                        }
-
-                        PendingIntent togglePending = PendingIntent.getBroadcast(
-                                context,
-                                (appWidgetId * 1000) + i,
-                                toggleIntent,
-                                itemFlags
-                        );
-
-                        itemViews.setOnClickPendingIntent(R.id.widget_todo_item_row, togglePending);
-
-                        views.addView(R.id.widget_todo_items_container, itemViews);
-                    } catch (Exception ignored) {}
-                }
-            }
-
-            appWidgetManager.updateAppWidget(appWidgetId, views);
+            updateAppWidget(context, appWidgetManager, appWidgetId);
         }
     }
-}
 
+    @Override
+    public void onDeleted(Context context, int[] appWidgetIds) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        for (int appWidgetId : appWidgetIds) {
+            editor.remove(TodoWidgetConfigureActivity.PREF_PREFIX_KEY + appWidgetId);
+            editor.remove(TodoWidgetConfigureActivity.PREF_TITLE_PREFIX_KEY + appWidgetId);
+        }
+        editor.apply();
+    }
+
+    public static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+
+        // Retrieve the note assigned to this widget
+        String noteId = prefs.getString(TodoWidgetConfigureActivity.PREF_PREFIX_KEY + appWidgetId, "");
+        String noteTitle = prefs.getString(TodoWidgetConfigureActivity.PREF_TITLE_PREFIX_KEY + appWidgetId, "");
+
+        // If not explicitly set, look up first checklist or fallback to default
+        if (noteId.isEmpty()) {
+            String allJson = prefs.getString(KEY_ALL_CHECKLISTS_JSON, "[]");
+            try {
+                JSONArray arr = new JSONArray(allJson);
+                if (arr.length() > 0) {
+                    JSONObject first = arr.getJSONObject(0);
+                    noteId = first.optString("id", "");
+                    noteTitle = first.optString("title", "To-Do List");
+                }
+            } catch (Exception ignored) {}
+
+            if (noteId.isEmpty()) {
+                noteId = prefs.getString(KEY_NOTE_ID, "");
+                noteTitle = prefs.getString(KEY_NOTE_TITLE, "To-Do List");
+            }
+        }
+
+        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_todo_list);
+
+        views.setTextViewText(R.id.widget_todo_title, (noteTitle == null || noteTitle.isEmpty()) ? "To-Do List" : noteTitle);
+
+        // Open note intent
+        Intent openIntent = new Intent(context, MainActivity.class);
+        openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        if (!noteId.isEmpty()) {
+            openIntent.putExtra("note_id", noteId);
+            openIntent.setAction("com.ahmedfarook.notesapp.OPEN_NOTE");
+        }
+
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            flags |= PendingIntent.FLAG_IMMUTABLE;
+        }
+
+        PendingIntent openPending = PendingIntent.getActivity(context, 100 + appWidgetId, openIntent, flags);
+        views.setOnClickPendingIntent(R.id.widget_todo_root, openPending);
+        views.setOnClickPendingIntent(R.id.widget_todo_header, openPending);
+        views.setOnClickPendingIntent(R.id.widget_todo_empty, openPending);
+
+        // Quick "+" button to add an item or create a new note
+        Intent addIntent = new Intent(context, MainActivity.class);
+        addIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        if (!noteId.isEmpty()) {
+            addIntent.setAction("com.ahmedfarook.notesapp.ADD_CHECKLIST_ITEM");
+            addIntent.putExtra("action", "add_checklist_item");
+            addIntent.putExtra("note_id", noteId);
+        } else {
+            addIntent.setAction(QuickNoteWidget.ACTION_NEW_NOTE);
+            addIntent.putExtra("action", "new_note");
+        }
+        PendingIntent addPending = PendingIntent.getActivity(context, 200 + appWidgetId, addIntent, flags);
+        views.setOnClickPendingIntent(R.id.widget_todo_btn_add, addPending);
+
+        // Connect scrollable ListView via RemoteViewsService
+        Intent serviceIntent = new Intent(context, TodoWidgetService.class);
+        serviceIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
+        serviceIntent.setData(Uri.parse(serviceIntent.toUri(Intent.URI_INTENT_SCHEME)));
+        views.setRemoteAdapter(R.id.widget_todo_listview, serviceIntent);
+        views.setEmptyView(R.id.widget_todo_listview, R.id.widget_todo_empty);
+
+        // Set pending intent template for clickable rows in scrollable list
+        Intent toggleIntent = new Intent(context, TodoWidget.class);
+        toggleIntent.setAction(ACTION_TOGGLE_TODO);
+        toggleIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
+
+        int templateFlags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            templateFlags |= PendingIntent.FLAG_MUTABLE;
+        }
+        PendingIntent togglePending = PendingIntent.getBroadcast(context, appWidgetId, toggleIntent, templateFlags);
+        views.setPendingIntentTemplate(R.id.widget_todo_listview, togglePending);
+
+        appWidgetManager.updateAppWidget(appWidgetId, views);
+        appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_todo_listview);
+    }
+}

@@ -73,7 +73,8 @@
     <TextView
         android:id="@+id/widget_todo_empty"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:text="No checklist items. Tap to open texō."
         android:textColor="#5A6E82"
         android:textSize="12sp"
@@ -82,11 +83,14 @@
         android:gravity="center"
         android:visibility="gone" />
 
-    <!-- Container for dynamic checklist rows -->
-    <LinearLayout
-        android:id="@+id/widget_todo_items_container"
+    <!-- Scrollable ListView for all checklist items -->
+    <ListView
+        android:id="@+id/widget_todo_listview"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical" />
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="@null"
+        android:dividerHeight="0dp"
+        android:scrollbars="vertical" />
 
 </LinearLayout>
