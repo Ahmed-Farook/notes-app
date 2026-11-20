@@ -377,20 +377,38 @@ const EnforceTitleExtension = Extension.create({
               return editor.chain().focus().liftListItem('listItem').run();
             }
             if (node.type.name === 'taskItem') {
+              const res = editor.chain().focus().liftListItem('taskItem').run();
+              if (res) return true;
               return editor.chain().focus().liftListItem('taskItem').clearNodes().run();
             }
           }
         }
 
-        // When pressing backspace on an empty textblock (like an empty paragraph after a checklist or table),
+        // Check if cursor is directly inside a list item or table container
+        let insideExcludedContainer = false;
+        for (let d = $from.depth; d > 0; d--) {
+          const n = $from.node(d).type.name;
+          if (n === 'listItem' || n === 'taskItem' || n === 'tableCell' || n === 'tableHeader') {
+            insideExcludedContainer = true;
+            break;
+          }
+        }
+
+        // When pressing backspace on an empty textblock (like an empty paragraph after lifting a checklist item or table),
         // cleanly delete the empty paragraph and place cursor at the end of the previous block
-        const isInsideList = editor.isActive('bulletList') || editor.isActive('orderedList') || editor.isActive('taskList');
-        if (!isInsideList && empty && $from.parent.isTextblock && $from.parent.content.size === 0 && $from.pos > 1) {
+        if (
+          !insideExcludedContainer &&
+          empty &&
+          $from.parent.isTextblock &&
+          $from.parent.textContent.length === 0 &&
+          $from.pos > 1 &&
+          $from.index(0) > 0
+        ) {
           const beforePos = $from.before();
           const tr = state.tr.delete(beforePos, $from.after());
           const targetPos = Math.max(1, beforePos - 1);
           tr.setSelection(Selection.near(tr.doc.resolve(targetPos), -1));
-          editor.view.dispatch(tr);
+          editor.view.dispatch(tr.scrollIntoView());
           return true;
         }
 
