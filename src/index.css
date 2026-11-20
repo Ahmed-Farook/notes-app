@@ -101,22 +101,31 @@
   display: none !important;
 }
 
-.tiptap > h1:first-child {
+/* Generous, clean 1-line breathing room strictly between the note title heading and the first line of content in ALL notes and checklists */
+.tiptap > h1:first-child,
+.tiptap > h1:first-of-type,
+.tiptap h1:first-of-type,
+.tiptap > h2:first-child,
+.tiptap > h3:first-child {
   font-size: 2.25rem;
   line-height: 2.5rem;
   font-weight: 700;
   margin-top: 0.35rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 2.75rem !important;
   letter-spacing: -0.025em;
   color: #1C2B36;
 }
 
-/* 1-line clean visual gap strictly between the note title heading and the first line of content in ALL notes and checklists */
-.tiptap > h1:first-child + * {
-  margin-top: 1.25rem !important;
+/* Ensure whatever block immediately follows the title heading has clear separation */
+.tiptap > h1:first-child + *,
+.tiptap > h1:first-of-type + *,
+.tiptap h1:first-of-type + *,
+.tiptap > h2:first-child + *,
+.tiptap > h3:first-child + * {
+  margin-top: 1.5rem !important;
 }
 
-.tiptap h1:not(:first-child) {
+.tiptap h1:not(:first-child):not(:first-of-type) {
   font-size: 2rem;
   line-height: 2.25rem;
   font-weight: 700;
@@ -126,7 +135,10 @@
   color: #1C2B36;
 }
 .dark .tiptap h1,
-.dark .tiptap > h1:first-child {
+.dark .tiptap > h1:first-child,
+.dark .tiptap > h1:first-of-type,
+.dark .tiptap > h2:first-child,
+.dark .tiptap > h3:first-child {
   color: #E8EEF3;
 }
 
