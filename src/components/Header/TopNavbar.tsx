@@ -244,7 +244,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
               setShowExportMenu((prev) => !prev);
             }}
             disabled={!noteToExport}
-            title={noteToExport ? `Export "${noteToExport.title || 'Untitled'}"` : 'Select a note to export'}
+            title={noteToExport ? 'Export note' : 'Select a note to export'}
             className="p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 disabled:opacity-30 disabled:pointer-events-none transition-colors active:scale-95"
           >
             <Download size={17} />

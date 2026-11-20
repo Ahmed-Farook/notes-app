@@ -73,11 +73,11 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
 
   // Calculate note counts
   const checklistsCount = notes.filter(
-    n => !n.isTrash && (n.folderId === 'checklists' || (n.content && n.content.includes('data-type="taskItem"')))
+    n => !n.isTrash && n.folderId === 'checklists'
   ).length;
 
   const defaultNotesCount = notes.filter(
-    n => !n.isTrash && n.folderId !== 'checklists' && (!n.content || !n.content.includes('data-type="taskItem"')) && (n.folderId === 'default' || n.folderId === 'quick' || n.folderId === 'all' || !n.folderId)
+    n => !n.isTrash && n.folderId !== 'checklists' && (n.folderId === 'default' || n.folderId === 'quick' || n.folderId === 'all' || !n.folderId)
   ).length;
   const trashCount = notes.filter(n => n.isTrash).length;
 

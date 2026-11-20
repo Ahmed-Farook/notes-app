@@ -514,9 +514,8 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             return false;
           }
         } else if (selectedFolderId === 'checklists') {
-          // Checklists section shows dedicated checklist notes and notes containing task items
-          const isChecklist = noteFolder === 'checklists' || (note.content && note.content.includes('data-type="taskItem"'));
-          if (!isChecklist) return false;
+          // Checklists section shows only files created in or moved to Checklists
+          if (noteFolder !== 'checklists') return false;
         } else {
           if (noteFolder !== selectedFolderId) return false;
         }

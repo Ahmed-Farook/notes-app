@@ -119,10 +119,10 @@ export function findBestWidgetNote(notes: Note[], activeNoteId: string | null): 
     if (chosen) return chosen;
   }
 
-  // 2. Active note if it is in checklists folder or has checklist items
+  // 2. Active note if it is in checklists folder
   if (activeNoteId) {
     const active = activeNotes.find((n) => n.id === activeNoteId);
-    if (active && (active.folderId === 'checklists' || active.content?.includes('data-type="taskItem"'))) {
+    if (active && active.folderId === 'checklists') {
       return active;
     }
   }
@@ -131,11 +131,7 @@ export function findBestWidgetNote(notes: Note[], activeNoteId: string | null): 
   const checklistFolderNote = activeNotes.find((n) => n.folderId === 'checklists');
   if (checklistFolderNote) return checklistFolderNote;
 
-  // 4. Any note containing task items
-  const withChecklist = activeNotes.find((n) => n.content && n.content.includes('data-type="taskItem"'));
-  if (withChecklist) return withChecklist;
-
-  // 5. Active note (even without checklist items)
+  // 4. Active note (fallback)
   if (activeNoteId) {
     const active = activeNotes.find((n) => n.id === activeNoteId);
     if (active) return active;
@@ -207,7 +203,7 @@ export async function syncAllChecklistsToAndroidWidget(notes: Note[]): Promise<v
   if (!widgetPlugin?.syncAllChecklists) return;
 
   const checklistNotes = notes.filter(
-    (n) => !n.isTrash && !n.isLocked && (n.folderId === 'checklists' || n.content?.includes('data-type="taskItem"'))
+    (n) => !n.isTrash && !n.isLocked && n.folderId === 'checklists'
   );
 
   const payload = checklistNotes.map((note) => ({

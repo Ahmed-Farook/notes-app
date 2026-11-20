@@ -58,8 +58,8 @@ export const ShareNoteModal: React.FC<ShareNoteModalProps> = ({
               <h3 className="font-bold text-sm tracking-tight text-[#1C2B36] dark:text-[#E8EEF3]">
                 Share Note
               </h3>
-              <p className="text-[11px] text-[#6E8092] dark:text-[#8AA0B4] truncate max-w-[210px]">
-                {note.title || 'Untitled Note'}
+              <p className="text-[11px] text-[#6E8092] dark:text-[#8AA0B4]">
+                Public read-only link
               </p>
             </div>
           </div>

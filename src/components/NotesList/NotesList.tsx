@@ -16,6 +16,7 @@ import {
   MoreVertical,
   Pencil,
   Download,
+  ListTodo,
 } from 'lucide-react';
 import { useNotes } from '../../store/NotesContext';
 import { NoteCard } from './NoteCard';
@@ -1096,6 +1097,24 @@ export const NotesList: React.FC<NotesListProps> = ({
                     <span className="font-medium">Notes</span>
                   </div>
                   {selectedFolderId === 'default' && (
+                    <span className="text-[10px] text-neutral-400">Current</span>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => {
+                    moveSelectedNotesToFolder('checklists');
+                    setShowMovePicker(false);
+                  }}
+                  className="w-full px-3.5 py-2.5 flex items-center justify-between text-xs text-[#1C2B36] dark:text-[#E8EEF3] hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors text-left"
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <div className="w-6 h-6 rounded-md bg-[#FAF0DE] dark:bg-[#2E2818] text-apple-yellow flex items-center justify-center shrink-0">
+                      <ListTodo size={14} />
+                    </div>
+                    <span className="font-medium">Checklists</span>
+                  </div>
+                  {selectedFolderId === 'checklists' && (
                     <span className="text-[10px] text-neutral-400">Current</span>
                   )}
                 </button>
