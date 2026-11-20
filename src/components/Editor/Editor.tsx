@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import { Extension } from '@tiptap/core';
-import { Plugin, PluginKey, Selection } from '@tiptap/pm/state';
+import { Plugin, PluginKey, Selection, TextSelection } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import StarterKit from '@tiptap/starter-kit';
 import TaskList from '@tiptap/extension-task-list';
@@ -394,22 +394,39 @@ const EnforceTitleExtension = Extension.create({
           }
         }
 
-        // When pressing backspace on an empty textblock (like an empty paragraph after lifting a checklist item or table),
-        // cleanly delete the empty paragraph and place cursor at the end of the previous block
-        if (
-          !insideExcludedContainer &&
-          empty &&
-          $from.parent.isTextblock &&
-          $from.parent.textContent.length === 0 &&
-          $from.pos > 1 &&
-          $from.index(0) > 0
-        ) {
-          const beforePos = $from.before();
-          const tr = state.tr.delete(beforePos, $from.after());
-          const targetPos = Math.max(1, beforePos - 1);
-          tr.setSelection(Selection.near(tr.doc.resolve(targetPos), -1));
-          editor.view.dispatch(tr.scrollIntoView());
-          return true;
+        // When pressing backspace at start of a textblock outside list items:
+        if (!insideExcludedContainer && empty && $from.parentOffset === 0 && $from.pos > 1 && $from.index(0) > 0) {
+          const parentNode = $from.parent;
+          const isParentEmpty = parentNode.textContent.trim().length === 0;
+          const blockStart = $from.before();
+          const blockEnd = $from.after();
+          const resolvedBefore = doc.resolve(blockStart);
+          const prevNode = resolvedBefore.nodeBefore;
+
+          // 1. If current block is completely empty (e.g. 2nd backspace after lifting a checkbox/bullet or empty paragraph):
+          // cleanly delete it and move cursor to the end of the previous block (checkbox, text, heading, table)
+          if (isParentEmpty) {
+            const tr = state.tr.delete(blockStart, blockEnd);
+            const resolved = tr.doc.resolve(Math.max(1, blockStart - 1));
+            tr.setSelection(Selection.near(resolved, -1));
+            editor.view.dispatch(tr.scrollIntoView());
+            return true;
+          }
+
+          // 2. If current block has text and is preceded by a taskList:
+          // merge its text into the preceding checklist item without letting ProseMirror joinBackward convert it into a taskItem!
+          if (prevNode && prevNode.type.name === 'taskList') {
+            const inlineContent = parentNode.content;
+            let tr = state.tr.delete(blockStart, blockEnd);
+            const resolved = tr.doc.resolve(Math.max(1, blockStart - 1));
+            const targetPos = Selection.near(resolved, -1).from;
+            if (inlineContent.size > 0) {
+              tr = tr.insert(targetPos, inlineContent);
+            }
+            tr.setSelection(TextSelection.create(tr.doc, targetPos));
+            editor.view.dispatch(tr.scrollIntoView());
+            return true;
+          }
         }
 
         return false;
