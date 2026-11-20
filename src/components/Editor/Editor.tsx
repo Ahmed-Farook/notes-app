@@ -28,6 +28,7 @@ import { MathBlock, isLatexFormula } from '../../extensions/MathExtension';
 import { CustomCodeBlock } from '../../extensions/CodeBlockExtension';
 import { checkBiometricsAvailable, BiometricCheckResult } from '../../utils/biometrics';
 import { compressImageFile } from '../../utils/imageCompressor';
+import { ChecklistEditor } from './ChecklistEditor';
 import type { Note } from '../../types/note';
 
 const activeNoteModuleRef = { current: null as Note | null };
@@ -144,47 +145,11 @@ const CustomTaskItem = TaskItem.extend({
               const resolved = tr.doc.resolve(position);
               const parentList = resolved.parent;
 
-              // If inside a taskList with multiple items, reorder so completed items move to the bottom of this specific checklist
-              if (parentList && parentList.type.name === 'taskList' && parentList.childCount > 1) {
-                const parentPos = resolved.before(resolved.depth);
-                const indexInParent = resolved.index(resolved.depth);
-
-                const uncompleted: any[] = [];
-                const completed: any[] = [];
-
-                parentList.forEach((child, _offset, index) => {
-                  if (index === indexInParent) return;
-                  if (child.attrs.checked) {
-                    completed.push(child);
-                  } else {
-                    uncompleted.push(child);
-                  }
-                });
-
-                const toggledChild = parentList.child(indexInParent);
-                const toggledItem = toggledChild.type.create(
-                  { ...toggledChild.attrs, checked },
-                  toggledChild.content,
-                  toggledChild.marks
-                );
-
-                if (checked) {
-                  // Checked: move to the bottom of the current checklist
-                  completed.push(toggledItem);
-                } else {
-                  // Unchecked: move to the bottom of uncompleted items (above completed items)
-                  uncompleted.push(toggledItem);
-                }
-
-                const finalItems = [...uncompleted, ...completed];
-                const newTaskList = parentList.type.create(parentList.attrs, finalItems);
-                tr.replaceWith(parentPos, parentPos + parentList.nodeSize, newTaskList);
-              } else {
-                tr.setNodeMarkup(position, undefined, {
-                  ...currentNode.attrs,
-                  checked,
-                });
-              }
+              // In standard notes, keep checklist items strictly in place (do not move to bottom)
+              tr.setNodeMarkup(position, undefined, {
+                ...currentNode.attrs,
+                checked,
+              });
               return true;
             })
             .run();
@@ -1871,50 +1836,61 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
             </div>
 
             <div className="relative" style={{ minHeight: containerMinHeight > 0 ? `${containerMinHeight}px` : undefined }}>
-              <EditorContent
-                editor={editor}
-                data-pdf-note-id={activeNote.id}
-                className="prose prose-neutral dark:prose-invert focus:outline-none min-h-[140px] select-text cursor-text"
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-                onContextMenu={handleContextMenu}
-                onClick={(e) => {
-                  if (isPenMode) return;
-                  if (isMouseSelectingRef.current) {
-                    isMouseSelectingRef.current = false;
-                    return;
-                  }
-                  const domSel = window.getSelection();
-                  if (domSel && domSel.toString().length > 0) return;
-                  if (editor && !editor.state.selection.empty) return;
+              {isChecklistFile ? (
+                <ChecklistEditor
+                  note={activeNote}
+                  onUpdate={(updates) => updateNote(activeNote.id, updates)}
+                  isReadOnly={activeNote.isTrash || isSharedPreview}
+                  theme={theme}
+                />
+              ) : (
+                <>
+                  <EditorContent
+                    editor={editor}
+                    data-pdf-note-id={activeNote.id}
+                    className="prose prose-neutral dark:prose-invert focus:outline-none min-h-[140px] select-text cursor-text"
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    onContextMenu={handleContextMenu}
+                    onClick={(e) => {
+                      if (isPenMode) return;
+                      if (isMouseSelectingRef.current) {
+                        isMouseSelectingRef.current = false;
+                        return;
+                      }
+                      const domSel = window.getSelection();
+                      if (domSel && domSel.toString().length > 0) return;
+                      if (editor && !editor.state.selection.empty) return;
 
-                  const target = e.target as HTMLElement;
-                  // If click was on a checkbox or its label, do NOT trigger focus or open keyboard
-                  if (
-                    target.tagName === 'INPUT' ||
-                    target.closest('label') ||
-                    target.closest('[data-type="taskItem"] > label') ||
-                    target.closest('.tiptap-table-controls') ||
-                    target.closest('.katex-math-block')
-                  ) {
-                    return;
-                  }
-                  const proseMirror = target.closest('.ProseMirror') as HTMLElement | null;
-                  if (proseMirror && e.clientY > proseMirror.getBoundingClientRect().bottom) {
-                    handleFocusOrCreateLineBelow();
-                  } else if (editor && !editor.isFocused && !activeNote.isTrash) {
-                    editor.commands.focus();
-                  }
-                }}
-              />
+                      const target = e.target as HTMLElement;
+                      // If click was on a checkbox or its label, do NOT trigger focus or open keyboard
+                      if (
+                        target.tagName === 'INPUT' ||
+                        target.closest('label') ||
+                        target.closest('[data-type="taskItem"] > label') ||
+                        target.closest('.tiptap-table-controls') ||
+                        target.closest('.katex-math-block')
+                      ) {
+                        return;
+                      }
+                      const proseMirror = target.closest('.ProseMirror') as HTMLElement | null;
+                      if (proseMirror && e.clientY > proseMirror.getBoundingClientRect().bottom) {
+                        handleFocusOrCreateLineBelow();
+                      } else if (editor && !editor.isFocused && !activeNote.isTrash) {
+                        editor.commands.focus();
+                      }
+                    }}
+                  />
 
-              {/* 5 lines of visual padding (~112px) where clicking brings the cursor up to the line below, and typing preserves this buffer underneath */}
-              <div
-                className="h-28 w-full cursor-text select-none"
-                onClick={handleFocusOrCreateLineBelow}
-                aria-hidden="true"
-              />
+                  {/* 5 lines of visual padding (~112px) where clicking brings the cursor up to the line below, and typing preserves this buffer underneath */}
+                  <div
+                    className="h-28 w-full cursor-text select-none"
+                    onClick={handleFocusOrCreateLineBelow}
+                    aria-hidden="true"
+                  />
+                </>
+              )}
 
               {/* Seamless In-Note Drawing Canvas Overlay (Disabled in Checklist mode) */}
               {!isChecklistFile && (
