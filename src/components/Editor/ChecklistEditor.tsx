@@ -320,8 +320,8 @@ export const ChecklistEditor: React.FC<ChecklistEditorProps> = ({
       className="tiptap prose prose-neutral dark:prose-invert max-w-none focus:outline-none min-h-[140px] pb-32 select-text"
       data-pdf-note-id={note.id}
     >
-      {/* Checklist Title Heading */}
-      <div className="mb-2">
+      {/* Checklist Title Heading with generous 1-line breathing room (2.75rem / 44px) matching standard notes */}
+      <h1 className="mb-11" style={{ marginBottom: '2.75rem' }}>
         <input
           type="text"
           value={title}
@@ -334,10 +334,10 @@ export const ChecklistEditor: React.FC<ChecklistEditorProps> = ({
             }
           }}
           placeholder="To-Do List"
-          className="w-full bg-transparent border-none outline-none font-bold text-2xl sm:text-3xl text-[#213A50] dark:text-[#E8EEF3] tracking-tight placeholder:text-[#8AA0B4]/40 leading-tight"
+          className="w-full bg-transparent border-none outline-none font-bold text-[2rem] sm:text-[2.25rem] text-[#1C2B36] dark:text-[#E8EEF3] tracking-tight placeholder:text-[#8AA0B4]/40 leading-[2.5rem]"
           aria-label="Checklist Title"
         />
-      </div>
+      </h1>
 
       {/* Line 1: Quick List Adder (Type task here and press Enter to add) */}
       {!isReadOnly && (
