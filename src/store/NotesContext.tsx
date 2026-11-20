@@ -27,6 +27,8 @@ import {
   deleteNoteFromCloud,
   upsertFolderToCloud,
   deleteFolderFromCloud,
+  batchUpsertNotesToCloud,
+  batchUpsertFoldersToCloud,
   mergeNotes,
   mergeFolders,
   dbToNote,
@@ -241,17 +243,22 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }, [user]);
 
   const isSyncingRef = useRef(false);
+  const lastSyncTimeRef = useRef<number>(0);
 
-  // Robust bidirectional cloud synchronization
-  const syncWithCloud = useCallback(async (showIndicator = false) => {
+  // Fast, optimized bidirectional cloud synchronization
+  const syncWithCloud = useCallback(async (showIndicator = false, force = false) => {
     if (!user || !encryptionKeyRef.current || isSyncingRef.current) return;
+    // Debounce rapid repeated sync calls unless explicitly forced
+    if (!force && Date.now() - lastSyncTimeRef.current < 3500) return;
+
     isSyncingRef.current = true;
     if (showIndicator) setSyncStatus('syncing');
 
     try {
+      // Pass existing local notes & folders so unchanged items skip expensive Web Crypto decryptions
       const [remoteNotes, remoteFolders] = await Promise.all([
-        fetchUserNotes(encryptionKeyRef.current),
-        fetchUserFolders(encryptionKeyRef.current),
+        fetchUserNotes(encryptionKeyRef.current, notesRef.current),
+        fetchUserFolders(encryptionKeyRef.current, foldersRef.current),
       ]);
 
       let effectiveRemoteNotes = remoteNotes;
@@ -280,11 +287,13 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setNotes(mergedNotes);
       setFolders(mergedFolders);
       setSyncStatus('synced');
+      lastSyncTimeRef.current = Date.now();
 
+      // Batch upload in single atomic HTTP requests to minimize network roundtrips
       if (notesToUpload.length > 0 || foldersToUpload.length > 0) {
         await Promise.all([
-          ...notesToUpload.map((n) => upsertNoteToCloud(n, user.id, encryptionKeyRef.current)),
-          ...foldersToUpload.map((f) => upsertFolderToCloud(f, user.id, encryptionKeyRef.current)),
+          batchUpsertNotesToCloud(notesToUpload, user.id, encryptionKeyRef.current),
+          batchUpsertFoldersToCloud(foldersToUpload, user.id, encryptionKeyRef.current),
         ]);
       }
     } catch (err) {

@@ -153,22 +153,90 @@ export async function dbToFolder(db: DbFolder, key: CryptoKey | null): Promise<F
   };
 }
 
-export async function fetchUserNotes(key: CryptoKey | null): Promise<Note[]> {
+export async function fetchUserNotes(key: CryptoKey | null, existingNotes?: Note[]): Promise<Note[]> {
   const { data, error } = await supabase.from('notes').select('*');
   if (error) {
     console.warn('Error fetching notes from Supabase:', error);
     return [];
   }
-  return Promise.all((data as DbNote[]).map((d) => dbToNote(d, key)));
+
+  const existingMap = new Map<string, Note>();
+  if (existingNotes) {
+    for (const n of existingNotes) {
+      existingMap.set(n.id, n);
+    }
+  }
+
+  return Promise.all(
+    (data as DbNote[]).map((d) => {
+      const local = existingMap.get(d.id);
+      // Fast path: if note hasn't changed since last sync or local is newer,
+      // reuse existing note directly without running costly Web Crypto decryptions!
+      if (local && (local.updatedAt === Number(d.updated_at) || local.updatedAt > Number(d.updated_at))) {
+        return Promise.resolve(local);
+      }
+      return dbToNote(d, key);
+    })
+  );
 }
 
-export async function fetchUserFolders(key: CryptoKey | null): Promise<Folder[]> {
+export async function fetchUserFolders(key: CryptoKey | null, existingFolders?: Folder[]): Promise<Folder[]> {
   const { data, error } = await supabase.from('folders').select('*');
   if (error) {
     console.warn('Error fetching folders from Supabase:', error);
     return [];
   }
-  return Promise.all((data as DbFolder[]).map((d) => dbToFolder(d, key)));
+
+  const existingMap = new Map<string, Folder>();
+  if (existingFolders) {
+    for (const f of existingFolders) {
+      existingMap.set(f.id, f);
+    }
+  }
+
+  return Promise.all(
+    (data as DbFolder[]).map((d) => {
+      const local = existingMap.get(d.id);
+      if (local && (d.is_system || local.name === d.name)) {
+        return Promise.resolve(local);
+      }
+      return dbToFolder(d, key);
+    })
+  );
+}
+
+export async function batchUpsertNotesToCloud(
+  notes: Note[],
+  userId: string,
+  key: CryptoKey | null
+): Promise<void> {
+  if (!notes || notes.length === 0) return;
+  try {
+    const payloads = await Promise.all(notes.map((n) => noteToDb(n, userId, key)));
+    const { error } = await supabase.from('notes').upsert(payloads);
+    if (error) {
+      console.warn('Error batch upserting notes to Supabase:', error);
+    }
+  } catch (err) {
+    console.warn('Failed to prepare or batch upsert notes:', err);
+  }
+}
+
+export async function batchUpsertFoldersToCloud(
+  folders: Folder[],
+  userId: string,
+  key: CryptoKey | null
+): Promise<void> {
+  if (!folders || folders.length === 0) return;
+  try {
+    const payloads = await Promise.all(folders.map((f) => folderToDb(f, userId, key)));
+    const { error } = await supabase.from('folders').upsert(payloads);
+    if (error) {
+      console.warn('Error batch upserting folders to Supabase:', error);
+    }
+  } catch (err) {
+    console.warn('Failed to prepare or batch upsert folders:', err);
+  }
 }
 
 export async function upsertNoteToCloud(note: Note, userId: string, key: CryptoKey | null): Promise<void> {

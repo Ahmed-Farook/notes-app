@@ -27,6 +27,7 @@ import { ImageMarkupModal } from '../Drawing/ImageMarkupModal';
 import { MathBlock, isLatexFormula } from '../../extensions/MathExtension';
 import { CustomCodeBlock } from '../../extensions/CodeBlockExtension';
 import { checkBiometricsAvailable, BiometricCheckResult } from '../../utils/biometrics';
+import { compressImageFile } from '../../utils/imageCompressor';
 import type { Note } from '../../types/note';
 
 const activeNoteModuleRef = { current: null as Note | null };
@@ -1091,6 +1092,32 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
         if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
           return false;
         }
+
+        // 1. Intercept pasted image files: automatically compress & downscale to keep note storage tiny
+        const items = event.clipboardData?.items;
+        if (items) {
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.type.startsWith('image/')) {
+              const file = item.getAsFile();
+              if (file) {
+                event.preventDefault();
+                compressImageFile(file, 1200, 0.82).then((compressedSrc) => {
+                  if (compressedSrc) {
+                    const node = view.state.schema.nodes.image?.create({ src: compressedSrc });
+                    if (node) {
+                      const tr = view.state.tr.replaceSelectionWith(node);
+                      view.dispatch(tr);
+                    }
+                  }
+                });
+                return true;
+              }
+            }
+          }
+        }
+
+        // 2. Intercept LaTeX formulas
         const text = event.clipboardData?.getData('text/plain');
         if (text && isLatexFormula(text)) {
           event.preventDefault();
@@ -1100,6 +1127,32 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
             const tr = view.state.tr.replaceSelectionWith(mathType.create({ latex: clean }));
             view.dispatch(tr);
             return true;
+          }
+        }
+        return false;
+      },
+      handleDrop: (view, event) => {
+        // Intercept dropped images: compress before inserting
+        const files = event.dataTransfer?.files;
+        if (files && files.length > 0) {
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            if (file.type.startsWith('image/')) {
+              event.preventDefault();
+              const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
+              compressImageFile(file, 1200, 0.82).then((compressedSrc) => {
+                if (compressedSrc) {
+                  const node = view.state.schema.nodes.image?.create({ src: compressedSrc });
+                  if (node) {
+                    const tr = coordinates
+                      ? view.state.tr.insert(coordinates.pos, node)
+                      : view.state.tr.replaceSelectionWith(node);
+                    view.dispatch(tr);
+                  }
+                }
+              });
+              return true;
+            }
           }
         }
         return false;

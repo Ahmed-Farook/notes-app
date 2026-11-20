@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { triggerHaptic } from '../../utils/haptics';
 import { toggleUnifiedCodeBlock } from '../../utils/editorCommands';
+import { compressImageFile } from '../../utils/imageCompressor';
 import type { DrawingToolType } from '../Drawing/InNoteCanvas';
 
 const PRESET_COLORS = [
@@ -260,44 +261,20 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
     cmd();
   };
 
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     triggerHaptic();
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const rawDataUrl = event.target?.result as string;
-      if (!rawDataUrl) return;
-
-      const img = new window.Image();
-      img.onload = () => {
-        let { width, height } = img;
-        const maxDim = 1400;
-        if (width > maxDim || height > maxDim) {
-          if (width > height) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height);
-            const compressed = canvas.toDataURL('image/jpeg', 0.88);
-            editor.chain().focus().setImage({ src: compressed }).run();
-            return;
-          }
-        }
-        editor.chain().focus().setImage({ src: rawDataUrl }).run();
-      };
-      img.src = rawDataUrl;
-    };
-    reader.readAsDataURL(file);
+    try {
+      // Downscale to max 1200px and compress to WebP/JPEG (0.82) to keep storage footprint minimal (<100KB)
+      const compressed = await compressImageFile(file, 1200, 0.82);
+      if (compressed) {
+        editor.chain().focus().setImage({ src: compressed }).run();
+      }
+    } catch (err) {
+      console.warn('Failed to compress uploaded image:', err);
+    }
     e.target.value = '';
   };
 
