@@ -27,6 +27,9 @@ import { ImageMarkupModal } from '../Drawing/ImageMarkupModal';
 import { MathBlock, isLatexFormula } from '../../extensions/MathExtension';
 import { CustomCodeBlock } from '../../extensions/CodeBlockExtension';
 import { checkBiometricsAvailable, BiometricCheckResult } from '../../utils/biometrics';
+import type { Note } from '../../types/note';
+
+const activeNoteModuleRef = { current: null as Note | null };
 
 /**
  * CustomImage: Preserves drawing strokes JSON in data-strokes attribute for re-editing
@@ -244,8 +247,9 @@ const EnforceTitleExtension = Extension.create({
         const { state } = editor;
         const { selection, doc } = state;
         const { $from, empty } = selection;
+        const isChecklist = activeNoteModuleRef.current?.folderId === 'checklists';
 
-        // If cursor/selection is within the first document node
+        // If cursor/selection is within the first document node (the title heading)
         if ($from.index(0) === 0) {
           const firstNode = doc.firstChild;
           if (firstNode && firstNode.type.name === 'heading') {
@@ -260,9 +264,70 @@ const EnforceTitleExtension = Extension.create({
           }
         }
 
-        // When deleting at the start of a list item (bulletList / orderedList) or checklist item (taskItem),
-        // lift it cleanly to remove bullet, number, or checkbox
-        if (empty && $from.parentOffset === 0) {
+        // STRICT CHECKLIST FILE BACKSPACE RULES
+        if (isChecklist) {
+          let taskItemDepth = -1;
+          for (let d = $from.depth; d > 0; d--) {
+            if ($from.node(d).type.name === 'taskItem') {
+              taskItemDepth = d;
+              break;
+            }
+          }
+
+          if (taskItemDepth > 0) {
+            const taskListDepth = taskItemDepth - 1;
+            const taskIndex = $from.index(taskListDepth);
+            const currentTaskNode = $from.node(taskItemDepth);
+            const isFirstTask = taskIndex === 0;
+            const isAtStart = $from.parentOffset === 0;
+            const isEmpty = currentTaskNode.textContent.trim().length === 0;
+
+            // 1. First checkbox: do NOT delete it, do NOT turn into paragraph, do NOT jump into heading
+            if (isFirstTask) {
+              if (empty && (isAtStart || isEmpty)) {
+                return true;
+              }
+              return false;
+            }
+
+            // 2. Any checkbox except the first one:
+            if (!isFirstTask && empty) {
+              if (isEmpty) {
+                // Delete this entire empty checkbox and move cursor to the end of the previous checklist item!
+                const fromPos = $from.before(taskItemDepth);
+                const toPos = $from.after(taskItemDepth);
+                const targetPos = Math.max(1, fromPos - 1);
+                const tr = state.tr.delete(fromPos, toPos);
+                tr.setSelection(Selection.near(tr.doc.resolve(targetPos), -1));
+                editor.view.dispatch(tr.scrollIntoView());
+                return true;
+              } else if (isAtStart) {
+                // Cursor at start of non-empty checkbox: merge text into previous checklist item
+                const fromPos = $from.before(taskItemDepth);
+                const toPos = $from.after(taskItemDepth);
+                const targetPos = Math.max(1, fromPos - 2);
+
+                let inlineContent: any = null;
+                currentTaskNode.forEach((child: any) => {
+                  if (child.isTextblock && child.content.size > 0) {
+                    inlineContent = child.content;
+                  }
+                });
+
+                let tr = state.tr.delete(fromPos, toPos);
+                if (inlineContent) {
+                  tr = tr.insert(targetPos, inlineContent);
+                }
+                tr.setSelection(Selection.near(tr.doc.resolve(targetPos), 1));
+                editor.view.dispatch(tr.scrollIntoView());
+                return true;
+              }
+            }
+          }
+        }
+
+        // Standard notes: lift list item cleanly to remove bullet/checkbox
+        if (!isChecklist && empty && $from.parentOffset === 0) {
           for (let d = $from.depth; d > 0; d--) {
             const node = $from.node(d);
             if (node.type.name === 'listItem') {
@@ -276,8 +341,6 @@ const EnforceTitleExtension = Extension.create({
 
         // When pressing backspace on an empty textblock (like an empty paragraph after a checklist or table),
         // cleanly delete the empty paragraph and place cursor at the end of the previous block
-        // instead of allowing ProseMirror joinBackward to convert it into a taskItem/checkbox!
-        // NOTE: Guard with !isInsideList so empty list items are handled by liftListItem above.
         const isInsideList = editor.isActive('bulletList') || editor.isActive('orderedList') || editor.isActive('taskList');
         if (!isInsideList && empty && $from.parent.isTextblock && $from.parent.content.size === 0 && $from.pos > 1) {
           const beforePos = $from.before();
@@ -290,10 +353,64 @@ const EnforceTitleExtension = Extension.create({
 
         return false;
       },
+      Enter: ({ editor }) => {
+        if (activeNoteModuleRef.current?.folderId === 'checklists') {
+          const { state } = editor;
+          const { selection, doc } = state;
+          const { $from, empty } = selection;
+
+          // If in heading: move down to first task item
+          if ($from.index(0) === 0) {
+            let firstTaskPos = -1;
+            doc.descendants((node, pos) => {
+              if (firstTaskPos === -1 && node.type.name === 'taskItem') {
+                firstTaskPos = pos;
+              }
+            });
+            if (firstTaskPos !== -1) {
+              editor.chain().focus().setTextSelection(firstTaskPos + 2).run();
+              return true;
+            }
+          }
+
+          // If inside a taskItem:
+          let taskItemDepth = -1;
+          for (let d = $from.depth; d > 0; d--) {
+            if ($from.node(d).type.name === 'taskItem') {
+              taskItemDepth = d;
+              break;
+            }
+          }
+
+          if (taskItemDepth > 0) {
+            const taskNode = $from.node(taskItemDepth);
+            const isEmpty = taskNode.textContent.trim().length === 0;
+
+            // If empty, do not convert to a paragraph! Keep it as a checklist item.
+            if (empty && isEmpty) {
+              return true;
+            }
+
+            // Split into new checklist item below
+            return editor.chain().focus().splitListItem('taskItem').run();
+          }
+        }
+        return false;
+      },
       Delete: ({ editor }) => {
         const { state } = editor;
         const { selection, doc } = state;
         const { $from } = selection;
+
+        if (activeNoteModuleRef.current?.folderId === 'checklists') {
+          // If in heading at the end: prevent forward delete from joining checklist into heading
+          if ($from.index(0) === 0) {
+            const headingNode = doc.firstChild;
+            if (headingNode && $from.parentOffset >= headingNode.content.size) {
+              return true;
+            }
+          }
+        }
 
         if ($from.index(0) === 0) {
           const firstNode = doc.firstChild;
@@ -331,8 +448,31 @@ const EnforceTitleExtension = Extension.create({
             return tr;
           }
 
+          // CHECKLIST MODE ENFORCEMENT: Ensure taskList exists
+          if (activeNoteModuleRef.current?.folderId === 'checklists') {
+            const taskListType = schema.nodes.taskList;
+            const taskItemType = schema.nodes.taskItem;
+            const paragraphType = schema.nodes.paragraph;
+
+            if (taskListType && taskItemType && paragraphType) {
+              let hasTaskList = false;
+              doc.forEach((child) => {
+                if (child.type.name === 'taskList') hasTaskList = true;
+              });
+
+              if (!hasTaskList) {
+                const newTaskList = taskListType.create(
+                  null,
+                  taskItemType.create({ checked: false }, paragraphType.create())
+                );
+                tr.insert(doc.content.size, newTaskList);
+                return tr;
+              }
+            }
+            return tr.docChanged ? tr : null;
+          }
+
           // If the document ends with a table, image, or mathBlock, automatically append an empty paragraph after it
-          // so the user always has a standard text caret and typing line below it!
           const last = doc.lastChild;
           if (last && (last.type.name === 'table' || last.type.name === 'image' || last.type.name === 'mathBlock')) {
             const paragraphType = schema.nodes.paragraph;
@@ -342,7 +482,7 @@ const EnforceTitleExtension = Extension.create({
             }
           }
 
-          return null;
+          return tr.docChanged ? tr : null;
         },
       }),
     ];
@@ -647,9 +787,6 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
   // Editor scroll container ref to reset scroll position on note change
   const editorScrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Dedicated quick-add input for checklist notes
-  const [newChecklistInput, setNewChecklistInput] = useState('');
-
   // Long-press / context menu state for Images, Tables and Math Formulas
   const [contextMenu, setContextMenu] = useState<{
     type: 'image' | 'table' | 'math';
@@ -854,6 +991,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
   const isUpdatingRef = useRef(false);
   const activeNoteRef = useRef(activeNote);
   activeNoteRef.current = activeNote;
+  activeNoteModuleRef.current = activeNote;
 
   const editor = useEditor({
     extensions: [
@@ -978,21 +1116,6 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
       window.removeEventListener('editor:quick-add-checklist', handleQuickAdd);
     };
   }, [editor]);
-
-  // Dedicated quick-add action for checklist notes
-  const handleQuickAddChecklistItem = useCallback(() => {
-    if (!editor || !newChecklistInput.trim()) return;
-    const text = newChecklistInput.trim();
-    setNewChecklistInput('');
-    triggerHaptic();
-
-    const currentHtml = editor.getHTML();
-    if (!currentHtml.includes('data-type="taskList"')) {
-      editor.chain().focus('end').toggleTaskList().insertContent(text).run();
-    } else {
-      editor.chain().focus('end').splitBlock().insertContent(text).run();
-    }
-  }, [editor, newChecklistInput]);
 
   // Reset scroll position to top whenever switching notes so the new note starts cleanly from the top
   useEffect(() => {
@@ -1220,8 +1343,55 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
     if (!paragraphType) return;
 
     if (isChecklistFile) {
-      editor.chain().focus('end').splitBlock().toggleTaskList().run();
-      return;
+      let lastTaskItemPos = -1;
+      let lastTaskItemNode: any = null;
+
+      doc.descendants((node, pos) => {
+        if (node.type.name === 'taskItem') {
+          lastTaskItemPos = pos;
+          lastTaskItemNode = node;
+        }
+      });
+
+      if (!lastTaskItemNode || lastTaskItemPos === -1) {
+        // Document has no task items yet: append the first one
+        const taskListType = schema.nodes.taskList;
+        const taskItemType = schema.nodes.taskItem;
+        const pType = schema.nodes.paragraph;
+        if (taskListType && taskItemType && pType) {
+          const newTaskList = taskListType.create(
+            null,
+            taskItemType.create({ checked: false }, pType.create())
+          );
+          const newTr = tr.insert(doc.content.size, newTaskList);
+          view.dispatch(newTr);
+          editor.chain().focus('end').run();
+        }
+        return;
+      }
+
+      const hasContent = lastTaskItemNode.textContent.trim().length > 0;
+
+      if (!hasContent) {
+        // If the last checkbox is empty, move cursor back to it without creating another!
+        const targetPos = lastTaskItemPos + lastTaskItemNode.nodeSize - 1;
+        editor.chain().focus().setTextSelection(targetPos).run();
+        return;
+      } else {
+        // If the last checkbox has content, create a new checkbox immediately below it!
+        const taskItemType = schema.nodes.taskItem;
+        const pType = schema.nodes.paragraph;
+        if (taskItemType && pType) {
+          const insertPos = lastTaskItemPos + lastTaskItemNode.nodeSize;
+          const newTaskItem = taskItemType.create({ checked: false }, pType.create());
+          const newTr = tr.insert(insertPos, newTaskItem);
+          const targetCursorPos = insertPos + 2;
+          newTr.setSelection(Selection.near(newTr.doc.resolve(targetCursorPos), 1));
+          view.dispatch(newTr.scrollIntoView());
+          editor.commands.focus();
+        }
+        return;
+      }
     }
 
     const lastChild = doc.lastChild;
@@ -1584,34 +1754,6 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
                   }
                 }}
               />
-
-              {/* Quick Add Task Input for Checklists */}
-              {activeNote.folderId === 'checklists' && !activeNote.isTrash && !isSharedPreview && (
-                <div className="mt-4 mb-2 flex items-center space-x-2 bg-[#FAF6EF] dark:bg-[#1C2733] p-1.5 rounded-xl border border-[#DFD3C0] dark:border-[#2C4054] shadow-xs">
-                  <div className="w-4 h-4 ml-2 rounded-md border-2 border-[#DFD3C0] dark:border-[#384F66] shrink-0" />
-                  <input
-                    type="text"
-                    value={newChecklistInput}
-                    onChange={(e) => setNewChecklistInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleQuickAddChecklistItem();
-                      }
-                    }}
-                    placeholder="Add a task... (Press Enter)"
-                    className="flex-1 bg-transparent px-2 py-1 text-xs text-[#1C2B36] dark:text-[#E8EEF3] placeholder-[#8AA0B4] outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleQuickAddChecklistItem}
-                    disabled={!newChecklistInput.trim()}
-                    className="px-3 py-1.5 rounded-lg bg-apple-yellow hover:bg-apple-yellowHover dark:bg-[#345A7D] dark:hover:bg-[#3D6A94] text-white text-xs font-semibold shadow-xs disabled:opacity-40 transition-all active:scale-95 cursor-pointer shrink-0"
-                  >
-                    Add
-                  </button>
-                </div>
-              )}
 
               {/* 5 lines of visual padding (~112px) where clicking brings the cursor up to the line below, and typing preserves this buffer underneath */}
               <div

@@ -107,9 +107,13 @@
   line-height: 2.5rem;
   font-weight: 700;
   margin-top: 0.35rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 1.5rem;
   letter-spacing: -0.025em;
   color: #1C2B36;
+}
+.tiptap > h1:first-child + ul[data-type="taskList"],
+.tiptap > h1 + ul[data-type="taskList"] {
+  margin-top: 1.25rem;
 }
 .dark .tiptap h1,
 .dark .tiptap > h1:first-child {
