@@ -101,7 +101,6 @@
   display: none !important;
 }
 
-.tiptap h1,
 .tiptap > h1:first-child {
   font-size: 2.25rem;
   line-height: 2.5rem;
@@ -111,9 +110,20 @@
   letter-spacing: -0.025em;
   color: #1C2B36;
 }
-.tiptap > h1:first-child + ul[data-type="taskList"],
-.tiptap > h1 + ul[data-type="taskList"] {
-  margin-top: 1.25rem;
+
+/* 1-line clean visual gap strictly between the note title heading and the first line of content in ALL notes and checklists */
+.tiptap > h1:first-child + * {
+  margin-top: 1.25rem !important;
+}
+
+.tiptap h1:not(:first-child) {
+  font-size: 2rem;
+  line-height: 2.25rem;
+  font-weight: 700;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.025em;
+  color: #1C2B36;
 }
 .dark .tiptap h1,
 .dark .tiptap > h1:first-child {
