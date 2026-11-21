@@ -92,7 +92,20 @@ export const loadStoredFolders = (): Folder[] => {
     const data = localStorage.getItem(FOLDERS_STORAGE_KEY);
     if (!data) return INITIAL_FOLDERS;
     const parsed = JSON.parse(data);
-    return Array.isArray(parsed) ? parsed : INITIAL_FOLDERS;
+    if (!Array.isArray(parsed)) return INITIAL_FOLDERS;
+    const sanitized = parsed.filter(
+      (f: any) =>
+        Boolean(
+          f &&
+          typeof f.id === 'string' &&
+          typeof f.name === 'string' &&
+          f.name.trim() &&
+          f.id !== 'default' &&
+          f.id !== 'checklists' &&
+          f.id !== 'trash'
+        )
+    );
+    return sanitized.length > 0 ? sanitized : INITIAL_FOLDERS;
   } catch (err) {
     console.error('Failed to load folders from localStorage', err);
     return INITIAL_FOLDERS;

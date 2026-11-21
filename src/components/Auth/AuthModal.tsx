@@ -14,8 +14,10 @@ import {
   Key,
   Trash2,
   ChevronDown,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../../store/AuthContext';
+import { useNotes } from '../../store/NotesContext';
 import { triggerHaptic } from '../../utils/haptics';
 import { TexoLogo } from '../common/TexoLogo';
 
@@ -31,7 +33,10 @@ export const AuthModal: React.FC = () => {
     unlockWithPassword,
     changePassword,
     deleteAccount,
+    syncStatus,
   } = useAuth();
+  const { syncWithCloud } = useNotes();
+  const [isManualSyncing, setIsManualSyncing] = useState(false);
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -200,14 +205,71 @@ export const AuthModal: React.FC = () => {
           {user ? (
             /* Logged in state */
             <div className="space-y-4 text-center">
-              <div className="w-12 h-12 mx-auto rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                <CheckCircle2 size={26} />
+              <div className="w-12 h-12 mx-auto rounded-full flex items-center justify-center transition-colors bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
+                {syncStatus === 'syncing' ? (
+                  <Loader2 size={26} className="text-amber-500 animate-spin" />
+                ) : syncStatus === 'error' ? (
+                  <AlertCircle size={26} className="text-red-500" />
+                ) : (
+                  <CheckCircle2 size={26} />
+                )}
               </div>
               <div className="space-y-1">
-                <h4 className="text-sm font-semibold">Sync is Active</h4>
+                <h4 className="text-sm font-semibold">
+                  {syncStatus === 'syncing'
+                    ? 'Syncing with Cloud...'
+                    : syncStatus === 'error'
+                    ? 'Sync Needs Attention'
+                    : 'Cloud Sync is Active'}
+                </h4>
                 <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate max-w-xs mx-auto">
                   Signed in as <span className="font-medium text-neutral-800 dark:text-neutral-200">{user.email}</span>
                 </p>
+
+                {/* Sync Now Action Card */}
+                <div className="pt-2">
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-neutral-100 dark:bg-neutral-800/60 border border-neutral-200/80 dark:border-neutral-700/60">
+                    <div className="flex items-center space-x-2 text-left">
+                      <Cloud
+                        size={16}
+                        className={
+                          syncStatus === 'syncing'
+                            ? 'text-amber-500 animate-pulse'
+                            : syncStatus === 'error'
+                            ? 'text-red-500'
+                            : 'text-emerald-500'
+                        }
+                      />
+                      <div className="text-xs">
+                        <p className="font-semibold text-neutral-800 dark:text-neutral-200">
+                          {syncStatus === 'syncing'
+                            ? 'Syncing notes & checklists...'
+                            : syncStatus === 'error'
+                            ? 'Sync issue encountered'
+                            : 'All changes synced'}
+                        </p>
+                        <p className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                          Cross-platform (Web, Android, Desktop)
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isManualSyncing || syncStatus === 'syncing'}
+                      onClick={async () => {
+                        triggerHaptic();
+                        setIsManualSyncing(true);
+                        await syncWithCloud(true, true);
+                        setIsManualSyncing(false);
+                      }}
+                      className="flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-apple-yellow text-white hover:bg-apple-yellowHover active:scale-95 transition-all disabled:opacity-50"
+                    >
+                      <RefreshCw size={12} className={isManualSyncing || syncStatus === 'syncing' ? 'animate-spin' : ''} />
+                      <span>Sync</span>
+                    </button>
+                  </div>
+                </div>
+
                 <div className="pt-2">
                   {isKeyUnlocked ? (
                     <div className="inline-flex items-center space-x-1.5 text-[11px] text-emerald-700 dark:text-emerald-300 font-medium bg-emerald-50 dark:bg-emerald-950/40 py-1.5 px-3 rounded-full border border-emerald-200 dark:border-emerald-800/60">

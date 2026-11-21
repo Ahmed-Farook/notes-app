@@ -256,7 +256,9 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
           )}
 
           <div className="space-y-0.5">
-            {folders.map(folder => {
+            {folders
+              .filter(folder => Boolean(folder && folder.name && folder.name.trim() && folder.id !== 'default' && folder.id !== 'checklists' && folder.id !== 'trash'))
+              .map(folder => {
               const isSelected = selectedFolderId === folder.id;
               const isEditing = editingFolderId === folder.id;
               const isChecked = selectedFolderIds.includes(folder.id);

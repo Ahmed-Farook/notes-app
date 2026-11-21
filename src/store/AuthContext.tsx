@@ -73,12 +73,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     );
 
     Promise.race([sessionPromise, timeoutPromise])
-      .then(({ data: { session }, error }: any) => {
+      .then(async ({ data: { session }, error }: any) => {
         if (!isMounted) return;
-        if (!error && session) {
+        if (!error && session?.user) {
           setSession(session);
+          await loadStoredKey(session.user.id);
           setUser(session.user);
-          loadStoredKey(session.user.id);
         }
         setIsLoading(false);
       })
@@ -89,13 +89,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // 2. Listen for ongoing auth state changes without blocking event queue
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!isMounted) return;
       setSession(session);
-      setUser(session ? session.user : null);
       if (session?.user) {
-        loadStoredKey(session.user.id);
+        await loadStoredKey(session.user.id);
+        setUser(session.user);
       } else {
+        setUser(null);
         setEncryptionKey(null);
         setIsKeyUnlocked(false);
       }

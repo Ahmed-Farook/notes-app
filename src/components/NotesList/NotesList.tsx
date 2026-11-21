@@ -554,7 +554,9 @@ export const NotesList: React.FC<NotesListProps> = ({
                   )}
 
                   {/* Existing Custom Folders */}
-                  {folders.map(f => {
+                  {folders
+                    .filter(f => Boolean(f && f.name && f.name.trim() && f.id !== 'default' && f.id !== 'checklists' && f.id !== 'trash'))
+                    .map(f => {
                     const count = getFolderCount(f.id);
                     const isSelected = selectedFolderId === f.id;
                     const isEditing = editingFolderId === f.id;
