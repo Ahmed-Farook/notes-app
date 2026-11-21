@@ -300,12 +300,30 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         ]);
       }
     } catch (err) {
-      console.error('Sync error:', err);
-      setSyncStatus('error');
+      console.warn('Sync error:', err);
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        setSyncStatus('offline');
+      } else {
+        setSyncStatus('error');
+      }
     } finally {
       isSyncingRef.current = false;
     }
   }, [user, setSyncStatus]);
+
+  // Auto-prune any unnamed or system folders from custom folders on startup
+  useEffect(() => {
+    setFolders(prev => {
+      const sanitized = prev.filter(
+        f => Boolean(f && f.id && f.name && f.name.trim() && f.id !== 'default' && f.id !== 'checklists' && f.id !== 'trash')
+      );
+      if (sanitized.length !== prev.length) {
+        saveStoredFolders(sanitized);
+        return sanitized;
+      }
+      return prev;
+    });
+  }, []);
 
   // Sync with Supabase on user sign-in & listen to Realtime changes
   useEffect(() => {

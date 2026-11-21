@@ -20,7 +20,6 @@ import {
   Share2,
   ListTodo,
   BookmarkPlus,
-  User,
 } from 'lucide-react';
 import { useNotes } from '../../store/NotesContext';
 import { useAuth } from '../../store/AuthContext';
@@ -418,24 +417,27 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           </button>
         )}
 
-        {/* Cloud Sync Button */}
+        {/* Cloud Sync & Account Button */}
         <button
           onClick={() => {
+            triggerHaptic();
             if (user) {
-              triggerHaptic();
               syncWithCloud(true, true);
-            } else {
-              openAuthModal();
             }
+            openAuthModal();
           }}
           title={
             user
-              ? `Cloud Sync Active (${user.email}) • Tap to Sync Now`
+              ? `Cloud Sync & Account (${user.email}) • Status: ${syncStatus}`
               : 'Sign in to Sync with Cloud'
           }
           className={`flex items-center space-x-1 p-1.5 rounded-md transition-colors active:scale-95 ${
             user
-              ? 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
+              ? syncStatus === 'error'
+                ? 'text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30'
+                : syncStatus === 'syncing'
+                ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/30'
+                : 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
               : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-800'
           }`}
         >
@@ -452,17 +454,6 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             />
           )}
         </button>
-
-        {/* User Account / Profile Button */}
-        {user && (
-          <button
-            onClick={() => openAuthModal()}
-            title={`Account Settings (${user.email})`}
-            className="p-1.5 rounded-md text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors active:scale-95"
-          >
-            <User size={17} />
-          </button>
-        )}
 
         {/* Dark/Light toggle */}
         <button

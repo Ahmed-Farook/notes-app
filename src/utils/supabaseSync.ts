@@ -140,26 +140,47 @@ export async function folderToDb(folder: Folder, userId: string, key: CryptoKey 
 }
 
 /**
+ * Safe AbortSignal helper for cross-platform compatibility across mobile WebView,
+ * Android Capacitor, Safari, and Electron.
+ */
+function getAbortSignal(timeoutMs = 15000): AbortSignal | undefined {
+  try {
+    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+      return AbortSignal.timeout(timeoutMs);
+    }
+    if (typeof AbortController !== 'undefined') {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), timeoutMs);
+      return controller.signal;
+    }
+  } catch (_) {}
+  return undefined;
+}
+
+/**
  * Decrypts a DbFolder retrieved from PostgreSQL.
  */
 export async function dbToFolder(db: DbFolder, key: CryptoKey | null): Promise<Folder> {
-  const decryptedName = db.is_system ? db.name : await decryptText(db.name, key);
+  let decryptedName = db.is_system ? db.name : await decryptText(db.name, key);
+  if (!decryptedName || !decryptedName.trim()) {
+    decryptedName = 'Untitled Folder';
+  }
 
   return {
     id: db.id,
-    name: decryptedName,
+    name: decryptedName.trim(),
     icon: db.icon || undefined,
-    isSystem: db.is_system,
+    isSystem: Boolean(db.is_system),
   };
 }
 
 export async function fetchUserNotes(key: CryptoKey | null, existingNotes?: Note[]): Promise<Note[]> {
   try {
-    // 15-second timeout so mobile cellular connections have plenty of time
-    const { data, error } = await supabase
-      .from('notes')
-      .select('*')
-      .abortSignal(AbortSignal.timeout(15000));
+    const signal = getAbortSignal(15000);
+    const query = supabase.from('notes').select('*');
+    if (signal) query.abortSignal(signal);
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching notes from Supabase:', error);
@@ -191,11 +212,11 @@ export async function fetchUserNotes(key: CryptoKey | null, existingNotes?: Note
 
 export async function fetchUserFolders(key: CryptoKey | null, existingFolders?: Folder[]): Promise<Folder[]> {
   try {
-    // 15-second timeout
-    const { data, error } = await supabase
-      .from('folders')
-      .select('*')
-      .abortSignal(AbortSignal.timeout(15000));
+    const signal = getAbortSignal(15000);
+    const query = supabase.from('folders').select('*');
+    if (signal) query.abortSignal(signal);
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching folders from Supabase:', error);
@@ -209,14 +230,24 @@ export async function fetchUserFolders(key: CryptoKey | null, existingFolders?: 
       }
     }
 
-    return Promise.all(
-      (data as DbFolder[]).map((d) => {
+    // Only process custom, non-system folders
+    const rawFolders = (data as DbFolder[]).filter(
+      (d) => d && d.id && !d.is_system && d.id !== 'default' && d.id !== 'checklists' && d.id !== 'trash'
+    );
+
+    const decryptedFolders = await Promise.all(
+      rawFolders.map((d) => {
         const local = existingMap.get(d.id);
         if (local && (d.is_system || local.name === d.name)) {
           return Promise.resolve(local);
         }
         return dbToFolder(d, key);
       })
+    );
+
+    // Filter out any folders with empty names
+    return decryptedFolders.filter(
+      (f) => Boolean(f && f.name && f.name.trim() && f.id !== 'default' && f.id !== 'checklists' && f.id !== 'trash')
     );
   } catch (err) {
     console.error('fetchUserFolders failed:', err);
@@ -232,17 +263,25 @@ export async function batchUpsertNotesToCloud(
   if (!notes || notes.length === 0) return;
   try {
     const payloads = await Promise.all(notes.map((n) => noteToDb(n, userId, key)));
-    const { error } = await supabase
-      .from('notes')
-      .upsert(payloads)
-      .abortSignal(AbortSignal.timeout(15000));
+    const signal = getAbortSignal(15000);
+    const query = supabase.from('notes').upsert(payloads);
+    if (signal) query.abortSignal(signal);
+
+    const { error } = await query;
     if (error) {
-      console.error('Error batch upserting notes to Supabase:', error);
-      throw error;
+      console.warn('Batch upsert notes encountered error, falling back to individual upserts:', error);
+      // Fallback: upsert individually so that one conflicting/corrupted note doesn't block the rest
+      for (const p of payloads) {
+        try {
+          const { error: indErr } = await supabase.from('notes').upsert(p);
+          if (indErr && indErr.code !== '42501') {
+            console.warn('Individual note upsert failed:', indErr);
+          }
+        } catch (_) {}
+      }
     }
   } catch (err) {
     console.error('Failed to prepare or batch upsert notes:', err);
-    throw err;
   }
 }
 
@@ -251,32 +290,45 @@ export async function batchUpsertFoldersToCloud(
   userId: string,
   key: CryptoKey | null
 ): Promise<void> {
-  if (!folders || folders.length === 0) return;
+  // Only upload valid custom folders; NEVER upload system folders (default, checklists, trash)
+  const validFolders = (folders || []).filter(
+    (f) => Boolean(f && f.id && f.name && f.name.trim() && !f.isSystem && f.id !== 'default' && f.id !== 'checklists' && f.id !== 'trash')
+  );
+  if (validFolders.length === 0) return;
+
   try {
-    const payloads = await Promise.all(folders.map((f) => folderToDb(f, userId, key)));
-    const { error } = await supabase
-      .from('folders')
-      .upsert(payloads)
-      .abortSignal(AbortSignal.timeout(15000));
+    const payloads = await Promise.all(validFolders.map((f) => folderToDb(f, userId, key)));
+    const signal = getAbortSignal(15000);
+    const query = supabase.from('folders').upsert(payloads);
+    if (signal) query.abortSignal(signal);
+
+    const { error } = await query;
     if (error) {
-      console.error('Error batch upserting folders to Supabase:', error);
-      throw error;
+      console.warn('Batch upsert folders encountered error, falling back to individual upserts:', error);
+      // Fallback: upsert individually so a 42501 RLS conflict on static legacy folders (e.g. 'work') doesn't block custom folders
+      for (const p of payloads) {
+        try {
+          const { error: indErr } = await supabase.from('folders').upsert(p);
+          if (indErr && indErr.code !== '42501') {
+            console.warn('Individual folder upsert failed:', indErr);
+          }
+        } catch (_) {}
+      }
     }
   } catch (err) {
     console.error('Failed to prepare or batch upsert folders:', err);
-    throw err;
   }
 }
 
 export async function upsertNoteToCloud(note: Note, userId: string, key: CryptoKey | null): Promise<void> {
   const payload = await noteToDb(note, userId, key);
-  const { error } = await supabase
-    .from('notes')
-    .upsert(payload)
-    .abortSignal(AbortSignal.timeout(15000));
+  const signal = getAbortSignal(15000);
+  const query = supabase.from('notes').upsert(payload);
+  if (signal) query.abortSignal(signal);
+
+  const { error } = await query;
   if (error) {
-    console.error('Error upserting note to Supabase:', error);
-    throw error;
+    console.warn('Error upserting note to Supabase:', error);
   }
 }
 
@@ -338,7 +390,7 @@ export function mergeNotes(
 }
 
 /**
- * Merge custom folders
+ * Merge custom folders (ignoring system folders and empty names)
  */
 export function mergeFolders(
   local: Folder[],
@@ -348,13 +400,17 @@ export function mergeFolders(
   const toUpload: Folder[] = [];
 
   for (const r of remote) {
-    map.set(r.id, r);
+    if (r && r.name && r.name.trim() && !r.isSystem && r.id !== 'default' && r.id !== 'checklists' && r.id !== 'trash') {
+      map.set(r.id, { ...r, name: r.name.trim() });
+    }
   }
 
   for (const l of local) {
-    if (!map.has(l.id)) {
-      map.set(l.id, l);
-      toUpload.push(l);
+    if (l && l.name && l.name.trim() && !l.isSystem && l.id !== 'default' && l.id !== 'checklists' && l.id !== 'trash') {
+      if (!map.has(l.id)) {
+        map.set(l.id, { ...l, name: l.name.trim() });
+        toUpload.push(l);
+      }
     }
   }
 
