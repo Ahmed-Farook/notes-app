@@ -20,6 +20,7 @@ import {
   Share2,
   ListTodo,
   BookmarkPlus,
+  User,
 } from 'lucide-react';
 import { useNotes } from '../../store/NotesContext';
 import { useAuth } from '../../store/AuthContext';
@@ -66,6 +67,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     sharedPreviewNote,
     saveSharedPreviewToNotes,
     dismissSharedPreview,
+    syncWithCloud,
   } = useNotes();
   const isSharedPreview = Boolean(sharedPreviewNote && activeNote?.id === sharedPreviewNote.id);
   const { user, openAuthModal, syncStatus } = useAuth();
@@ -418,10 +420,17 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
 
         {/* Cloud Sync Button */}
         <button
-          onClick={() => openAuthModal()}
+          onClick={() => {
+            if (user) {
+              triggerHaptic();
+              syncWithCloud(true, true);
+            } else {
+              openAuthModal();
+            }
+          }}
           title={
             user
-              ? `Cloud Sync Active (${user.email}) • Status: ${syncStatus}`
+              ? `Cloud Sync Active (${user.email}) • Tap to Sync Now`
               : 'Sign in to Sync with Cloud'
           }
           className={`flex items-center space-x-1 p-1.5 rounded-md transition-colors active:scale-95 ${
@@ -443,6 +452,17 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             />
           )}
         </button>
+
+        {/* User Account / Profile Button */}
+        {user && (
+          <button
+            onClick={() => openAuthModal()}
+            title={`Account Settings (${user.email})`}
+            className="p-1.5 rounded-md text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors active:scale-95"
+          >
+            <User size={17} />
+          </button>
+        )}
 
         {/* Dark/Light toggle */}
         <button

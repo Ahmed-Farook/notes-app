@@ -321,8 +321,8 @@ export const Layout: React.FC = () => {
                 hasUpdate={Boolean(updater.updateInfo?.hasUpdate)}
                 updateInfo={updater.updateInfo}
               />
-              {/* Android Floating Action Button (FAB) - hidden when in Recycle Bin or Selection Mode */}
-              {!isSelectionMode && selectedFolderId !== 'trash' && (
+              {/* Android Floating Action Button (FAB) - hidden when in Recycle Bin, Selection Mode, or when Folder Picker popup is open */}
+              {!isSelectionMode && selectedFolderId !== 'trash' && !isFolderPickerOpen && (
                 <button
                   onClick={() => {
                     triggerHaptic();

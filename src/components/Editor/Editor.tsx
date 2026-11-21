@@ -1225,19 +1225,14 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
 
     editor.setEditable(!activeNote.isTrash && !isSharedPreview);
 
+    // Checklist notes are managed by dedicated ChecklistEditor
+    if (isChecklistFile) return;
+
     let contentToLoad = activeNote.content || '<p></p>';
-    if (isChecklistFile && !isSharedPreview) {
-      if (!contentToLoad.includes('data-type="taskList"')) {
-        const titleMatch = contentToLoad.match(/<h1>([\s\S]*?)<\/h1>/i);
-        const titleHtml = titleMatch ? titleMatch[0] : '<h1>To-Do List</h1>';
-        contentToLoad = `${titleHtml}<ul data-type="taskList"><li data-type="taskItem" data-checked="false"><p></p></li></ul>`;
-        updateNote(activeNote.id, { content: contentToLoad });
-      }
-    }
     // Migrate legacy notes where title was saved as <h3> to <h1> (personal notes only)
     if (!isSharedPreview && /^\s*<h3>([\s\S]*?)<\/h3>/i.test(contentToLoad)) {
       contentToLoad = contentToLoad.replace(/^\s*<h3>([\s\S]*?)<\/h3>/i, '<h1>$1</h1>');
-      updateNote(activeNote.id, { content: contentToLoad });
+      updateNote(activeNote.id, { content: contentToLoad, updatedAt: activeNote.updatedAt });
     }
 
     const currentHTML = editor.getHTML();

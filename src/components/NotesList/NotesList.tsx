@@ -250,8 +250,11 @@ export const NotesList: React.FC<NotesListProps> = ({
     .filter(group => group.notes.length > 0);
 
   // Folder note counts
+  const checklistsCount = notes.filter(
+    n => !n.isTrash && n.folderId === 'checklists'
+  ).length;
   const defaultNotesCount = notes.filter(
-    n => !n.isTrash && (n.folderId === 'default' || n.folderId === 'quick' || n.folderId === 'all' || !n.folderId)
+    n => !n.isTrash && n.folderId !== 'checklists' && (n.folderId === 'default' || n.folderId === 'quick' || n.folderId === 'all' || !n.folderId)
   ).length;
   const trashCount = notes.filter(n => n.isTrash).length;
   const getFolderCount = (folderId: string) =>
@@ -445,6 +448,45 @@ export const NotesList: React.FC<NotesListProps> = ({
                       {defaultNotesCount}
                     </span>
                     {selectedFolderId === 'default' && (
+                      <Check size={15} className="text-white stroke-[2.5]" />
+                    )}
+                  </div>
+                </button>
+
+                {/* Checklists */}
+                <button
+                  onClick={() => {
+                    triggerHaptic();
+                    setSelectedFolderId('checklists');
+                    setIsFolderPickerOpen(false);
+                  }}
+                  className={`w-full px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors text-left ${
+                    selectedFolderId === 'checklists'
+                      ? 'bg-[#213A50] dark:bg-[#254260] text-white font-medium shadow-xs'
+                      : 'text-[#1C2B36] dark:text-[#E8EEF3] hover:bg-[#E5DCCB] dark:hover:bg-[#202E3C]'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <div
+                      className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
+                        selectedFolderId === 'checklists'
+                          ? 'bg-white/20 text-white'
+                          : 'bg-[#E8F1F7] dark:bg-[#203448] text-[#213A50] dark:text-[#7EAAD0]'
+                      }`}
+                    >
+                      <ListTodo size={14} />
+                    </div>
+                    <span className="font-medium">Checklists</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span
+                      className={`text-[11px] font-mono ${
+                        selectedFolderId === 'checklists' ? 'text-white/90' : 'text-[#8A9BA8] dark:text-[#8AA0B4]'
+                      }`}
+                    >
+                      {checklistsCount}
+                    </span>
+                    {selectedFolderId === 'checklists' && (
                       <Check size={15} className="text-white stroke-[2.5]" />
                     )}
                   </div>
