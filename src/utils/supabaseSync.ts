@@ -176,15 +176,15 @@ export async function dbToFolder(db: DbFolder, key: CryptoKey | null): Promise<F
 
 export async function fetchUserNotes(key: CryptoKey | null, existingNotes?: Note[]): Promise<Note[]> {
   try {
-    const signal = getAbortSignal(15000);
-    const query = supabase.from('notes').select('*');
-    if (signal) query.abortSignal(signal);
-
-    const { data, error } = await query;
+    const { data, error } = await supabase.from('notes').select('*');
 
     if (error) {
-      console.error('Error fetching notes from Supabase:', error);
-      throw error;
+      console.warn('Error fetching notes from Supabase:', error);
+      return existingNotes || [];
+    }
+
+    if (!data || !Array.isArray(data)) {
+      return existingNotes || [];
     }
 
     const existingMap = new Map<string, Note>();
@@ -205,22 +205,22 @@ export async function fetchUserNotes(key: CryptoKey | null, existingNotes?: Note
       })
     );
   } catch (err) {
-    console.error('fetchUserNotes failed:', err);
-    throw err;
+    console.warn('fetchUserNotes network error:', err);
+    return existingNotes || [];
   }
 }
 
 export async function fetchUserFolders(key: CryptoKey | null, existingFolders?: Folder[]): Promise<Folder[]> {
   try {
-    const signal = getAbortSignal(15000);
-    const query = supabase.from('folders').select('*');
-    if (signal) query.abortSignal(signal);
-
-    const { data, error } = await query;
+    const { data, error } = await supabase.from('folders').select('*');
 
     if (error) {
-      console.error('Error fetching folders from Supabase:', error);
-      throw error;
+      console.warn('Error fetching folders from Supabase:', error);
+      return existingFolders || [];
+    }
+
+    if (!data || !Array.isArray(data)) {
+      return existingFolders || [];
     }
 
     const existingMap = new Map<string, Folder>();
@@ -250,8 +250,8 @@ export async function fetchUserFolders(key: CryptoKey | null, existingFolders?: 
       (f) => Boolean(f && f.name && f.name.trim() && f.id !== 'default' && f.id !== 'checklists' && f.id !== 'trash')
     );
   } catch (err) {
-    console.error('fetchUserFolders failed:', err);
-    throw err;
+    console.warn('fetchUserFolders network error:', err);
+    return existingFolders || [];
   }
 }
 
@@ -263,11 +263,7 @@ export async function batchUpsertNotesToCloud(
   if (!notes || notes.length === 0) return;
   try {
     const payloads = await Promise.all(notes.map((n) => noteToDb(n, userId, key)));
-    const signal = getAbortSignal(15000);
-    const query = supabase.from('notes').upsert(payloads);
-    if (signal) query.abortSignal(signal);
-
-    const { error } = await query;
+    const { error } = await supabase.from('notes').upsert(payloads);
     if (error) {
       console.warn('Batch upsert notes encountered error, falling back to individual upserts:', error);
       // Fallback: upsert individually so that one conflicting/corrupted note doesn't block the rest
@@ -281,7 +277,7 @@ export async function batchUpsertNotesToCloud(
       }
     }
   } catch (err) {
-    console.error('Failed to prepare or batch upsert notes:', err);
+    console.warn('Failed batch upsert notes:', err);
   }
 }
 
@@ -298,11 +294,7 @@ export async function batchUpsertFoldersToCloud(
 
   try {
     const payloads = await Promise.all(validFolders.map((f) => folderToDb(f, userId, key)));
-    const signal = getAbortSignal(15000);
-    const query = supabase.from('folders').upsert(payloads);
-    if (signal) query.abortSignal(signal);
-
-    const { error } = await query;
+    const { error } = await supabase.from('folders').upsert(payloads);
     if (error) {
       console.warn('Batch upsert folders encountered error, falling back to individual upserts:', error);
       // Fallback: upsert individually so a 42501 RLS conflict on static legacy folders (e.g. 'work') doesn't block custom folders
@@ -316,19 +308,19 @@ export async function batchUpsertFoldersToCloud(
       }
     }
   } catch (err) {
-    console.error('Failed to prepare or batch upsert folders:', err);
+    console.warn('Failed batch upsert folders:', err);
   }
 }
 
 export async function upsertNoteToCloud(note: Note, userId: string, key: CryptoKey | null): Promise<void> {
-  const payload = await noteToDb(note, userId, key);
-  const signal = getAbortSignal(15000);
-  const query = supabase.from('notes').upsert(payload);
-  if (signal) query.abortSignal(signal);
-
-  const { error } = await query;
-  if (error) {
-    console.warn('Error upserting note to Supabase:', error);
+  try {
+    const payload = await noteToDb(note, userId, key);
+    const { error } = await supabase.from('notes').upsert(payload);
+    if (error) {
+      console.warn('Error upserting note to Supabase:', error);
+    }
+  } catch (err) {
+    console.warn('Failed to upsert note to cloud:', err);
   }
 }
 

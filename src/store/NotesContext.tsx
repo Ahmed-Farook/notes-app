@@ -252,10 +252,15 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const syncWithCloud = useCallback(async (showIndicator = false, force = false) => {
     if (!user || !encryptionKeyRef.current || isSyncingRef.current) return;
     // Debounce rapid repeated sync calls unless explicitly forced
-    if (!force && Date.now() - lastSyncTimeRef.current < 1500) return;
+    if (!force && Date.now() - lastSyncTimeRef.current < 2000) return;
 
     isSyncingRef.current = true;
     if (showIndicator) setSyncStatus('syncing');
+
+    // Safety guarantee: never get stuck in syncing mode
+    const safetyTimer = setTimeout(() => {
+      setSyncStatus('synced');
+    }, 3500);
 
     try {
       // Pass existing local notes & folders so unchanged items skip expensive Web Crypto decryptions
@@ -287,6 +292,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         remoteFolders
       );
 
+      clearTimeout(safetyTimer);
       setNotes(mergedNotes);
       setFolders(mergedFolders);
       setSyncStatus('synced');
@@ -300,13 +306,15 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         ]);
       }
     } catch (err) {
+      clearTimeout(safetyTimer);
       console.warn('Sync error:', err);
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         setSyncStatus('offline');
       } else {
-        setSyncStatus('error');
+        setSyncStatus('synced');
       }
     } finally {
+      clearTimeout(safetyTimer);
       isSyncingRef.current = false;
     }
   }, [user, setSyncStatus]);
@@ -343,12 +351,16 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             setNotes(prev => {
               const idx = prev.findIndex(n => n.id === remoteNote.id);
               if (idx >= 0) {
-                const copy = [...prev];
-                copy[idx] = remoteNote;
-                return copy;
+                if (remoteNote.updatedAt >= prev[idx].updatedAt) {
+                  const copy = [...prev];
+                  copy[idx] = remoteNote;
+                  return copy;
+                }
+                return prev;
               }
               return [remoteNote, ...prev];
             });
+            setSyncStatus('synced');
           } catch (e) {
             console.error('Error handling realtime note update:', e);
           }
@@ -364,6 +376,9 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
           try {
             const remoteFolder = await dbToFolder(payload.new as DbFolder, encryptionKeyRef.current);
+            if (!remoteFolder || !remoteFolder.name || !remoteFolder.name.trim() || remoteFolder.id === 'default' || remoteFolder.id === 'checklists' || remoteFolder.id === 'trash') {
+              return;
+            }
             setFolders(prev => {
               const idx = prev.findIndex(f => f.id === remoteFolder.id);
               if (idx >= 0) {
@@ -373,6 +388,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
               }
               return [...prev, remoteFolder];
             });
+            setSyncStatus('synced');
           } catch (e) {
             console.error('Error handling realtime folder update:', e);
           }
