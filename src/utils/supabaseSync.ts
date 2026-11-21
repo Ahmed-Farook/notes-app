@@ -155,15 +155,15 @@ export async function dbToFolder(db: DbFolder, key: CryptoKey | null): Promise<F
 
 export async function fetchUserNotes(key: CryptoKey | null, existingNotes?: Note[]): Promise<Note[]> {
   try {
-    // 5-second timeout so a slow connection never blocks startup or sync
+    // 15-second timeout so mobile cellular connections have plenty of time
     const { data, error } = await supabase
       .from('notes')
       .select('*')
-      .abortSignal(AbortSignal.timeout(5000));
+      .abortSignal(AbortSignal.timeout(15000));
 
     if (error) {
-      console.warn('Error fetching notes from Supabase:', error);
-      return existingNotes || [];
+      console.error('Error fetching notes from Supabase:', error);
+      throw error;
     }
 
     const existingMap = new Map<string, Note>();
@@ -176,31 +176,30 @@ export async function fetchUserNotes(key: CryptoKey | null, existingNotes?: Note
     return Promise.all(
       (data as DbNote[]).map((d) => {
         const local = existingMap.get(d.id);
-        // Fast path: if note hasn't changed since last sync or local is newer,
-        // reuse existing note directly without running costly Web Crypto decryptions!
-        if (local && (local.updatedAt === Number(d.updated_at) || local.updatedAt > Number(d.updated_at))) {
+        // Fast path: ONLY reuse existing note if updated_at is identical!
+        if (local && local.updatedAt === Number(d.updated_at)) {
           return Promise.resolve(local);
         }
         return dbToNote(d, key);
       })
     );
   } catch (err) {
-    console.warn('fetchUserNotes timed out or network error:', err);
-    return existingNotes || [];
+    console.error('fetchUserNotes failed:', err);
+    throw err;
   }
 }
 
 export async function fetchUserFolders(key: CryptoKey | null, existingFolders?: Folder[]): Promise<Folder[]> {
   try {
-    // 5-second timeout
+    // 15-second timeout
     const { data, error } = await supabase
       .from('folders')
       .select('*')
-      .abortSignal(AbortSignal.timeout(5000));
+      .abortSignal(AbortSignal.timeout(15000));
 
     if (error) {
-      console.warn('Error fetching folders from Supabase:', error);
-      return existingFolders || [];
+      console.error('Error fetching folders from Supabase:', error);
+      throw error;
     }
 
     const existingMap = new Map<string, Folder>();
@@ -220,8 +219,8 @@ export async function fetchUserFolders(key: CryptoKey | null, existingFolders?: 
       })
     );
   } catch (err) {
-    console.warn('fetchUserFolders timed out or network error:', err);
-    return existingFolders || [];
+    console.error('fetchUserFolders failed:', err);
+    throw err;
   }
 }
 
@@ -236,12 +235,14 @@ export async function batchUpsertNotesToCloud(
     const { error } = await supabase
       .from('notes')
       .upsert(payloads)
-      .abortSignal(AbortSignal.timeout(6000));
+      .abortSignal(AbortSignal.timeout(15000));
     if (error) {
-      console.warn('Error batch upserting notes to Supabase:', error);
+      console.error('Error batch upserting notes to Supabase:', error);
+      throw error;
     }
   } catch (err) {
-    console.warn('Failed to prepare or batch upsert notes:', err);
+    console.error('Failed to prepare or batch upsert notes:', err);
+    throw err;
   }
 }
 
@@ -256,20 +257,26 @@ export async function batchUpsertFoldersToCloud(
     const { error } = await supabase
       .from('folders')
       .upsert(payloads)
-      .abortSignal(AbortSignal.timeout(6000));
+      .abortSignal(AbortSignal.timeout(15000));
     if (error) {
-      console.warn('Error batch upserting folders to Supabase:', error);
+      console.error('Error batch upserting folders to Supabase:', error);
+      throw error;
     }
   } catch (err) {
-    console.warn('Failed to prepare or batch upsert folders:', err);
+    console.error('Failed to prepare or batch upsert folders:', err);
+    throw err;
   }
 }
 
 export async function upsertNoteToCloud(note: Note, userId: string, key: CryptoKey | null): Promise<void> {
   const payload = await noteToDb(note, userId, key);
-  const { error } = await supabase.from('notes').upsert(payload);
+  const { error } = await supabase
+    .from('notes')
+    .upsert(payload)
+    .abortSignal(AbortSignal.timeout(15000));
   if (error) {
-    console.warn('Error upserting note to Supabase:', error);
+    console.error('Error upserting note to Supabase:', error);
+    throw error;
   }
 }
 

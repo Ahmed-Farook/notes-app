@@ -9,6 +9,8 @@ import React, {
   ReactNode,
 } from 'react';
 import { Note, Folder, ViewMode } from '../types/note';
+import { App as CapApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import {
   loadStoredNotes,
   saveStoredNotes,
@@ -142,6 +144,9 @@ interface NotesContextType {
   sharedPreviewNote: Note | null;
   saveSharedPreviewToNotes: () => void;
   dismissSharedPreview: () => void;
+
+  // Cloud Synchronization
+  syncWithCloud: (showIndicator?: boolean, force?: boolean) => Promise<void>;
 }
 
 export async function hashNotePassword(password: string, salt: string = ''): Promise<string> {
@@ -243,19 +248,14 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const isSyncingRef = useRef(false);
   const lastSyncTimeRef = useRef<number>(0);
 
-  // Fast, optimized bidirectional cloud synchronization
+  // Fast, reliable bidirectional cloud synchronization
   const syncWithCloud = useCallback(async (showIndicator = false, force = false) => {
     if (!user || !encryptionKeyRef.current || isSyncingRef.current) return;
     // Debounce rapid repeated sync calls unless explicitly forced
-    if (!force && Date.now() - lastSyncTimeRef.current < 3500) return;
+    if (!force && Date.now() - lastSyncTimeRef.current < 1500) return;
 
     isSyncingRef.current = true;
     if (showIndicator) setSyncStatus('syncing');
-
-    // Safety guarantee: Never keep blinking orange for more than 3.5s on launch
-    const safetyTimer = setTimeout(() => {
-      setSyncStatus('synced');
-    }, 3500);
 
     try {
       // Pass existing local notes & folders so unchanged items skip expensive Web Crypto decryptions
@@ -287,7 +287,6 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         remoteFolders
       );
 
-      clearTimeout(safetyTimer);
       setNotes(mergedNotes);
       setFolders(mergedFolders);
       setSyncStatus('synced');
@@ -301,11 +300,9 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         ]);
       }
     } catch (err) {
-      clearTimeout(safetyTimer);
-      console.warn('Sync error:', err);
-      setSyncStatus('offline');
+      console.error('Sync error:', err);
+      setSyncStatus('error');
     } finally {
-      clearTimeout(safetyTimer);
       isSyncingRef.current = false;
     }
   }, [user, setSyncStatus]);
@@ -315,7 +312,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     if (!user || !encryptionKey) return;
 
     let isMounted = true;
-    syncWithCloud(true);
+    syncWithCloud(true, true);
 
     // 2. Realtime WebSocket subscription
     const channel = supabase
@@ -323,19 +320,20 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notes' }, async (payload) => {
         if (!isMounted) return;
         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          const remoteNote = await dbToNote(payload.new as DbNote, encryptionKeyRef.current);
-          setNotes(prev => {
-            const idx = prev.findIndex(n => n.id === remoteNote.id);
-            if (idx >= 0) {
-              if (remoteNote.updatedAt >= prev[idx].updatedAt) {
+          try {
+            const remoteNote = await dbToNote(payload.new as DbNote, encryptionKeyRef.current);
+            setNotes(prev => {
+              const idx = prev.findIndex(n => n.id === remoteNote.id);
+              if (idx >= 0) {
                 const copy = [...prev];
                 copy[idx] = remoteNote;
                 return copy;
               }
-              return prev;
-            }
-            return [remoteNote, ...prev];
-          });
+              return [remoteNote, ...prev];
+            });
+          } catch (e) {
+            console.error('Error handling realtime note update:', e);
+          }
         } else if (payload.eventType === 'DELETE') {
           const deletedId = (payload.old as any)?.id;
           if (deletedId) {
@@ -346,16 +344,20 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       .on('postgres_changes', { event: '*', schema: 'public', table: 'folders' }, async (payload) => {
         if (!isMounted) return;
         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          const remoteFolder = await dbToFolder(payload.new as DbFolder, encryptionKeyRef.current);
-          setFolders(prev => {
-            const idx = prev.findIndex(f => f.id === remoteFolder.id);
-            if (idx >= 0) {
-              const copy = [...prev];
-              copy[idx] = remoteFolder;
-              return copy;
-            }
-            return [...prev, remoteFolder];
-          });
+          try {
+            const remoteFolder = await dbToFolder(payload.new as DbFolder, encryptionKeyRef.current);
+            setFolders(prev => {
+              const idx = prev.findIndex(f => f.id === remoteFolder.id);
+              if (idx >= 0) {
+                const copy = [...prev];
+                copy[idx] = remoteFolder;
+                return copy;
+              }
+              return [...prev, remoteFolder];
+            });
+          } catch (e) {
+            console.error('Error handling realtime folder update:', e);
+          }
         } else if (payload.eventType === 'DELETE') {
           const deletedId = (payload.old as any)?.id;
           if (deletedId) {
@@ -371,13 +373,40 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
   }, [user, encryptionKey, syncWithCloud]);
 
+  // Capacitor Native App Resume & Lifecycle Listeners for Mobile Android/iOS
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    let appStateHandle: any = null;
+    let resumeHandle: any = null;
+
+    try {
+      CapApp.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) {
+          syncWithCloud(true, true);
+        }
+      }).then(handle => { appStateHandle = handle; });
+
+      CapApp.addListener('resume', () => {
+        syncWithCloud(true, true);
+      }).then(handle => { resumeHandle = handle; });
+    } catch (e) {
+      console.warn('Failed to attach Capacitor app lifecycle listeners:', e);
+    }
+
+    return () => {
+      if (appStateHandle?.remove) appStateHandle.remove();
+      if (resumeHandle?.remove) resumeHandle.remove();
+    };
+  }, [syncWithCloud]);
+
   // Fast background auto-sync whenever the window regains focus, becomes visible, or network comes online
   useEffect(() => {
     if (!user || !encryptionKey) return;
 
     const handleWakeupSync = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        syncWithCloud(true);
+        syncWithCloud(true, true);
       }
     };
 
@@ -385,12 +414,12 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     window.addEventListener('online', handleWakeupSync);
     document.addEventListener('visibilitychange', handleWakeupSync);
 
-    // Periodic heartbeat sync every 25 seconds when app is visible
+    // Periodic heartbeat sync every 20 seconds when app is visible
     const heartbeatTimer = setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        syncWithCloud(false);
+        syncWithCloud(false, false);
       }
-    }, 25000);
+    }, 20000);
 
     return () => {
       window.removeEventListener('focus', handleWakeupSync);
@@ -399,6 +428,32 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       clearInterval(heartbeatTimer);
     };
   }, [user, encryptionKey, syncWithCloud]);
+
+  // Flush pending cloud saves when closing or navigating away from web app
+  useEffect(() => {
+    const flushPendingSaves = () => {
+      const activeTimers = cloudSaveTimers.current;
+      const ids = Object.keys(activeTimers);
+      if (ids.length > 0 && user && encryptionKeyRef.current) {
+        for (const id of ids) {
+          clearTimeout(activeTimers[id]);
+          delete activeTimers[id];
+          const noteToSave = notesRef.current.find(n => n.id === id);
+          if (noteToSave) {
+            upsertNoteToCloud(noteToSave, user.id, encryptionKeyRef.current).catch(console.warn);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', flushPendingSaves);
+    window.addEventListener('pagehide', flushPendingSaves);
+
+    return () => {
+      window.removeEventListener('beforeunload', flushPendingSaves);
+      window.removeEventListener('pagehide', flushPendingSaves);
+    };
+  }, [user]);
 
   // Apply dark mode class to html element
   useEffect(() => {
@@ -1412,6 +1467,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         sharedPreviewNote,
         saveSharedPreviewToNotes,
         dismissSharedPreview,
+        syncWithCloud,
       }}
     >
       {children}
