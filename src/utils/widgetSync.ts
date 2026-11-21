@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { Note } from '../types/note';
+import { isChecklistNote } from './storage';
 
 export interface WidgetTodoItem {
   text: string;
@@ -133,16 +134,16 @@ export function findBestWidgetNote(notes: Note[], activeNoteId: string | null): 
     if (chosen) return chosen;
   }
 
-  // 2. Active note if it is in checklists folder
+  // 2. Active note if it is a checklist
   if (activeNoteId) {
     const active = activeNotes.find((n) => n.id === activeNoteId);
-    if (active && active.folderId === 'checklists') {
+    if (active && isChecklistNote(active)) {
       return active;
     }
   }
 
-  // 3. Most recently updated note in checklists folder
-  const checklistFolderNote = activeNotes.find((n) => n.folderId === 'checklists');
+  // 3. Most recently updated checklist
+  const checklistFolderNote = activeNotes.find((n) => isChecklistNote(n));
   if (checklistFolderNote) return checklistFolderNote;
 
   // 4. Active note (fallback)
@@ -217,7 +218,7 @@ export async function syncAllChecklistsToAndroidWidget(notes: Note[]): Promise<v
   if (!widgetPlugin?.syncAllChecklists) return;
 
   const checklistNotes = notes.filter(
-    (n) => !n.isTrash && !n.isLocked && n.folderId === 'checklists'
+    (n) => !n.isTrash && !n.isLocked && isChecklistNote(n)
   );
 
   const payload = checklistNotes.map((note) => ({
@@ -234,7 +235,7 @@ export async function syncAllChecklistsToAndroidWidget(notes: Note[]): Promise<v
 }
 
 /**
- * Checks for any to-do items toggled directly on the Android widget while the app was in the background.
+ * Checks for any to-do items toggled or added directly on the Android widget while the app was in the background.
  */
 export async function syncPendingWidgetToggles(
   notes: Note[],
@@ -256,12 +257,39 @@ export async function syncPendingWidgetToggles(
         if (target && target.content) {
           const updatedHtml = toggleTaskItemInHtml(target.content, itemIndex, checked);
           if (updatedHtml !== target.content) {
-            updateNote(noteId, { content: updatedHtml });
+            updateNote(noteId, { content: updatedHtml, updatedAt: Date.now() });
+          }
+        }
+      }
+    }
+
+    // Process pending items added via in-widget quick add
+    if (widgetPlugin.getPendingAdds) {
+      const addsRes = await widgetPlugin.getPendingAdds();
+      const adds = addsRes?.adds;
+      if (Array.isArray(adds) && adds.length > 0) {
+        for (const a of adds) {
+          const { noteId, text } = a;
+          if (!text || !text.trim()) continue;
+          const target = notes.find((n) => n.id === noteId) || notes.find((n) => isChecklistNote(n));
+          if (target && target.content) {
+            const cleanText = text.trim();
+            const taskHtml = `<li data-type="taskItem" data-checked="false"><label><input type="checkbox"><span></span></label><div><p>${cleanText
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')}</p></div></li>`;
+            let updatedHtml = target.content;
+            if (updatedHtml.includes('</ul>')) {
+              updatedHtml = updatedHtml.replace('</ul>', `${taskHtml}</ul>`);
+            } else {
+              updatedHtml = `${updatedHtml}<ul data-type="taskList">${taskHtml}</ul>`;
+            }
+            updateNote(target.id, { content: updatedHtml, updatedAt: Date.now() });
           }
         }
       }
     }
   } catch (err) {
-    console.warn('Failed to apply pending widget toggles:', err);
+    console.warn('Failed to apply pending widget actions:', err);
   }
 }

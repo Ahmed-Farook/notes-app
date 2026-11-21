@@ -5,6 +5,7 @@ export interface Note {
   plainTextPreview: string; // snippet for list preview
   drawingStrokes?: string; // JSON string of DrawingStroke[] for seamless in-note stylus annotations
   folderId: string;
+  isChecklist?: boolean; // persistent flag indicating this note is a checklist
   isPinned: boolean;
   isTrash?: boolean;
   deletedAt?: number; // timestamp when moved to Recently Deleted for 7-day auto-purge

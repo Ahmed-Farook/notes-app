@@ -256,7 +256,7 @@ export const Layout: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#F7F2EA] dark:bg-[#131B24] font-sans pb-[env(safe-area-inset-bottom)]">
+    <div className="flex flex-col h-[100dvh] min-h-[100dvh] w-screen overflow-hidden bg-[#F7F2EA] dark:bg-[#131B24] font-sans pb-[env(safe-area-inset-bottom,0px)]">
       {/* Top Navbar */}
       <TopNavbar
         onToggleChecklist={handleToggleChecklist}
@@ -321,15 +321,16 @@ export const Layout: React.FC = () => {
                 hasUpdate={Boolean(updater.updateInfo?.hasUpdate)}
                 updateInfo={updater.updateInfo}
               />
-              {/* Android Floating Action Button (FAB) - hidden when in Recycle Bin, Selection Mode, or when Folder Picker popup is open */}
+              {/* Android & Mobile Floating Action Button (FAB) - safely elevated above bottom address bar & safe areas */}
               {!isSelectionMode && selectedFolderId !== 'trash' && !isFolderPickerOpen && (
                 <button
                   onClick={() => {
                     triggerHaptic();
                     createNote();
                   }}
-                  className="absolute right-5 bottom-6 w-14 h-14 rounded-full bg-apple-yellow dark:bg-[#345A7D] text-white shadow-lg flex items-center justify-center active:scale-90 transition-transform z-30"
+                  className="absolute right-5 bottom-[calc(1.75rem+env(safe-area-inset-bottom,0px))] md:bottom-6 w-14 h-14 rounded-full bg-apple-yellow dark:bg-[#345A7D] text-white shadow-xl flex items-center justify-center active:scale-90 transition-transform z-30 touch-manipulation"
                   title="New Note"
+                  aria-label="New Note"
                 >
                   <Plus size={28} />
                 </button>

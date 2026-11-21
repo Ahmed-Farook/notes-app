@@ -14,7 +14,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="texō"
-        android:textColor="#D97706"
+        android:textColor="#213A50"
         android:textSize="12sp"
         android:textStyle="bold" />
 
@@ -67,7 +67,7 @@
             android:layout_marginTop="16dp"
             android:text="Open texō"
             android:textColor="#FFFFFF"
-            android:backgroundTint="#D97706" />
+            android:backgroundTint="#213A50" />
     </LinearLayout>
 
     <!-- Checklist ListView -->

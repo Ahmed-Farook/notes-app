@@ -17,6 +17,7 @@ import { CURRENT_VERSION } from '../../utils/updateChecker';
 import { triggerHaptic } from '../../utils/haptics';
 import type { Folder as FolderType } from '../../types/note';
 import { DeleteFolderModal } from '../common/DeleteFolderModal';
+import { isChecklistNote } from '../../utils/storage';
 
 interface FolderListProps {
   onCheckUpdates?: () => void;
@@ -73,11 +74,11 @@ export const FolderList: React.FC<FolderListProps> = ({ onCheckUpdates, hasUpdat
 
   // Calculate note counts
   const checklistsCount = notes.filter(
-    n => !n.isTrash && n.folderId === 'checklists'
+    n => !n.isTrash && isChecklistNote(n)
   ).length;
 
   const defaultNotesCount = notes.filter(
-    n => !n.isTrash && n.folderId !== 'checklists' && (n.folderId === 'default' || n.folderId === 'quick' || n.folderId === 'all' || !n.folderId)
+    n => !n.isTrash && !isChecklistNote(n) && (n.folderId === 'default' || n.folderId === 'quick' || n.folderId === 'all' || !n.folderId)
   ).length;
   const trashCount = notes.filter(n => n.isTrash).length;
 

@@ -85,6 +85,14 @@
             </intent-filter>
         </activity>
 
+        <!-- Quick Add Task floating dialog activity for In-Widget task creation -->
+        <activity
+            android:name=".QuickAddTaskActivity"
+            android:theme="@style/AppTheme.TranslucentQuickAdd"
+            android:windowSoftInputMode="stateVisible|adjustResize"
+            android:excludeFromRecents="true"
+            android:exported="false" />
+
         <!-- Widget RemoteViewsService for Scrollable ListView -->
         <service
             android:name=".TodoWidgetService"

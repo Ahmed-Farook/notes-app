@@ -28,7 +28,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="texō"
-                android:textColor="#D97706"
+                android:textColor="#213A50"
                 android:textSize="11sp"
                 android:textStyle="bold" />
 

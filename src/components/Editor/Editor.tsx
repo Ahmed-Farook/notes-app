@@ -29,6 +29,7 @@ import { CustomCodeBlock } from '../../extensions/CodeBlockExtension';
 import { checkBiometricsAvailable, BiometricCheckResult } from '../../utils/biometrics';
 import { compressImageFile } from '../../utils/imageCompressor';
 import { ChecklistEditor } from './ChecklistEditor';
+import { isChecklistNote } from '../../utils/storage';
 import type { Note } from '../../types/note';
 
 const activeNoteModuleRef = { current: null as Note | null };
@@ -255,7 +256,7 @@ const EnforceTitleExtension = Extension.create({
         const { state } = editor;
         const { selection, doc } = state;
         const { $from, empty } = selection;
-        const isChecklist = activeNoteModuleRef.current?.folderId === 'checklists';
+        const isChecklist = isChecklistNote(activeNoteModuleRef.current);
 
         // If cursor/selection is within the first document node (the title heading)
         if ($from.index(0) === 0) {
@@ -397,7 +398,7 @@ const EnforceTitleExtension = Extension.create({
         return false;
       },
       Enter: ({ editor }) => {
-        if (activeNoteModuleRef.current?.folderId === 'checklists') {
+        if (isChecklistNote(activeNoteModuleRef.current)) {
           const { state } = editor;
           const { selection, doc } = state;
           const { $from, empty } = selection;
@@ -445,7 +446,7 @@ const EnforceTitleExtension = Extension.create({
         const { selection, doc } = state;
         const { $from } = selection;
 
-        if (activeNoteModuleRef.current?.folderId === 'checklists') {
+        if (isChecklistNote(activeNoteModuleRef.current)) {
           // If in heading at the end: prevent forward delete from joining checklist into heading
           if ($from.index(0) === 0) {
             const headingNode = doc.firstChild;
@@ -492,7 +493,7 @@ const EnforceTitleExtension = Extension.create({
           }
 
           // CHECKLIST MODE ENFORCEMENT: Ensure taskList exists
-          if (activeNoteModuleRef.current?.folderId === 'checklists') {
+          if (isChecklistNote(activeNoteModuleRef.current)) {
             const taskListType = schema.nodes.taskList;
             const taskItemType = schema.nodes.taskItem;
             const paragraphType = schema.nodes.paragraph;
@@ -701,7 +702,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
   }, [isSharedPreview, triggerSaveRequiredNotice]);
 
   // Pure checklist mode: strictly checkboxes, no drawing, no complex formatters
-  const isChecklistFile = activeNote?.folderId === 'checklists';
+  const isChecklistFile = isChecklistNote(activeNote);
 
   const handleUnlockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

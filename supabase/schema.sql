@@ -82,4 +82,36 @@ $$;
 revoke all on function public.delete_user() from public;
 grant execute on function public.delete_user() to authenticated;
 
+-- 7. Create Shared Notes Table for short shareable slugs (texo-notes.vercel.app/s/<slug>)
+create table if not exists public.shared_notes (
+  slug text primary key,
+  title text default '',
+  content text default '',
+  strokes text,
+  user_id uuid references auth.users(id) on delete set null,
+  created_at timestamptz default now()
+);
+
+alter table public.shared_notes enable row level security;
+
+drop policy if exists "Anyone can read shared notes" on public.shared_notes;
+drop policy if exists "Anyone can create shared notes" on public.shared_notes;
+drop policy if exists "Users can update their own shared notes" on public.shared_notes;
+
+create policy "Anyone can read shared notes"
+  on public.shared_notes
+  for select
+  using (true);
+
+create policy "Anyone can create shared notes"
+  on public.shared_notes
+  for insert
+  with check (true);
+
+create policy "Users can update their own shared notes"
+  on public.shared_notes
+  for update
+  using (auth.uid() = user_id);
+
+
 

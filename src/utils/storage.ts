@@ -27,6 +27,23 @@ export const INITIAL_NOTES: Note[] = [
   },
 ];
 
+/**
+ * Accurately determines if a note is a checklist.
+ * Checks the persistent flag `isChecklist`, the system folder 'checklists',
+ * or checklist markup in note content.
+ */
+export function isChecklistNote(note?: Partial<Note> | null): boolean {
+  if (!note) return false;
+  if (note.isChecklist === true) return true;
+  if (note.folderId === 'checklists') return true;
+  if (note.content && typeof note.content === 'string') {
+    if (note.content.includes('data-type="taskList"') && !note.content.includes('<p>We\'re so glad you\'re here')) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export const loadStoredNotes = (): Note[] => {
   try {
     const data = localStorage.getItem(NOTES_STORAGE_KEY);
@@ -55,6 +72,11 @@ export const loadStoredNotes = (): Note[] => {
       if (updated.isTrash && updated.isPinned) {
         hasMigration = true;
         updated = { ...updated, isPinned: false };
+      }
+      // Ensure persistent isChecklist flag is populated
+      if (isChecklistNote(updated) && !updated.isChecklist) {
+        hasMigration = true;
+        updated = { ...updated, isChecklist: true };
       }
       // Migrate older notes where title was saved as <h3> to <h1>
       if (typeof updated.content === 'string' && /^\s*<h3>([\s\S]*?)<\/h3>/i.test(updated.content)) {

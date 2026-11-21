@@ -23,6 +23,7 @@ public class TodoWidget extends AppWidgetProvider {
     public static final String KEY_ITEMS_JSON = "widget_items_json";
     public static final String KEY_ALL_CHECKLISTS_JSON = "widget_all_checklists_json";
     public static final String KEY_PENDING_TOGGLES = "widget_pending_toggles";
+    public static final String KEY_PENDING_ADDS = "widget_pending_adds";
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -180,17 +181,12 @@ public class TodoWidget extends AppWidgetProvider {
         views.setOnClickPendingIntent(R.id.widget_todo_header, openPending);
         views.setOnClickPendingIntent(R.id.widget_todo_empty, openPending);
 
-        // Quick "+" button to add an item or create a new note
-        Intent addIntent = new Intent(context, MainActivity.class);
+        // Quick "+" button: opens lightweight floating QuickAddTaskActivity to add item directly without launching full app
+        Intent addIntent = new Intent(context, QuickAddTaskActivity.class);
         addIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        if (!noteId.isEmpty()) {
-            addIntent.setAction("com.ahmedfarook.notesapp.ADD_CHECKLIST_ITEM");
-            addIntent.putExtra("action", "add_checklist_item");
-            addIntent.putExtra("note_id", noteId);
-        } else {
-            addIntent.setAction(QuickNoteWidget.ACTION_NEW_NOTE);
-            addIntent.putExtra("action", "new_note");
-        }
+        addIntent.putExtra("note_id", noteId);
+        addIntent.putExtra("note_title", (noteTitle == null || noteTitle.isEmpty()) ? "To-Do List" : noteTitle);
+        addIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
         PendingIntent addPending = PendingIntent.getActivity(context, 200 + appWidgetId, addIntent, flags);
         views.setOnClickPendingIntent(R.id.widget_todo_btn_add, addPending);
 

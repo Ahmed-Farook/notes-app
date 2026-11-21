@@ -1,6 +1,7 @@
 import { Note, Folder } from '../types/note';
 import { supabase } from '../lib/supabase';
 import { encryptText, decryptText } from './crypto';
+import { isChecklistNote } from './storage';
 
 export interface DbNote {
   id: string;
@@ -28,8 +29,10 @@ export interface DbFolder {
  * Encrypts and formats a Note for PostgreSQL storage.
  */
 export async function noteToDb(note: Note, userId: string, key: CryptoKey | null): Promise<DbNote> {
-  // Bundle handwritten drawing strokes, trash deletion timestamp, and lock metadata securely with content
+  // Bundle handwritten drawing strokes, checklist state, trash deletion timestamp, and lock metadata securely with content
+  const isChecklist = isChecklistNote(note);
   const needsBundle = Boolean(
+    isChecklist ||
     note.drawingStrokes ||
     note.deletedAt ||
     note.isLocked ||
@@ -39,6 +42,7 @@ export async function noteToDb(note: Note, userId: string, key: CryptoKey | null
   const rawContent = needsBundle
     ? JSON.stringify({
         html: note.content || '',
+        ...(isChecklist ? { isChecklist: true } : {}),
         ...(note.drawingStrokes ? { strokes: note.drawingStrokes } : {}),
         ...(note.deletedAt ? { deletedAt: note.deletedAt } : {}),
         ...(note.isLocked ? { isLocked: note.isLocked } : {}),
@@ -77,7 +81,7 @@ export async function dbToNote(db: DbNote, key: CryptoKey | null): Promise<Note>
     decryptText(db.plain_text_preview, key),
   ]);
 
-  const title = decryptedTitle || '';
+  let title = decryptedTitle || '';
   let content = decryptedContent || '';
   let plainTextPreview = decryptedPreview || '';
   let drawingStrokes: string | undefined = undefined;
@@ -85,13 +89,17 @@ export async function dbToNote(db: DbNote, key: CryptoKey | null): Promise<Note>
   let isLocked: boolean | undefined = undefined;
   let passwordHash: string | undefined = undefined;
   let passwordHint: string | undefined = undefined;
+  let isChecklist: boolean | undefined = db.folder_id === 'checklists' ? true : undefined;
 
-  // Unpack bundled drawing strokes / deletedAt / lock metadata if present
+  // Unpack bundled drawing strokes / checklist flag / deletedAt / lock metadata if present
   if (content && typeof content === 'string' && content.startsWith('{"html":')) {
     try {
       const parsed = JSON.parse(content);
       content = parsed.html || '';
       drawingStrokes = parsed.strokes;
+      if (typeof parsed.isChecklist === 'boolean') {
+        isChecklist = parsed.isChecklist;
+      }
       if (typeof parsed.deletedAt === 'number') {
         deletedAt = parsed.deletedAt;
       }
@@ -107,6 +115,11 @@ export async function dbToNote(db: DbNote, key: CryptoKey | null): Promise<Note>
     } catch (_) {}
   }
 
+  // Fallback to structure detection if not explicitly set
+  if (!isChecklist && (content.includes('data-type="taskList"') && !content.includes('<p>We\'re so glad you\'re here'))) {
+    isChecklist = true;
+  }
+
   return {
     id: db.id,
     title,
@@ -114,6 +127,7 @@ export async function dbToNote(db: DbNote, key: CryptoKey | null): Promise<Note>
     drawingStrokes,
     plainTextPreview,
     folderId: db.folder_id || 'default',
+    isChecklist,
     isPinned: Boolean(db.is_pinned),
     isTrash: Boolean(db.is_trash),
     deletedAt,

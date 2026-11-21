@@ -1,10 +1,159 @@
 import { Capacitor } from '@capacitor/core';
 import { deflateSync, inflateSync, strToU8, strFromU8 } from 'fflate';
+import { supabase } from '../lib/supabase';
 
 export interface SharedNoteData {
   title: string;
   content: string;
   strokes?: string;
+}
+
+const SLUG_ALPHABET = '23456789abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
+
+export function generateShareSlug(length: number = 7): string {
+  let slug = '';
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const randomBytes = new Uint8Array(length);
+    crypto.getRandomValues(randomBytes);
+    for (let i = 0; i < length; i++) {
+      slug += SLUG_ALPHABET[randomBytes[i] % SLUG_ALPHABET.length];
+    }
+  } else {
+    for (let i = 0; i < length; i++) {
+      slug += SLUG_ALPHABET.charAt(Math.floor(Math.random() * SLUG_ALPHABET.length));
+    }
+  }
+  return slug;
+}
+
+/**
+ * Creates a short, clean shareable link via Supabase `shared_notes` table.
+ * Returns a 35-character URL like `https://texo-notes.vercel.app/s/x7K9pQ`.
+ * Falls back safely to compressed URL hash if offline or on network error.
+ */
+export async function createSupabaseShareLink(note: {
+  title?: string;
+  content?: string;
+  drawingStrokes?: string;
+}): Promise<{ url: string; slug: string; isCloudSlug: boolean }> {
+  const fallbackUrl = buildShareUrl(note);
+
+  // If completely offline or running without network
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return { url: fallbackUrl, slug: '', isCloudSlug: false };
+  }
+
+  try {
+    const slug = generateShareSlug(7);
+    const cleanTitle = note.title?.trim() || 'Shared Note';
+    const cleanContent = note.content || '';
+    const cleanStrokes = note.drawingStrokes || null;
+
+    // Get current auth user ID if available (optional)
+    let currentUserId: string | null = null;
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      currentUserId = authData?.user?.id || null;
+    } catch (_) {}
+
+    const { error } = await supabase.from('shared_notes').insert([
+      {
+        slug,
+        title: cleanTitle,
+        content: cleanContent,
+        strokes: cleanStrokes,
+        user_id: currentUserId,
+      },
+    ]);
+
+    if (error) {
+      console.warn('Supabase shared_notes insert warning:', error.message);
+      // Fallback to client-side compressed hash link
+      return { url: fallbackUrl, slug: '', isCloudSlug: false };
+    }
+
+    let base = 'https://texo-notes.vercel.app';
+    if (typeof window !== 'undefined') {
+      const origin = window.location.origin;
+      if (origin && origin.startsWith('http') && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
+        base = origin.replace(/\/$/, '');
+      }
+    }
+
+    return {
+      url: `${base}/s/${slug}`,
+      slug,
+      isCloudSlug: true,
+    };
+  } catch (err) {
+    console.warn('Failed to create Supabase share link, falling back to URL payload:', err);
+    return { url: fallbackUrl, slug: '', isCloudSlug: false };
+  }
+}
+
+/**
+ * Fetches a public shared note by its short slug from Supabase.
+ */
+export async function fetchSharedNoteFromSupabase(slug: string): Promise<SharedNoteData | null> {
+  if (!slug || !slug.trim()) return null;
+  const cleanSlug = slug.trim();
+
+  try {
+    const { data, error } = await supabase
+      .from('shared_notes')
+      .select('title, content, strokes')
+      .eq('slug', cleanSlug)
+      .maybeSingle();
+
+    if (error || !data) {
+      console.warn('Shared note lookup failed or not found for slug:', cleanSlug, error);
+      return null;
+    }
+
+    return {
+      title: data.title || 'Shared Note',
+      content: data.content || '',
+      strokes: data.strokes || undefined,
+    };
+  } catch (err) {
+    console.warn('Error fetching shared note from Supabase:', err);
+    return null;
+  }
+}
+
+/**
+ * Detects if the current URL contains a short slug (/s/<slug> or ?s=<slug>).
+ */
+export function getShareSlugFromUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  if (Capacitor.isNativePlatform()) return null;
+
+  try {
+    // 1. Path format: /s/<slug> or /share/<slug>
+    const pathname = window.location.pathname;
+    const match = pathname.match(/^\/(?:s|share)\/([a-zA-Z0-9_-]+)/i);
+    if (match && match[1] && match[1].length <= 20) {
+      return match[1].trim();
+    }
+
+    // 2. Query param: ?s=<slug> or ?share=<slug> (short, alphanumeric)
+    const params = new URLSearchParams(window.location.search);
+    const paramSlug = params.get('s') || params.get('slug');
+    if (paramSlug && paramSlug.length <= 16 && /^[a-zA-Z0-9_-]+$/.test(paramSlug)) {
+      return paramSlug.trim();
+    }
+
+    // 3. Hash format: #s=<slug> (short, alphanumeric, not a base64 block)
+    const hash = window.location.hash;
+    if (hash.startsWith('#s=') || hash.startsWith('#/s/')) {
+      const hashVal = hash.replace(/^#(?:\/s\/|s=)/, '').split('&')[0];
+      if (hashVal && hashVal.length <= 16 && /^[a-zA-Z0-9_-]+$/.test(hashVal)) {
+        return hashVal.trim();
+      }
+    }
+  } catch (_) {}
+
+  return null;
 }
 
 function uint8ToBase64Url(bytes: Uint8Array): string {

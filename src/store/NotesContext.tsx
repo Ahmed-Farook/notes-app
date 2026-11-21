@@ -18,6 +18,7 @@ import {
   saveStoredFolders,
   SYSTEM_FOLDERS,
   INITIAL_NOTES,
+  isChecklistNote,
 } from '../utils/storage';
 import { triggerHaptic } from '../utils/haptics';
 import { useAuth } from './AuthContext';
@@ -52,6 +53,8 @@ import {
 } from '../utils/widgetSync';
 import {
   getSharePayloadFromUrl,
+  getShareSlugFromUrl,
+  fetchSharedNoteFromSupabase,
   parseSharedPayload,
   cleanShareUrl,
 } from '../utils/shareUtils';
@@ -634,15 +637,17 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       } else {
         if (note.isTrash) return false;
         const noteFolder = note.folderId || 'default';
+        const isChecklist = isChecklistNote(note);
+
         if (selectedFolderId === 'default') {
           // Main Notes section contains default notes and legacy quick/all (excluding checklists)
-          if (noteFolder === 'checklists') return false;
+          if (isChecklist) return false;
           if (noteFolder !== 'default' && noteFolder !== 'quick' && noteFolder !== 'all') {
             return false;
           }
         } else if (selectedFolderId === 'checklists') {
-          // Checklists section shows only files created in or moved to Checklists
-          if (noteFolder !== 'checklists') return false;
+          // Checklists section shows all checklists across folders
+          if (!isChecklist) return false;
         } else {
           if (noteFolder !== selectedFolderId) return false;
         }
@@ -702,6 +707,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         : '<h1>New Note</h1><p></p>',
       plainTextPreview: isChecklistTarget ? '0 tasks completed' : 'No additional text',
       folderId: targetFolder,
+      isChecklist: isChecklistTarget ? true : undefined,
       isPinned: false,
       isTrash: false,
       createdAt: Date.now(),
@@ -837,12 +843,8 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // Decode and load shared note into in-app preview mode (WITHOUT auto-saving to private library)
   useEffect(() => {
     if (sharedPayloadProcessedRef.current) return;
-    const payloadStr = getSharePayloadFromUrl();
-    if (!payloadStr) return;
 
-    sharedPayloadProcessedRef.current = true;
-    const sharedData = parseSharedPayload(payloadStr);
-    if (sharedData) {
+    const setupPreview = (sharedData: { title?: string; content?: string; strokes?: string }) => {
       let plainSnippet = '';
       if (typeof document !== 'undefined') {
         try {
@@ -862,6 +864,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         drawingStrokes: sharedData.strokes || undefined,
         plainTextPreview: plainSnippet || 'Shared note preview',
         folderId: 'default',
+        isChecklist: isChecklistNote({ content: sharedData.content, title: sharedData.title }),
         isPinned: false,
         isTrash: false,
         createdAt: Date.now(),
@@ -872,6 +875,28 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setSharedPreviewNote(previewNote);
       setActiveNoteId('shared-preview-note');
       setMobileView('editor');
+    };
+
+    // 1. Check for short Supabase slug (e.g. /s/<slug> or ?s=<slug>)
+    const slug = getShareSlugFromUrl();
+    if (slug) {
+      sharedPayloadProcessedRef.current = true;
+      fetchSharedNoteFromSupabase(slug).then((sharedData) => {
+        if (sharedData) {
+          setupPreview(sharedData);
+        }
+      });
+      return;
+    }
+
+    // 2. Check for compressed or legacy payload in URL hash/query
+    const payloadStr = getSharePayloadFromUrl();
+    if (payloadStr) {
+      sharedPayloadProcessedRef.current = true;
+      const sharedData = parseSharedPayload(payloadStr);
+      if (sharedData) {
+        setupPreview(sharedData);
+      }
     }
   }, [setActiveNoteId]);
 
@@ -1023,7 +1048,13 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setNotes(prev =>
       prev.map(n => {
         if (n.id === noteId) {
-          const updated: Note = { ...n, folderId, updatedAt: Date.now() };
+          const isChecklist = isChecklistNote(n);
+          const updated: Note = {
+            ...n,
+            folderId,
+            isChecklist: isChecklist ? true : undefined,
+            updatedAt: Date.now(),
+          };
           if (user) {
             upsertNoteToCloud(updated, user.id, encryptionKeyRef.current);
           }
@@ -1461,7 +1492,13 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setNotes(prev =>
       prev.map(note => {
         if (idsToMove.has(note.id)) {
-          const updated: Note = { ...note, folderId, updatedAt: Date.now() };
+          const isChecklist = isChecklistNote(note);
+          const updated: Note = {
+            ...note,
+            folderId,
+            isChecklist: isChecklist ? true : undefined,
+            updatedAt: Date.now(),
+          };
           if (user) upsertNoteToCloud(updated, user.id, encryptionKeyRef.current);
           return updated;
         }

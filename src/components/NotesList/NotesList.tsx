@@ -25,6 +25,7 @@ import { getDateBucket, DateBucket } from '../../utils/dateUtils';
 import type { UpdateInfo } from '../../utils/updateChecker';
 import type { Folder as FolderType } from '../../types/note';
 import { DeleteFolderModal } from '../common/DeleteFolderModal';
+import { isChecklistNote } from '../../utils/storage';
 
 interface NotesListProps {
   width?: number;
@@ -251,10 +252,10 @@ export const NotesList: React.FC<NotesListProps> = ({
 
   // Folder note counts
   const checklistsCount = notes.filter(
-    n => !n.isTrash && n.folderId === 'checklists'
+    n => !n.isTrash && isChecklistNote(n)
   ).length;
   const defaultNotesCount = notes.filter(
-    n => !n.isTrash && n.folderId !== 'checklists' && (n.folderId === 'default' || n.folderId === 'quick' || n.folderId === 'all' || !n.folderId)
+    n => !n.isTrash && !isChecklistNote(n) && (n.folderId === 'default' || n.folderId === 'quick' || n.folderId === 'all' || !n.folderId)
   ).length;
   const trashCount = notes.filter(n => n.isTrash).length;
   const getFolderCount = (folderId: string) =>
@@ -851,7 +852,7 @@ export const NotesList: React.FC<NotesListProps> = ({
       )}
 
       {/* Notes List / Gallery container */}
-      <div className="flex-1 overflow-y-auto p-2">
+      <div className="flex-1 overflow-y-auto p-2 pb-28 md:pb-2">
         {filteredNotes.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-4 text-neutral-400 dark:text-neutral-500">
             <FileText size={32} className="mb-2 stroke-1 opacity-60" />

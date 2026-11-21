@@ -104,5 +104,29 @@ public class NotesWidgetPlugin extends Plugin {
             call.reject("Failed to get pending toggles: " + e.getMessage(), e);
         }
     }
+
+    @PluginMethod
+    public void getPendingAdds(PluginCall call) {
+        try {
+            Context context = getContext();
+            SharedPreferences prefs = context.getSharedPreferences(TodoWidget.PREFS_NAME, Context.MODE_PRIVATE);
+            String pendingStr = prefs.getString(TodoWidget.KEY_PENDING_ADDS, "[]");
+
+            JSONArray pending = new JSONArray(pendingStr);
+            JSArray retArray = new JSArray();
+            for (int i = 0; i < pending.length(); i++) {
+                retArray.put(pending.get(i));
+            }
+
+            // Clear pending adds after reading
+            prefs.edit().putString(TodoWidget.KEY_PENDING_ADDS, "[]").apply();
+
+            JSObject result = new JSObject();
+            result.put("adds", retArray);
+            call.resolve(result);
+        } catch (Exception e) {
+            call.reject("Failed to get pending adds: " + e.getMessage(), e);
+        }
+    }
 }
 

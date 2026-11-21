@@ -4,6 +4,7 @@ import { Note, ViewMode } from '../../types/note';
 import { formatListDate } from '../../utils/dateUtils';
 import { useNotes } from '../../store/NotesContext';
 import { triggerHaptic } from '../../utils/haptics';
+import { isChecklistNote } from '../../utils/storage';
 
 interface NoteCardProps {
   note: Note;
@@ -472,7 +473,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, isSelected, viewMode }
               if (note.isLocked && !unlockedNoteIds.has(note.id)) {
                 return 'Locked Note';
               }
-              const isChecklist = note.folderId === 'checklists';
+              const isChecklist = isChecklistNote(note);
               if (isChecklist) {
                 const totalTasks = (note.content?.match(/data-type="taskItem"/g) || []).length;
                 const completedTasks = (note.content?.match(/data-checked="true"/g) || []).length;
