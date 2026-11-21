@@ -646,9 +646,11 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             return false;
           }
         } else if (selectedFolderId === 'checklists') {
-          // Checklists section shows checklists in the checklists folder
+          // Checklists section shows checklists in checklists folder or any checklist in default section
           if (!isChecklist) return false;
-          if (noteFolder !== 'checklists') return false;
+          if (noteFolder !== 'checklists' && noteFolder !== 'default' && noteFolder !== 'quick' && noteFolder !== 'all') {
+            return false;
+          }
         } else {
           if (noteFolder !== selectedFolderId) return false;
         }
@@ -1053,9 +1055,11 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       prev.map(n => {
         if (n.id === noteId) {
           const isChecklist = isChecklistNote(n);
+          // If a checklist is moved to 'default' (Notes section), keep its folder as 'checklists' so it stays safely in Checklists
+          const targetFolderId = (isChecklist && folderId === 'default') ? 'checklists' : folderId;
           const updated: Note = {
             ...n,
-            folderId,
+            folderId: targetFolderId,
             isChecklist: isChecklist ? true : false,
             updatedAt: Date.now(),
           };
@@ -1497,9 +1501,10 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       prev.map(note => {
         if (idsToMove.has(note.id)) {
           const isChecklist = isChecklistNote(note);
+          const targetFolderId = (isChecklist && folderId === 'default') ? 'checklists' : folderId;
           const updated: Note = {
             ...note,
-            folderId,
+            folderId: targetFolderId,
             isChecklist: isChecklist ? true : false,
             updatedAt: Date.now(),
           };

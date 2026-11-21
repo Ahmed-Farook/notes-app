@@ -85,6 +85,12 @@ export const loadStoredNotes = (): Note[] => {
         hasMigration = true;
         updated = { ...updated, isChecklist: false };
       }
+
+      // If a checklist has folderId 'default' (e.g. accidentally moved to Notes), restore it to 'checklists'
+      if (updated.isChecklist === true && (updated.folderId === 'default' || !updated.folderId)) {
+        hasMigration = true;
+        updated = { ...updated, folderId: 'checklists' };
+      }
       // Migrate older notes where title was saved as <h3> to <h1>
       if (typeof updated.content === 'string' && /^\s*<h3>([\s\S]*?)<\/h3>/i.test(updated.content)) {
         hasMigration = true;

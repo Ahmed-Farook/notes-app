@@ -252,7 +252,7 @@ export const NotesList: React.FC<NotesListProps> = ({
 
   // Folder note counts
   const checklistsCount = notes.filter(
-    n => !n.isTrash && isChecklistNote(n) && n.folderId === 'checklists'
+    n => !n.isTrash && isChecklistNote(n) && (n.folderId === 'checklists' || n.folderId === 'default' || !n.folderId)
   ).length;
   const defaultNotesCount = notes.filter(
     n => !n.isTrash && !isChecklistNote(n) && (n.folderId === 'default' || n.folderId === 'quick' || n.folderId === 'all' || !n.folderId)
