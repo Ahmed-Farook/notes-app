@@ -213,23 +213,31 @@ export const ChecklistEditor: React.FC<ChecklistEditorProps> = ({
     commitChanges(val, activeTasks, completedTasks);
   };
 
+  // First line adder action: creates task and adds to active tasks
+  const handleAddNewTask = () => {
+    const text = adderText.trim();
+    if (!text) return;
+
+    const newTask: ChecklistItem = {
+      id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      text,
+    };
+
+    const nextActive = [...activeTasks, newTask];
+    setActiveTasks(nextActive);
+    setAdderText('');
+    triggerHaptic();
+    commitChanges(title, nextActive, completedTasks);
+
+    // Keep focus in adder input on desktop, or ensure adder remains ready
+    adderInputRef.current?.focus();
+  };
+
   // First line adder key down handler
   const handleAdderKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' || e.keyCode === 13 || e.which === 13) {
       e.preventDefault();
-      const text = adderText.trim();
-      if (!text) return;
-
-      const newTask: ChecklistItem = {
-        id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        text,
-      };
-
-      const nextActive = [...activeTasks, newTask];
-      setActiveTasks(nextActive);
-      setAdderText('');
-      triggerHaptic();
-      commitChanges(title, nextActive, completedTasks);
+      handleAddNewTask();
     }
   };
 
@@ -240,7 +248,7 @@ export const ChecklistEditor: React.FC<ChecklistEditorProps> = ({
     commitChanges(title, nextActive, completedTasks);
   };
 
-  // Active task keyboard navigation / deletion
+  // Active task keyboard navigation / creation / deletion
   const handleActiveTaskKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
     index: number,
@@ -255,14 +263,24 @@ export const ChecklistEditor: React.FC<ChecklistEditorProps> = ({
       } else {
         adderInputRef.current?.focus();
       }
-    } else if (e.key === 'Enter') {
+    } else if (e.key === 'Enter' || e.keyCode === 13 || e.which === 13) {
       e.preventDefault();
-      if (index < activeTasks.length - 1) {
-        const nextTask = activeTasks[index + 1];
-        taskInputRefs.current.get(nextTask.id)?.focus();
-      } else {
-        adderInputRef.current?.focus();
-      }
+      // Pressing enter inside an active task creates a new task directly below it!
+      const newTask: ChecklistItem = {
+        id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        text: '',
+      };
+      const nextActive = [
+        ...activeTasks.slice(0, index + 1),
+        newTask,
+        ...activeTasks.slice(index + 1),
+      ];
+      setActiveTasks(nextActive);
+      triggerHaptic();
+      commitChanges(title, nextActive, completedTasks);
+      setTimeout(() => {
+        taskInputRefs.current.get(newTask.id)?.focus();
+      }, 40);
     }
   };
 
@@ -326,9 +344,10 @@ export const ChecklistEditor: React.FC<ChecklistEditorProps> = ({
           type="text"
           value={title}
           disabled={isReadOnly}
+          enterKeyHint="next"
           onChange={(e) => handleTitleChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' || e.keyCode === 13 || e.which === 13) {
               e.preventDefault();
               adderInputRef.current?.focus();
             }
@@ -341,11 +360,25 @@ export const ChecklistEditor: React.FC<ChecklistEditorProps> = ({
 
       {/* Line 1: Quick List Adder (Type task here and press Enter to add) */}
       {!isReadOnly && (
-        <div className="flex items-center gap-3 py-1.5 px-0.5 group">
-          <div className="w-[1.15rem] h-[1.15rem] rounded-full border-[1.5px] border-[#c2b5a1] dark:border-[#3b5062] flex-shrink-0 grid place-content-center opacity-60" />
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleAddNewTask();
+          }}
+          className="flex items-center gap-3 py-1.5 px-0.5 group"
+        >
+          <button
+            type="button"
+            onClick={handleAddNewTask}
+            disabled={!adderText.trim()}
+            className="w-[1.15rem] h-[1.15rem] rounded-full border-[1.5px] border-[#c2b5a1] dark:border-[#3b5062] hover:border-[#213A50] dark:hover:border-[#4B708B] flex-shrink-0 grid place-content-center opacity-60 hover:opacity-100 transition-all cursor-pointer"
+            aria-label="Add task"
+            title="Add task"
+          />
           <input
             ref={adderInputRef}
             type="text"
+            enterKeyHint="done"
             value={adderText}
             onChange={(e) => setAdderText(e.target.value)}
             onKeyDown={handleAdderKeyDown}
@@ -353,7 +386,7 @@ export const ChecklistEditor: React.FC<ChecklistEditorProps> = ({
             className="flex-1 bg-transparent border-none outline-none text-[15px] sm:text-base text-[#213A50] dark:text-[#E8EEF3] placeholder:text-[#8AA0B4]/60 dark:placeholder:text-[#52667A]/60 leading-relaxed"
             aria-label="Add task"
           />
-        </div>
+        </form>
       )}
 
       {/* Active Tasks List */}
@@ -379,6 +412,7 @@ export const ChecklistEditor: React.FC<ChecklistEditorProps> = ({
                 else taskInputRefs.current.delete(task.id);
               }}
               type="text"
+              enterKeyHint="enter"
               disabled={isReadOnly}
               value={task.text}
               onChange={(e) => handleTaskTextChange(task.id, e.target.value)}
@@ -386,15 +420,16 @@ export const ChecklistEditor: React.FC<ChecklistEditorProps> = ({
               className="flex-1 bg-transparent border-none outline-none text-[15px] sm:text-base text-[#213A50] dark:text-[#E8EEF3] leading-relaxed"
             />
 
-            {/* Delete button (hover on desktop or touch) */}
+            {/* Delete button (visible on mobile touch, hover on desktop) */}
             {!isReadOnly && (
               <button
                 type="button"
                 onClick={() => handleDeleteActiveTask(task.id)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-[#8AA0B4] hover:text-red-500 rounded flex-shrink-0 cursor-pointer"
+                className="opacity-60 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 -mr-1 text-[#8AA0B4] hover:text-red-500 active:text-red-500 rounded flex-shrink-0 cursor-pointer touch-manipulation"
                 aria-label="Delete task"
+                title="Delete task"
               >
-                <X size={15} />
+                <X size={16} />
               </button>
             )}
           </div>
@@ -455,15 +490,16 @@ export const ChecklistEditor: React.FC<ChecklistEditorProps> = ({
                     {task.text}
                   </span>
 
-                  {/* Delete completed task button */}
+                  {/* Delete completed task button (visible on mobile touch, hover on desktop) */}
                   {!isReadOnly && (
                     <button
                       type="button"
                       onClick={() => handleDeleteCompletedTask(task.id)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-[#8AA0B4] hover:text-red-500 rounded flex-shrink-0 cursor-pointer"
+                      className="opacity-60 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 -mr-1 text-[#8AA0B4] hover:text-red-500 active:text-red-500 rounded flex-shrink-0 cursor-pointer touch-manipulation"
                       aria-label="Delete task"
+                      title="Delete task"
                     >
-                      <X size={15} />
+                      <X size={16} />
                     </button>
                   )}
                 </div>
