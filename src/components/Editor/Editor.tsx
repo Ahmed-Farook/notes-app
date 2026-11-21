@@ -779,27 +779,27 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
 
   const handlePenSizeChange = (sz: number) => {
     setPenSize(sz);
-    try { localStorage.setItem('texo_pen_size', String(sz)); } catch (_) {}
+    try { localStorage.setItem('texo_pen_size', String(sz)); } catch (_) { }
   };
 
   const handlePenColorChange = (col: string) => {
     setPenColor(col);
-    try { localStorage.setItem('texo_pen_color', col); } catch (_) {}
+    try { localStorage.setItem('texo_pen_color', col); } catch (_) { }
   };
 
   const handleHighlighterSizeChange = (sz: number) => {
     setHighlighterSize(sz);
-    try { localStorage.setItem('texo_highlighter_size', String(sz)); } catch (_) {}
+    try { localStorage.setItem('texo_highlighter_size', String(sz)); } catch (_) { }
   };
 
   const handleHighlighterColorChange = (col: string) => {
     setHighlighterColor(col);
-    try { localStorage.setItem('texo_highlighter_color', col); } catch (_) {}
+    try { localStorage.setItem('texo_highlighter_color', col); } catch (_) { }
   };
 
   const handleEraserSizeChange = (sz: number) => {
     setEraserSize(sz);
-    try { localStorage.setItem('texo_eraser_size', String(sz)); } catch (_) {}
+    try { localStorage.setItem('texo_eraser_size', String(sz)); } catch (_) { }
   };
 
   const currentDrawingSize =
@@ -808,8 +808,8 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
       : activeDrawingTool === 'partial_eraser' ||
         activeDrawingTool === 'stroke_eraser' ||
         activeDrawingTool === 'eraser'
-      ? eraserSize
-      : penSize;
+        ? eraserSize
+        : penSize;
 
   const currentDrawingColor =
     activeDrawingTool === 'highlighter' ? highlighterColor : penColor;
@@ -991,7 +991,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
       }
       try {
         localStorage.setItem('texo_stylus_only', String(next));
-      } catch (_) {}
+      } catch (_) { }
       return next;
     });
   };
@@ -1001,7 +1001,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
       setStylusOnly(true);
       try {
         localStorage.setItem('texo_stylus_only', 'true');
-      } catch (_) {}
+      } catch (_) { }
     }
   };
 
@@ -1027,7 +1027,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
             }
           }
         }
-      } catch (_) {}
+      } catch (_) { }
     }
     return maxY > 0 ? Math.ceil(maxY + 60) : 0;
   }, [activeNote?.drawingStrokes]);
@@ -1253,7 +1253,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
             from: Math.min(from, maxPos),
             to: Math.min(to, maxPos),
           });
-        } catch (_) {}
+        } catch (_) { }
       }
 
       const timer = setTimeout(() => {
@@ -1308,13 +1308,13 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
         .then((handle) => {
           willHideHandle = handle;
         })
-        .catch(() => {});
+        .catch(() => { });
 
       Keyboard.addListener('keyboardDidHide', dismissCursorAndBlur)
         .then((handle) => {
           didHideHandle = handle;
         })
-        .catch(() => {});
+        .catch(() => { });
     }
 
     // VisualViewport listener for mobile browsers & WebViews
@@ -1944,8 +1944,8 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
               {contextMenu.type === 'image'
                 ? 'Image Options'
                 : contextMenu.type === 'table'
-                ? 'Table Options'
-                : 'Formula Options'}
+                  ? 'Table Options'
+                  : 'Formula Options'}
             </div>
 
             {contextMenu.type === 'image' ? (
@@ -2062,7 +2062,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
                           }
                           return true;
                         });
-                      } catch (_) {}
+                      } catch (_) { }
 
                       if (!deleted) {
                         try {
@@ -2073,7 +2073,7 @@ export const Editor: React.FC<EditorProps> = ({ showToolbar, onRegisterToggleChe
                             editor.chain().focus().deleteRange({ from: pos, to: pos + size }).run();
                             deleted = true;
                           }
-                        } catch (_) {}
+                        } catch (_) { }
                       }
 
                       if (!deleted) {

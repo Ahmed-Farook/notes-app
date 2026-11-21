@@ -115,11 +115,6 @@ export async function dbToNote(db: DbNote, key: CryptoKey | null): Promise<Note>
     } catch (_) {}
   }
 
-  // Fallback to structure detection if not explicitly set
-  if (!isChecklist && (content.includes('data-type="taskList"') && !content.includes('<p>We\'re so glad you\'re here'))) {
-    isChecklist = true;
-  }
-
   return {
     id: db.id,
     title,

@@ -29,19 +29,16 @@ export const INITIAL_NOTES: Note[] = [
 
 /**
  * Accurately determines if a note is a checklist.
- * Checks the persistent flag `isChecklist`, the system folder 'checklists',
- * or checklist markup in note content.
+ * A note is a checklist IF AND ONLY IF it was created as a checklist (`isChecklist === true`),
+ * or legacy notes created in the 'checklists' system folder.
+ * Having checkboxes inside a normal rich text note does NOT convert it into a checklist.
  */
 export function isChecklistNote(note?: Partial<Note> | null): boolean {
   if (!note) return false;
-  if (note.isChecklist === true) return true;
-  if (note.folderId === 'checklists') return true;
-  if (note.content && typeof note.content === 'string') {
-    if (note.content.includes('data-type="taskList"') && !note.content.includes('<p>We\'re so glad you\'re here')) {
-      return true;
-    }
+  if (typeof note.isChecklist === 'boolean') {
+    return note.isChecklist;
   }
-  return false;
+  return note.folderId === 'checklists';
 }
 
 export const loadStoredNotes = (): Note[] => {
@@ -73,10 +70,20 @@ export const loadStoredNotes = (): Note[] => {
         hasMigration = true;
         updated = { ...updated, isPinned: false };
       }
-      // Ensure persistent isChecklist flag is populated
-      if (isChecklistNote(updated) && !updated.isChecklist) {
+      // Strict isChecklist flag enforcement: only true if created in checklists or explicit pure checklist
+      if (updated.isChecklist === undefined) {
         hasMigration = true;
-        updated = { ...updated, isChecklist: true };
+        updated = { ...updated, isChecklist: updated.folderId === 'checklists' };
+      } else if (
+        updated.isChecklist === true &&
+        updated.folderId !== 'checklists' &&
+        updated.content &&
+        updated.content.includes('<p>') &&
+        !updated.content.startsWith('<h1>To-Do List</h1><ul data-type="taskList">')
+      ) {
+        // Revert any normal note with checkboxes that was wrongly flagged as a checklist
+        hasMigration = true;
+        updated = { ...updated, isChecklist: false };
       }
       // Migrate older notes where title was saved as <h3> to <h1>
       if (typeof updated.content === 'string' && /^\s*<h3>([\s\S]*?)<\/h3>/i.test(updated.content)) {

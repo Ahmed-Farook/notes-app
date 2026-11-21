@@ -646,8 +646,9 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             return false;
           }
         } else if (selectedFolderId === 'checklists') {
-          // Checklists section shows all checklists across folders
+          // Checklists section shows checklists in the checklists folder
           if (!isChecklist) return false;
+          if (noteFolder !== 'checklists') return false;
         } else {
           if (noteFolder !== selectedFolderId) return false;
         }
@@ -696,7 +697,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const targetFolder =
       folderId ||
       (selectedFolderId === 'trash' || selectedFolderId === 'all' || selectedFolderId === 'pinned'
-        ? 'default'
+        ? (isChecklistTarget ? 'checklists' : 'default')
         : selectedFolderId);
 
     const newNote: Note = {
@@ -707,7 +708,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         : '<h1>New Note</h1><p></p>',
       plainTextPreview: isChecklistTarget ? '0 tasks completed' : 'No additional text',
       folderId: targetFolder,
-      isChecklist: isChecklistTarget ? true : undefined,
+      isChecklist: isChecklistTarget ? true : false,
       isPinned: false,
       isTrash: false,
       createdAt: Date.now(),
@@ -864,7 +865,10 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         drawingStrokes: sharedData.strokes || undefined,
         plainTextPreview: plainSnippet || 'Shared note preview',
         folderId: 'default',
-        isChecklist: isChecklistNote({ content: sharedData.content, title: sharedData.title }),
+        isChecklist: Boolean(
+          sharedData.title === 'To-Do List' &&
+          sharedData.content?.startsWith('<h1>To-Do List</h1><ul data-type="taskList">')
+        ),
         isPinned: false,
         isTrash: false,
         createdAt: Date.now(),
@@ -1052,7 +1056,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           const updated: Note = {
             ...n,
             folderId,
-            isChecklist: isChecklist ? true : undefined,
+            isChecklist: isChecklist ? true : false,
             updatedAt: Date.now(),
           };
           if (user) {
@@ -1496,7 +1500,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           const updated: Note = {
             ...note,
             folderId,
-            isChecklist: isChecklist ? true : undefined,
+            isChecklist: isChecklist ? true : false,
             updatedAt: Date.now(),
           };
           if (user) upsertNoteToCloud(updated, user.id, encryptionKeyRef.current);
