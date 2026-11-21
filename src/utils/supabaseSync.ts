@@ -77,7 +77,9 @@ export async function dbToNote(db: DbNote, key: CryptoKey | null): Promise<Note>
     decryptText(db.plain_text_preview, key),
   ]);
 
-  let content = decryptedContent;
+  const title = decryptedTitle || '';
+  let content = decryptedContent || '';
+  let plainTextPreview = decryptedPreview || '';
   let drawingStrokes: string | undefined = undefined;
   let deletedAt: number | undefined = undefined;
   let isLocked: boolean | undefined = undefined;
@@ -85,9 +87,9 @@ export async function dbToNote(db: DbNote, key: CryptoKey | null): Promise<Note>
   let passwordHint: string | undefined = undefined;
 
   // Unpack bundled drawing strokes / deletedAt / lock metadata if present
-  if (decryptedContent.startsWith('{"html":')) {
+  if (content && typeof content === 'string' && content.startsWith('{"html":')) {
     try {
-      const parsed = JSON.parse(decryptedContent);
+      const parsed = JSON.parse(content);
       content = parsed.html || '';
       drawingStrokes = parsed.strokes;
       if (typeof parsed.deletedAt === 'number') {
@@ -107,19 +109,19 @@ export async function dbToNote(db: DbNote, key: CryptoKey | null): Promise<Note>
 
   return {
     id: db.id,
-    title: decryptedTitle,
+    title,
     content,
     drawingStrokes,
-    plainTextPreview: decryptedPreview,
-    folderId: db.folder_id,
-    isPinned: db.is_pinned,
-    isTrash: db.is_trash,
+    plainTextPreview,
+    folderId: db.folder_id || 'default',
+    isPinned: Boolean(db.is_pinned),
+    isTrash: Boolean(db.is_trash),
     deletedAt,
     isLocked,
     passwordHash,
     passwordHint,
-    createdAt: Number(db.created_at),
-    updatedAt: Number(db.updated_at),
+    createdAt: Number(db.created_at) || Date.now(),
+    updatedAt: Number(db.updated_at) || Date.now(),
   };
 }
 
@@ -194,16 +196,27 @@ export async function fetchUserNotes(key: CryptoKey | null, existingNotes?: Note
       }
     }
 
-    return Promise.all(
-      (data as DbNote[]).map((d) => {
+    const notePromises = (data as DbNote[]).map(async (d) => {
+      try {
         const local = existingMap.get(d.id);
-        // Fast path: ONLY reuse existing note if updated_at is identical!
+        // Fast path: reuse decrypted content if updated_at is identical, but apply DB's latest folder_id, is_pinned, is_trash
         if (local && local.updatedAt === Number(d.updated_at)) {
-          return Promise.resolve(local);
+          return {
+            ...local,
+            folderId: d.folder_id || 'default',
+            isPinned: Boolean(d.is_pinned),
+            isTrash: Boolean(d.is_trash),
+          };
         }
-        return dbToNote(d, key);
-      })
-    );
+        return await dbToNote(d, key);
+      } catch (err) {
+        console.warn('Failed to parse note:', d.id, err);
+        return existingMap.get(d.id) || null;
+      }
+    });
+
+    const parsedNotes = await Promise.all(notePromises);
+    return parsedNotes.filter((n): n is Note => n !== null);
   } catch (err) {
     console.warn('fetchUserNotes network error:', err);
     return existingNotes || [];
@@ -347,11 +360,12 @@ export async function deleteFolderFromCloud(folderId: string): Promise<void> {
 }
 
 /**
- * Merge local and remote notes using last-write-wins (updatedAt)
+ * Merge local and remote notes using last-write-wins (updatedAt) and tombstone/synced tracking
  */
 export function mergeNotes(
   local: Note[],
-  remote: Note[]
+  remote: Note[],
+  syncedIds?: Set<string>
 ): { merged: Note[]; toUpload: Note[] } {
   const map = new Map<string, Note>();
   const toUpload: Note[] = [];
@@ -365,7 +379,12 @@ export function mergeNotes(
   for (const l of local) {
     const existing = map.get(l.id);
     if (!existing) {
-      // Local note not in cloud -> upload to cloud
+      // If note was previously confirmed synced to cloud but is now gone from cloud,
+      // it was deleted from another device. Do not resurrect it.
+      if (syncedIds && syncedIds.has(l.id)) {
+        continue;
+      }
+      // Brand new local note not in cloud -> upload to cloud
       map.set(l.id, l);
       toUpload.push(l);
     } else if (l.updatedAt > existing.updatedAt) {

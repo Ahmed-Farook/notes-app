@@ -204,6 +204,19 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
   // Tracks newly created notes that haven't received any edits yet so exiting discards them cleanly
   const uneditedNewNoteIdsRef = useRef<Set<string>>(new Set());
+  // Tracks note IDs confirmed present in the cloud to cleanly detect deletions across devices
+  const syncedNoteIdsRef = useRef<Set<string>>(
+    (() => {
+      try {
+        const raw = localStorage.getItem('apple_notes_synced_ids_v1');
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) return new Set<string>(arr);
+        }
+      } catch (_) {}
+      return new Set<string>();
+    })()
+  );
 
   const setActiveNoteId = useCallback((nextId: string | null) => {
     setActiveNoteIdState((prevId) => {
@@ -283,10 +296,20 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         effectiveRemoteNotes = INITIAL_NOTES;
       }
 
+      const syncedIds = syncedNoteIdsRef.current;
       const { merged: mergedNotes, toUpload: notesToUpload } = mergeNotes(
         notesRef.current,
-        effectiveRemoteNotes
+        effectiveRemoteNotes,
+        syncedIds.size > 0 ? syncedIds : undefined
       );
+
+      // Track all current remote notes in synced IDs
+      for (const r of effectiveRemoteNotes) {
+        syncedIds.add(r.id);
+      }
+      try {
+        localStorage.setItem('apple_notes_synced_ids_v1', JSON.stringify(Array.from(syncedIds)));
+      } catch (_) {}
       const { merged: mergedFolders, toUpload: foldersToUpload } = mergeFolders(
         foldersRef.current,
         remoteFolders
@@ -931,6 +954,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       isTrash: true,
       isPinned: false,
       deletedAt: Date.now(),
+      updatedAt: Date.now(),
     };
     setNotes(prev => prev.map(n => (n.id === id ? trashed : n)));
     if (user) {
@@ -984,8 +1008,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setNotes(prev =>
       prev.map(n => {
         if (n.id === id) {
-          // Do not bump updatedAt when toggling pin (ordering based on edit time)
-          const updated: Note = { ...n, isPinned: !n.isPinned };
+          const updated: Note = { ...n, isPinned: !n.isPinned, updatedAt: Date.now() };
           if (user) {
             upsertNoteToCloud(updated, user.id, encryptionKeyRef.current);
           }
@@ -1000,8 +1023,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setNotes(prev =>
       prev.map(n => {
         if (n.id === noteId) {
-          // Do not bump updatedAt when moving folders
-          const updated: Note = { ...n, folderId };
+          const updated: Note = { ...n, folderId, updatedAt: Date.now() };
           if (user) {
             upsertNoteToCloud(updated, user.id, encryptionKeyRef.current);
           }
@@ -1049,7 +1071,14 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     triggerHaptic();
     setFolders(prev => prev.filter(f => f.id !== id));
     setNotes(prev =>
-      prev.map(n => (n.folderId === id ? { ...n, folderId: 'default' } : n))
+      prev.map(n => {
+        if (n.folderId === id) {
+          const updated = { ...n, folderId: 'default', updatedAt: Date.now() };
+          if (user) upsertNoteToCloud(updated, user.id, encryptionKeyRef.current);
+          return updated;
+        }
+        return n;
+      })
     );
     if (selectedFolderId === id) {
       setSelectedFolderId('default');
@@ -1065,7 +1094,14 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const idSet = new Set(ids);
     setFolders(prev => prev.filter(f => !idSet.has(f.id)));
     setNotes(prev =>
-      prev.map(n => (n.folderId && idSet.has(n.folderId) ? { ...n, folderId: 'default' } : n))
+      prev.map(n => {
+        if (n.folderId && idSet.has(n.folderId)) {
+          const updated = { ...n, folderId: 'default', updatedAt: Date.now() };
+          if (user) upsertNoteToCloud(updated, user.id, encryptionKeyRef.current);
+          return updated;
+        }
+        return n;
+      })
     );
     if (selectedFolderId && idSet.has(selectedFolderId)) {
       setSelectedFolderId('default');
@@ -1312,7 +1348,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setNotes(prev =>
       prev.map(note => {
         if (idsToDelete.has(note.id)) {
-          const trashed: Note = { ...note, isTrash: true, isPinned: false, deletedAt };
+          const trashed: Note = { ...note, isTrash: true, isPinned: false, deletedAt, updatedAt: Date.now() };
           if (user) upsertNoteToCloud(trashed, user.id, encryptionKeyRef.current);
           return trashed;
         }
@@ -1335,6 +1371,12 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setNotes(prev => prev.filter(n => !idsToRemove.has(n.id)));
     if (user) {
       idsToRemove.forEach(id => deleteNoteFromCloud(id));
+      for (const id of idsToRemove) {
+        syncedNoteIdsRef.current.delete(id);
+      }
+      try {
+        localStorage.setItem('apple_notes_synced_ids_v1', JSON.stringify(Array.from(syncedNoteIdsRef.current)));
+      } catch (_) {}
     }
 
     if (activeNoteId && idsToRemove.has(activeNoteId)) {
@@ -1399,7 +1441,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setNotes(prev =>
       prev.map(note => {
         if (idsToToggle.has(note.id)) {
-          const updated: Note = { ...note, isPinned: targetPinned };
+          const updated: Note = { ...note, isPinned: targetPinned, updatedAt: Date.now() };
           if (user) upsertNoteToCloud(updated, user.id, encryptionKeyRef.current);
           return updated;
         }
@@ -1419,7 +1461,7 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setNotes(prev =>
       prev.map(note => {
         if (idsToMove.has(note.id)) {
-          const updated: Note = { ...note, folderId };
+          const updated: Note = { ...note, folderId, updatedAt: Date.now() };
           if (user) upsertNoteToCloud(updated, user.id, encryptionKeyRef.current);
           return updated;
         }
